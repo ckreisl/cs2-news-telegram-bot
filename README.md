@@ -3,7 +3,7 @@
   <h1 align="center">Counter-Strike 2 Posts Telegram Bot</h1>
 </p>
 
-This is a simple Telegram bot providing you the latest posts (news, updates, events) about Counter Strike 2. Stay up to date with the latest about the game by retrieving automatic messages from the bot.
+This is a simple Telegram bot providing you the latest posts (news, updates, events) about Counter Strike 2. Stay up to date about the game by retrieving automatic update messages from the bot via Telegram.
 
 The data is crawled from the official website of [Counter Strike 2](https://www.counter-strike.net/).
 
@@ -65,9 +65,10 @@ Possible environment variables:
 * `CHAT_BAN_TIMEOUT_SECONDS` (default: 600)
 * `CHAT_MAX_STRIKES` (default: 3)
 
+for detailed information see `cs2posts/bot/settings.py`.
 
-Create a docker image and run the bot (in the root folder):
 
+Create a docker image and run the bot. From the root folder exeucte the following commands:
 
 ```bash
 docker build -t cs2-posts-bot .
