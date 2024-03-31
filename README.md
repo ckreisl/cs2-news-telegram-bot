@@ -52,7 +52,7 @@ Similar to group chats the spam protection is enabled. The `/options` is availab
 
 ## Deploying the Bot
 
-To deploy the bot as an own instance you need to create a Telegram Bot via the [@BotFather](https://t.me/BotFather) on Telegram. After creating the bot you will receive a **token**. Create a `.env` file in the root directory and add the following content:
+To deploy the bot as an own instance you need to create a Telegram Bot via the [@BotFather](https://t.me/BotFather) on Telegram. After creating the bot you will receive a **token**. Rename the `.env.example` to `.env` in the root directory and add the token to the file.
 
 ```env
 TELEGRAM_TOKEN=<your_token>
