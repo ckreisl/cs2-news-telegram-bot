@@ -3,6 +3,8 @@
   <h1 align="center">Counter-Strike 2 Posts Telegram Bot</h1>
 </p>
 
+[![CI](https://github.com/ckreisl/cs2-posts-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ckreisl/cs2-posts-telegram-bot/actions/workflows/ci.yml)
+
 This is a simple Telegram bot providing you the latest posts (news, updates, events) about Counter Strike 2. Stay up to date about the game by retrieving automatic update messages from the bot via Telegram.
 
 The data is crawled from the official website of [Counter Strike 2](https://www.counter-strike.net/).
