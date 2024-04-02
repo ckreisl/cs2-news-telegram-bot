@@ -22,9 +22,11 @@ The data is crawled from the official website of [Counter Strike 2](https://www.
 
 ## Usage
 
-To use the bot, simply start a chat with the bot [@CS2PostsBot](https://t.me/CS2PostsBot) on Telegram.
+> [!NOTE]
+> We have a bot already up and running for you which is compeltely free to use.
+> Checkout: [@CS2PostsBot](https://t.me/CS2PostsBot)
 
-In Telegram just write `/start` to get started and `/help` to get a list of available commands.
+To use [@CS2PostsBot](https://t.me/CS2PostsBot), simply start a chat with the bot on Telegram. Then just write `/start` to get started and `/help` to get a list of available commands.
 
 
 ### Commands
@@ -80,7 +82,7 @@ To start the cron job checking for news & updates write `/start` in the chat of 
 
 ## Contributing
 
-Any contributions is **highly appreciated**.
+Any contributions are **highly appreciated**.
 
 
 ## License
