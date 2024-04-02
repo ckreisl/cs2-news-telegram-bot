@@ -3,3 +3,4 @@ python-telegram-bot==20.7
 python-telegram-bot[job-queue]==20.7
 bbcode==1.1.0
 python-dotenv==1.0.1
+pytest==8.1.1
