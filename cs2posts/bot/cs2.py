@@ -125,8 +125,9 @@ class CounterStrike2UpdateBot:
 
     async def post_shutdown(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info('Shutting down bot...')
-        logger.info('Saving latest update...')
-        self.local_post_store.save(self.latest_post)
+        logger.info('Saving posts ...')
+        self.local_post_store.save(self.latest_news_post)
+        self.local_post_store.save(self.latest_update_post)
 
         logger.info('Saving chats...')
         self.local_chat_store.save(self.chats)
@@ -146,6 +147,7 @@ class CounterStrike2UpdateBot:
                 logger.info('Chat not found. Creating new chat...')
                 chat = Chat(chat_id=update.message.chat_id)
                 self.chats.add(chat)
+                self.local_chat_store.save(self.chats)
 
             chat.chat_id_admin = update.message.from_user.id
 
@@ -160,8 +162,10 @@ class CounterStrike2UpdateBot:
         chat = self.chats.get(update.message.chat_id)
         if chat is None:
             return
+
         logger.info('Removing chat from chat list...')
         self.chats.remove(chat)
+        self.local_chat_store.save(self.chats)
 
     @spam_protected
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -169,9 +173,11 @@ class CounterStrike2UpdateBot:
 
         chat_id = update.message.chat_id
         chat = self.chats.get(chat_id=chat_id)
+
         if chat is None:
             chat = self.chats.create_and_add(chat_id=chat_id)
             chat.chat_id_admin = update.message.from_user.id
+            self.local_chat_store.save(self.chats)
 
         if not chat.is_running:
             chat.is_running = True
@@ -213,10 +219,13 @@ class CounterStrike2UpdateBot:
             chat.is_running = False
             await update.message.reply_text(
                 'Bot is stopped for this chat. You can start it again with /start')
+            # We do not remove the chat here, because we want to keep the chat
+            # and only remove it if the bot is removed from the group chat.
             return
 
         if chat_type == ChatType.PRIVATE:
             self.chats.remove(chat)
+            self.local_chat_store.save(self.chats)
             return
 
     @spam_protected
@@ -278,6 +287,7 @@ class CounterStrike2UpdateBot:
         logger.info(f'New post! ({posts.latest.posttime_as_datetime=})')
 
         self.update_posts(posts.latest)
+        self.local_post_store.save(self.latest_post)
 
         await self.send_post_to_chats(context, self.latest_post)
 
