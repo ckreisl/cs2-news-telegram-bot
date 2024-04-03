@@ -15,7 +15,6 @@ from telegram.ext import ContextTypes
 
 from cs2posts.bot.chats import Chat
 from cs2posts.bot.chats import Chats
-from cs2posts.bot.decorators import superadmin
 
 
 logger = logging.getLogger(__name__)
@@ -100,7 +99,6 @@ class Options:
     def set_chats(self, chats: Chats) -> None:
         self.__chats = chats
 
-    @superadmin
     async def options(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         chat = self.chats.get(update.message.chat_id)
@@ -146,7 +144,6 @@ class Options:
 
     async def update(self, context: ContextTypes.DEFAULT_TYPE, query: CallbackQuery, chat: Chat) -> None:
         text, reply_markup = OptionsMessageFactory.create(chat)
-
         await context.bot.edit_message_text(
             text=text,
             chat_id=chat.chat_id,
