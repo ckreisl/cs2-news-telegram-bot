@@ -50,9 +50,12 @@ class SpamProtector:
 
         self.update_chat_activity(chat)
 
+    def _get_utc_now(self) -> datetime:
+        return datetime.now(tz=ZoneInfo('UTC')).replace(tzinfo=None)
+
     def update_chat_activity(self, chat: Chat) -> None:
         logger.info(f'Updated chat activity for {chat.chat_id}')
-        chat.last_activity = datetime.now(tz=ZoneInfo('UTC'))
+        chat.last_activity = self._get_utc_now()
 
     def reduce_strike_level(self, chat: Chat) -> None:
         logger.info(f'Reduce strike level for {chat.chat_id}')
@@ -65,7 +68,7 @@ class SpamProtector:
             chat.strikes += 1
 
     def is_spamming(self, chat: Chat) -> bool:
-        time_diff = datetime.now(tz=ZoneInfo('UTC')) - chat.last_activity
+        time_diff = self._get_utc_now() - chat.last_activity
         limit = timedelta(milliseconds=settings.CHAT_SPAM_INTERVAL_MS)
         return time_diff <= limit
 
@@ -82,7 +85,7 @@ class SpamProtector:
 
     def is_timeouted(self, chat: Chat) -> bool:
         last_activity = chat.last_activity
-        time_diff = datetime.now(tz=ZoneInfo('UTC')) - last_activity
+        time_diff = self._get_utc_now() - last_activity
         return time_diff.seconds < self.BAN_TIMEOUT
 
     async def strike(self, bot, chat: Chat) -> None:
