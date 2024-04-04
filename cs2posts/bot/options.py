@@ -15,6 +15,7 @@ from telegram.ext import ContextTypes
 
 from cs2posts.bot.chats import Chat
 from cs2posts.bot.chats import Chats
+from cs2posts.store import Store
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,7 @@ class Options:
 
     def __init__(self, app: Application) -> None:
         self.__chats = None
+        self.__store = None
 
         app.add_handler(CommandHandler("options", self.options))
         app.add_handler(CallbackQueryHandler(self.button))
@@ -98,6 +100,9 @@ class Options:
 
     def set_chats(self, chats: Chats) -> None:
         self.__chats = chats
+
+    def set_chats_store(self, store: Store) -> None:
+        self.__store = store
 
     async def options(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
@@ -136,9 +141,11 @@ class Options:
 
         if btn is ButtonData.UPDATE:
             chat.is_update_interested = not chat.is_update_interested
+            self.__store.save(self.chats)
 
         if btn is ButtonData.NEWS:
             chat.is_news_interested = not chat.is_news_interested
+            self.__store.save(self.chats)
 
         await self.update(context, query, chat)
 

@@ -108,6 +108,7 @@ class CounterStrike2UpdateBot:
         self.latest_update_post: Post = self.local_post_store.get_latest_update_post()
         self.chats: Chats = self.local_chat_store.load()
         self.options.set_chats(self.chats)
+        self.options.set_chats_store(self.local_chat_store)
 
     def update_posts(self, post: Post) -> None:
         self.latest_post = post
