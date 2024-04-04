@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 class EventType(Enum):
@@ -12,6 +13,11 @@ class EventType(Enum):
     NEWS = 13
     SPECIAL = 14
     EVENTS = 28
+    NOT_DEFINED = -1
+
+    @classmethod
+    def _missing_(cls, value: object) -> Any:
+        return cls.NOT_DEFINED
 
 
 @dataclass
@@ -25,8 +31,9 @@ class Post:
     event_type: int
 
     @property
-    def posttime_as_datetime(self) -> datetime:
-        return datetime.fromtimestamp(self.posttime)
+    def posttime_as_datetime(self, tz: ZoneInfo = ZoneInfo('UTC')) -> datetime:
+        # Do not return a timezone-aware datetime object
+        return datetime.fromtimestamp(self.posttime, tz=tz).replace(tzinfo=None)
 
     def to_dict(self) -> dict:
         return asdict(self)

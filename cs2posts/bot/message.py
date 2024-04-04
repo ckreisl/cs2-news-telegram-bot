@@ -3,7 +3,6 @@ from __future__ import annotations
 import abc
 import logging
 import re
-from functools import lru_cache
 
 import requests
 from telegram.constants import ParseMode
@@ -44,7 +43,7 @@ class TelegramMessage:
         chunk = ''
 
         for line in lines:
-            if len(chunk) + len(line) < TELEGRAM_MAX_MESSAGE_LENGTH:
+            if (len(chunk) + len(line)) < TELEGRAM_MAX_MESSAGE_LENGTH:
                 chunk += line + "\n"
                 continue
 
@@ -95,7 +94,6 @@ class ImageContainer:
     def resolve_image_url(self) -> str:
         return self.url.replace("{STEAM_CLAN_IMAGE}", self.STEAM_CLAN_IMAGE)
 
-    @lru_cache(maxsize=7)
     def is_valid_url(self) -> bool:
         if self.is_empty():
             return False
