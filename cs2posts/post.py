@@ -42,13 +42,14 @@ class Post:
         return EventType(self.event_type) == EventType.UPDATE
 
     def is_news(self) -> bool:
-        return EventType(self.event_type) == EventType.NEWS
+        return ((EventType(self.event_type) == EventType.NEWS) or  # noqa
+                (EventType(self.event_type) == EventType.SPECIAL) or  # noqa
+                (EventType(self.event_type) == EventType.EVENTS))
 
-    def is_special(self) -> bool:
-        return EventType(self.event_type) == EventType.SPECIAL
-
-    def is_event(self) -> bool:
-        return EventType(self.event_type) == EventType.EVENTS
+    def is_newer_than(self, other: Post) -> bool:
+        if other is None:
+            return False
+        return self.posttime > other.posttime
 
     def __getitem__(self, key: str) -> Any:
         return self.to_dict()[key]

@@ -1,3 +1,20 @@
 {
-    
+    "update": {
+        "gid": "4185606994270578440",
+        "posterid": "0",
+        "headline": "Release Notes for 4/2/2024",
+        "posttime": 1712103496,
+        "updatetime": 1712594934,
+        "body": "[ COPENHAGEN 2024 MAJOR ]\n[list][*] Congratulations to Natus Vincere for winning the PGL Copenhagen Major!\n[*] The Copenhagen 2024 Champions Autograph Capsule is now available for purchase in the Copenhagen 2024 Major Hub[/list]\n[ MISC ]\n[list][*] Fixed several cases of sticky collisions when jumping against surfaces\n[*] Fixed another threading bug that could lead to a frame rate hitch, especially if all CPUs were busy\n[*] Purchased and traded Counter-Strike items will not be visible to other users who view your Steam Inventory for 10 days[/list]",
+        "event_type": 12
+    },
+    "news": {
+        "gid": "4185606994270578198",
+        "posterid": "0",
+        "headline": "Copenhagen Major Champions",
+        "posttime": 1712103491,
+        "updatetime": 1712103491,
+        "body": "[img]https://clan.akamai.steamstatic.com/images/3381077/75c3204fcb2874385f7c3e1dafeb00003b76502e.png[/img]\nCongratulations to Natus Vincere, the first CS2 Major Champions!\n\nPlaying in front of a sold-out arena and with over 1.8 million viewers watching around the world, NAVI and FaZe met in the Grand Final of one of the most hotly-contested Counter-Strike Majors of all time. Trading map wins in Ancient and Mirage, the teams moved to Inferno for the decider. There, b1t, jL, Aleksib, iM, and w0nderful put on a dominating performance to earn the trophy and title of Major Champions.\n\nTo celebrate their achievement, the Copenhagen 2024 Major Champions Capsule is now available for purchase. The capsule features autographs for each member of the winning team in paper, glitter, holo, and gold. 50% of the proceeds go to the players and organizations.\n\nAnd with that, the Copenhagen Major has come to a close. See you next time in Shanghai!",
+        "event_type": 13
+    }
 }

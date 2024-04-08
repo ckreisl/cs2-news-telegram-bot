@@ -110,14 +110,6 @@ class CounterStrike2UpdateBot:
         self.options.set_chats(self.chats)
         self.options.set_chats_store(self.local_chat_store)
 
-    def update_posts(self, post: Post) -> None:
-        self.latest_post = post
-        # TODO: Handle different types!
-        if post.is_news() or post.is_event() or post.is_special():
-            self.latest_news_post = post
-        else:
-            self.latest_update_post = post
-
     async def post_init(self, application: Application) -> None:
         logger.info('Post init bot...')
         # Bot username is only available after initialization
@@ -271,42 +263,56 @@ class CounterStrike2UpdateBot:
         await self.send_message(context=context, msg=msg, chat=chat)
 
     async def post_checker(self, context: CallbackContext) -> None:
-        logger.info('Crawling latest post ...')
+        logger.info('Crawling latest posts ...')
         try:
-            data = self.crawler.crawl(count=1)
+            data = self.crawler.crawl(count=10)
         except Exception as e:
             logger.exception(f'Could not fetch latest post: {e}')
             return
 
         posts = CounterStrikeNetPosts(data)
 
-        if posts.latest.posttime == self.latest_post.posttime:
+        latest_news_post = posts.latest_news_post
+        latest_update_post = posts.latest_update_post
+
+        if (not latest_news_post.is_newer_than(self.latest_news_post) and  # noqa
+            not latest_update_post.is_newer_than(self.latest_update_post)):  # noqa
             logger.info(
                 f'No new post found {posts.latest.posttime_as_datetime=}')
             return
 
-        logger.info(f'New post! ({posts.latest.posttime_as_datetime=})')
+        if latest_news_post.is_newer_than(self.latest_news_post):
+            logger.info(
+                f'New news post found {latest_news_post.posttime_as_datetime=}')
+            self.latest_news_post = latest_news_post
+            self.local_post_store.save(self.latest_news_post)
+            await self.send_post_to_chats(context, self.latest_news_post)
 
-        self.update_posts(posts.latest)
-        self.local_post_store.save(self.latest_post)
+        if latest_update_post.is_newer_than(self.latest_update_post):
+            logger.info(
+                f'New update post found {latest_update_post.posttime_as_datetime=}')
+            self.latest_update_post = latest_update_post
+            self.local_post_store.save(self.latest_update_post)
+            await self.send_post_to_chats(context, self.latest_update_post)
 
-        await self.send_post_to_chats(context, self.latest_post)
+        self.latest_post = posts.latest
 
     async def send_post_to_chats(self, context: CallbackContext, post: Post) -> None:
         logger.info('Sending post to chats ...')
 
-        msg = TelegramMessageFactory.create(post=post)
-
         # Send to all chats that are interested in the post type
-        if post.is_news() or post.is_special() or post.is_event():
+        if post.is_news():
             chats = [chat for chat in self.chats.get_running_chats()
                      if chat.is_news_interested]
         elif post.is_update():
             chats = [chat for chat in self.chats.get_running_chats()
                      if chat.is_update_interested]
         else:
-            logger.error(f'Unknown post type {post}. Not sending any message.')
+            logger.error(
+                f'Unknown post type {post.to_dict()}. Not sending any message.')
             return
+
+        msg = TelegramMessageFactory.create(post=post)
 
         for chat in chats:
             await self.send_message(context=context, msg=msg, chat=chat)

@@ -187,7 +187,7 @@ class TelegramMessageFactory:
 
     @staticmethod
     def create(post: Post) -> TelegramMessage:
-        if post.is_news() or post.is_event() or post.is_special():
+        if post.is_news():
             return CounterStrikeNewsMessage(post)
         if post.is_update():
             return CounterStrikeUpdateMessage(post)

@@ -17,6 +17,17 @@ def post_fixture():
                 event_type=12)
 
 
+@pytest.fixture
+def post_fixture2():
+    return Post(gid="2",
+                posterid="2",
+                headline="Test2",
+                posttime=1234567890,
+                updatetime=9876543210,
+                body="Test body2",
+                event_type=13)
+
+
 def test_event_types():
     assert EventType(12) == EventType.UPDATE
     assert EventType(13) == EventType.NEWS
@@ -35,16 +46,10 @@ def test_post_is_update(post_fixture):
 def test_post_is_news(post_fixture):
     post_fixture.event_type = EventType.NEWS.value
     assert post_fixture.is_news()
-
-
-def test_post_is_special(post_fixture):
     post_fixture.event_type = EventType.SPECIAL.value
-    assert post_fixture.is_special()
-
-
-def test_post_is_event(post_fixture):
+    assert post_fixture.is_news()
     post_fixture.event_type = EventType.EVENTS.value
-    assert post_fixture.is_event()
+    assert post_fixture.is_news()
 
 
 def test_post_to_dict(post_fixture):
@@ -73,11 +78,12 @@ def test_post_equals(post_fixture):
     assert post_fixture != {}
 
 
-def test_post_not_equals(post_fixture):
-    assert post_fixture != Post(gid="2",
-                                posterid="2",
-                                headline="Test2",
-                                posttime=1234567890,
-                                updatetime=9876543210,
-                                body="Test body2",
-                                event_type=12)
+def test_post_not_equals(post_fixture, post_fixture2):
+    assert post_fixture != post_fixture2
+
+
+def test_post_is_newer_than(post_fixture, post_fixture2):
+    assert not post_fixture.is_newer_than(None)
+    assert not post_fixture.is_newer_than(post_fixture2)
+    post_fixture2.posttime = 123456789
+    assert post_fixture.is_newer_than(post_fixture2)
