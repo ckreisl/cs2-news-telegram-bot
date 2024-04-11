@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 import pytest
@@ -128,3 +129,27 @@ def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post):
     mocked_cs2_news_post.event_type = 0
     with pytest.raises(ValueError):
         TelegramMessageFactory.create(mocked_cs2_news_post)
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_send_news(mocked_cs2_news_post):
+    with patch('requests.get') as mocked_get:
+        mocked_get.return_value.ok = True
+        msg = TelegramMessageFactory.create(mocked_cs2_news_post)
+
+        mocked_bot = AsyncMock()
+        await msg.send(bot=mocked_bot, chat_id=1337)
+
+        assert mocked_bot.send_photo.called
+        assert mocked_bot.send_message.called
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_send_update(mocked_cs2_update_post):
+    msg = TelegramMessageFactory.create(mocked_cs2_update_post)
+    mocked_bot = AsyncMock()
+
+    await msg.send(bot=mocked_bot, chat_id=1337)
+
+    assert mocked_bot.send_photo.not_called
+    assert mocked_bot.send_message.called
