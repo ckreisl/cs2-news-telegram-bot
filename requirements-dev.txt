@@ -1,4 +1,8 @@
-requests
-pytest
-pre-commit
-bbcode
+requests==2.31.0
+python-telegram-bot==20.7
+python-telegram-bot[job-queue]==20.7
+bbcode==1.1.0
+python-dotenv==1.0.1
+pytest==8.1.1
+pytest-asyncio==0.23.6
+pytest-mock==3.14.0

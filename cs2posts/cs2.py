@@ -17,24 +17,31 @@ class CounterStrikeNetPosts:
     def __init__(self, posts: dict[str, Any]) -> None:
 
         self.__posts = []
+
+        if posts is None or posts == {}:
+            return
+
+        if 'events' not in posts:
+            return
+
         for event in posts['events']:
 
-            try:
-                event_type = EventType(event['event_type'])
-            except Exception:
+            event_type = EventType(event['event_type'])
+            if event_type == EventType.NOT_DEFINED:
                 logger.warning(
-                    f"Unknown post event type: {event['event_type']}")
-                logger.warning(
-                    f"Headline: {event['announcement_body']['headline']}")
+                    f"Unknown event type: {event['event_type']}"
+                    f" for post with gid: {event['gid']}"
+                    f" with headline: {event['announcement_body']['headline']}")
                 continue
 
-            self.__posts.append(Post(event['gid'],
-                                     event['announcement_body']['posterid'],
-                                     event['announcement_body']['headline'],
-                                     event['announcement_body']['posttime'],
-                                     event['announcement_body']['updatetime'],
-                                     event['announcement_body']['body'],
-                                     event_type.value))
+            self.__posts.append(
+                Post(event['gid'],
+                     event['announcement_body']['posterid'],
+                     event['announcement_body']['headline'],
+                     event['announcement_body']['posttime'],
+                     event['announcement_body']['updatetime'],
+                     event['announcement_body']['body'],
+                     event_type.value))
 
     @property
     def posts(self) -> list[Post]:
@@ -55,8 +62,8 @@ class CounterStrikeNetPosts:
         return list(map(lambda x: x.to_dict(), self.__posts))
 
     @property
-    def latest(self) -> Post:
-        return self.__posts[0]
+    def latest(self) -> Post | None:
+        return self.__posts[0] if self.__posts else None
 
     @property
     def latest_news_post(self) -> Post | None:
@@ -67,8 +74,8 @@ class CounterStrikeNetPosts:
         return self.update_posts[0] if self.update_posts else None
 
     @property
-    def oldest(self) -> Post:
-        return self.__posts[-1]
+    def oldest(self) -> Post | None:
+        return self.__posts[-1] if self.__posts else None
 
     @property
     def oldest_news_post(self) -> Post | None:
@@ -79,10 +86,17 @@ class CounterStrikeNetPosts:
         return self.update_posts[-1] if self.update_posts else None
 
     def is_latest_post_news(self) -> bool:
+        if self.latest is None:
+            return False
         return self.latest.is_news()
 
     def is_latest_post_update(self) -> bool:
+        if self.latest is None:
+            return False
         return self.latest.is_update()
+
+    def is_empty(self) -> bool:
+        return len(self.__posts) == 0
 
     def __len__(self) -> int:
         return len(self.__posts)

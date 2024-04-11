@@ -84,8 +84,7 @@ class SpamProtector:
         return chat.is_banned
 
     def is_timeouted(self, chat: Chat) -> bool:
-        last_activity = chat.last_activity
-        time_diff = self._get_utc_now() - last_activity
+        time_diff = self._get_utc_now() - chat.last_activity
         return time_diff.seconds < self.BAN_TIMEOUT
 
     async def strike(self, bot, chat: Chat) -> None:

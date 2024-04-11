@@ -83,6 +83,12 @@ class Chats:
     def get_interested_in_updates(self) -> list[Chat]:
         return [chat for chat in self.__chats.values() if chat.is_update_interested]
 
+    def get_running_and_interested_in_news(self) -> list[Chat]:
+        return [chat for chat in self.__chats.values() if chat.is_running and chat.is_news_interested]
+
+    def get_running_and_interested_in_updates(self) -> list[Chat]:
+        return [chat for chat in self.__chats.values() if chat.is_running and chat.is_update_interested]
+
     def __contains__(self, chat: Chat) -> bool:
         return chat.chat_id in self.__chats
 
