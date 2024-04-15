@@ -297,7 +297,7 @@ class CounterStrike2UpdateBot:
             logger.error(f'Could not fetch latest posts: {e}')
             return
 
-        posts = CounterStrikeNetPosts(data)
+        posts = CounterStrikeNetPosts.create(data)
 
         if posts.is_empty():
             logger.info(f'No post(s) found in latest crawl: {posts}')

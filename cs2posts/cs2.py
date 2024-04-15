@@ -43,6 +43,10 @@ class CounterStrikeNetPosts:
                      event['announcement_body']['body'],
                      event_type.value))
 
+    @classmethod
+    def create(cls, posts: dict[str, Any]) -> CounterStrikeNetPosts:
+        return cls(posts)
+
     @property
     def posts(self) -> list[Post]:
         return self.__posts

@@ -98,6 +98,10 @@ class Options:
     def chats(self) -> Chats:
         return self.__chats
 
+    @property
+    def store(self) -> Store:
+        return self.__store
+
     def set_chats(self, chats: Chats) -> None:
         self.__chats = chats
 
@@ -160,6 +164,7 @@ class Options:
 
     async def close(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
+        await query.answer()
         await context.bot.delete_message(
             chat_id=query.message.chat_id,
             message_id=query.message.message_id)
