@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def admin(func):
     async def wrapper(self, update: Update, context: CallbackContext):
-        chat = self.chats.get(update.message.chat_id)
+        chat = self.chats.get(chat_id=update.message.chat_id)
         if chat is None:
             return
         if update.message.from_user.id != chat.chat_id_admin:
@@ -137,8 +137,8 @@ class CounterStrike2UpdateBot:
             chat = self.chats.get(update.message.chat_id)
             if chat is None:
                 logger.info('Chat not found. Creating new chat...')
-                chat = Chat(chat_id=update.message.chat_id)
-                self.chats.add(chat)
+                chat = self.chats.create_and_add(
+                    chat_id=update.message.chat_id)
                 self.local_chat_store.save(self.chats)
 
             chat.chat_id_admin = update.message.from_user.id
@@ -173,6 +173,8 @@ class CounterStrike2UpdateBot:
 
         if not chat.is_running:
             chat.is_running = True
+            # TODO: Chat is not updated here
+            # running=true is not saved to file
             await update.message.reply_text(
                 text=const.WELCOME_MESSAGE_ENGLISH,
                 parse_mode=ParseMode.HTML)
@@ -200,10 +202,6 @@ class CounterStrike2UpdateBot:
         chat = self.chats.get(update.message.chat_id)
         if chat is None:
             logger.info('Chat not found. Nothing to do.')
-            return
-
-        if chat.is_banned:
-            chat.is_removed_while_banned = True
             return
 
         chat_type = update.message.chat.type
