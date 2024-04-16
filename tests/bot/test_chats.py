@@ -79,3 +79,19 @@ def test_chats_get_interested_in_updates(chats):
     chat = chats.get(chat_id=1)
     chat.is_update_interested = False
     assert len(chats.get_interested_in_updates()) == len(chats) - 1
+
+
+def test_chats_get_running_and_interested_in_news(chats):
+    assert chats.get_running_and_interested_in_news() == []
+    chat = chats.get(chat_id=1)
+    chat.is_running = True
+    chat.is_news_interested = True
+    assert chats.get_running_and_interested_in_news() == [chat]
+
+
+def test_chats_get_running_and_interested_in_updates(chats):
+    assert chats.get_running_and_interested_in_updates() == []
+    chat = chats.get(chat_id=1)
+    chat.is_running = True
+    chat.is_update_interested = True
+    assert chats.get_running_and_interested_in_updates() == [chat]

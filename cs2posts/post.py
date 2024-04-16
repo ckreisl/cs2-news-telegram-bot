@@ -51,6 +51,11 @@ class Post:
             return False
         return self.posttime > other.posttime
 
+    def is_older_eq_than(self, other: Post) -> bool:
+        if other is None:
+            return False
+        return self.posttime <= other.posttime
+
     def __getitem__(self, key: str) -> Any:
         return self.to_dict()[key]
 

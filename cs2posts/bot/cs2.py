@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def admin(func):
     async def wrapper(self, update: Update, context: CallbackContext):
-        chat = self.chats.get(update.message.chat_id)
+        chat = self.chats.get(chat_id=update.message.chat_id)
         if chat is None:
             return
         if update.message.from_user.id != chat.chat_id_admin:
@@ -63,12 +63,10 @@ class CounterStrike2UpdateBot:
                     .token(kwargs['token'])
                     .build())
 
-        self.crawler = CounterStrike2NetCrawler()
-        self.spam_protector = SpamProtector()
-        self.local_post_store = LocalLatestPostStore(
-            settings.LOCAL_LATEST_POST_STORE_FILEPATH)
-        self.local_chat_store = LocalChatStore(
-            settings.LOCAL_CHAT_STORE_FILEPATH)
+        self.crawler: CounterStrike2NetCrawler = kwargs['crawler']
+        self.spam_protector: SpamProtector = kwargs['spam_protector']
+        self.local_post_store: LocalLatestPostStore = kwargs['local_post_store']
+        self.local_chat_store: LocalChatStore = kwargs['local_chat_store']
 
         self.options = Options(app=self.app)
 
@@ -98,6 +96,7 @@ class CounterStrike2UpdateBot:
             # TODO: Maybe ensure that there is a latest update and news post
             # As of now we just fetch 100 items.
             logger.info('No post data found. Fetching latest posts...')
+            # TODO: What happens here if crawler fails?
             data = self.crawler.crawl()
             posts = CounterStrikeNetPosts(data)
             self.local_post_store.save(posts.latest_update_post)
@@ -138,8 +137,8 @@ class CounterStrike2UpdateBot:
             chat = self.chats.get(update.message.chat_id)
             if chat is None:
                 logger.info('Chat not found. Creating new chat...')
-                chat = Chat(chat_id=update.message.chat_id)
-                self.chats.add(chat)
+                chat = self.chats.create_and_add(
+                    chat_id=update.message.chat_id)
                 self.local_chat_store.save(self.chats)
 
             chat.chat_id_admin = update.message.from_user.id
@@ -174,6 +173,8 @@ class CounterStrike2UpdateBot:
 
         if not chat.is_running:
             chat.is_running = True
+            # TODO: Chat is not updated here
+            # running=true is not saved to file
             await update.message.reply_text(
                 text=const.WELCOME_MESSAGE_ENGLISH,
                 parse_mode=ParseMode.HTML)
@@ -201,10 +202,6 @@ class CounterStrike2UpdateBot:
         chat = self.chats.get(update.message.chat_id)
         if chat is None:
             logger.info('Chat not found. Nothing to do.')
-            return
-
-        if chat.is_banned:
-            chat.is_removed_while_banned = True
             return
 
         chat_type = update.message.chat.type
@@ -262,51 +259,67 @@ class CounterStrike2UpdateBot:
         msg = TelegramMessageFactory.create(self.latest_update_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
+    async def _post_checker_news(self, context: CallbackContext, post: Post) -> None:
+        if post is None:
+            return
+
+        if not post.is_newer_than(self.latest_news_post):
+            logger.info(
+                f'No new news post found latest_news_post=[{post.headline}]')
+            return
+
+        logger.info(
+            f'New news post found latest_news_post=[{post.headline}]')
+
+        self.latest_news_post = post
+        await self.send_post_to_chats(context, post=post)
+
+    async def _post_checker_update(self, context: CallbackContext, post: Post) -> None:
+        if post is None:
+            return
+
+        if not post.is_newer_than(self.latest_update_post):
+            logger.info(
+                f'No new update post found latest_update_post=[{post.headline}]')
+            return
+
+        logger.info(
+            f'New update post found latest_update_post=[{post.headline}]')
+
+        self.latest_update_post = post
+        await self.send_post_to_chats(context, post=post)
+
     async def post_checker(self, context: CallbackContext) -> None:
         logger.info('Crawling latest posts ...')
         try:
             data = self.crawler.crawl(count=10)
         except Exception as e:
-            logger.exception(f'Could not fetch latest post: {e}')
+            logger.error(f'Could not fetch latest posts: {e}')
             return
 
-        posts = CounterStrikeNetPosts(data)
+        posts = CounterStrikeNetPosts.create(data)
+
+        if posts.is_empty():
+            logger.info(f'No post(s) found in latest crawl: {posts}')
+            return
 
         latest_news_post = posts.latest_news_post
         latest_update_post = posts.latest_update_post
 
-        if (not latest_news_post.is_newer_than(self.latest_news_post) and  # noqa
-            not latest_update_post.is_newer_than(self.latest_update_post)):  # noqa
-            logger.info(
-                f'No new post found {posts.latest.posttime_as_datetime=}')
-            return
+        await self._post_checker_news(context, latest_news_post)
+        await self._post_checker_update(context, latest_update_post)
 
-        if latest_news_post.is_newer_than(self.latest_news_post):
-            logger.info(
-                f'New news post found {latest_news_post.posttime_as_datetime=}')
-            self.latest_news_post = latest_news_post
-            self.local_post_store.save(self.latest_news_post)
-            await self.send_post_to_chats(context, self.latest_news_post)
-
-        if latest_update_post.is_newer_than(self.latest_update_post):
-            logger.info(
-                f'New update post found {latest_update_post.posttime_as_datetime=}')
-            self.latest_update_post = latest_update_post
-            self.local_post_store.save(self.latest_update_post)
-            await self.send_post_to_chats(context, self.latest_update_post)
-
-        self.latest_post = posts.latest
+        self.latest_post = self.latest_post if self.latest_post.is_older_eq_than(
+            posts.latest) else posts.latest
 
     async def send_post_to_chats(self, context: CallbackContext, post: Post) -> None:
         logger.info('Sending post to chats ...')
 
         # Send to all chats that are interested in the post type
         if post.is_news():
-            chats = [chat for chat in self.chats.get_running_chats()
-                     if chat.is_news_interested]
+            chats = self.chats.get_running_and_interested_in_news()
         elif post.is_update():
-            chats = [chat for chat in self.chats.get_running_chats()
-                     if chat.is_update_interested]
+            chats = self.chats.get_running_and_interested_in_updates()
         else:
             logger.error(
                 f'Unknown post type {post.to_dict()}. Not sending any message.')
