@@ -130,7 +130,7 @@ async def test_spam_protector_check(spam_protector, chat):
 
 
 @pytest.mark.asyncio
-async def test_spam_protector_strik(spam_protector, chat):
+async def test_spam_protector_strike(spam_protector, chat):
     chat.is_banned = True
     await spam_protector.strike(None, chat)
     assert chat.strikes == 0

@@ -41,7 +41,7 @@ def create_news_post():
 @patch('cs2posts.crawler.CounterStrike2NetCrawler')
 def bot(mocked_crawler, mocked_post_store, mocked_chat_store, mocked_spam_protector):
     mocked_spam_protector.check = AsyncMock()
-    mocked_spam_protector.strick = AsyncMock()
+    mocked_spam_protector.strike = AsyncMock()
     bot = CounterStrike2UpdateBot(
         token='test_token',
         local_chat_store=mocked_chat_store,
