@@ -35,16 +35,19 @@ def create_news_post():
 
 
 @pytest.fixture
+@patch('cs2posts.bot.spam.SpamProtector')
 @patch('cs2posts.store.LocalChatStore')
 @patch('cs2posts.store.LocalLatestPostStore')
 @patch('cs2posts.crawler.CounterStrike2NetCrawler')
-def bot(mocked_crawler, mocked_post_store, mocked_chat_store):
+def bot(mocked_crawler, mocked_post_store, mocked_chat_store, mocked_spam_protector):
+    mocked_spam_protector.check = AsyncMock()
+    mocked_spam_protector.strick = AsyncMock()
     bot = CounterStrike2UpdateBot(
         token='test_token',
         local_chat_store=mocked_chat_store,
         local_post_store=mocked_post_store,
         crawler=mocked_crawler,
-        spam_protector=AsyncMock())
+        spam_protector=mocked_spam_protector)
     bot.chats = Mock()
     return bot
 
@@ -189,7 +192,8 @@ async def test_cs2_bot_start_command_new_user(bot):
     await bot.start(mocked_update, mocked_context)
 
     bot.chats.create_and_add.assert_called_once_with(chat_id=chat.chat_id)
-    bot.local_chat_store.save.assert_called_once()
+    bot.local_chat_store.save.call_count == 2
+    bot.spam_protector.update_chat_activity.assert_called_once_with(chat)
     assert chat.chat_id_admin == mocked_update.message.from_user.id
 
     assert chat.is_running

@@ -169,15 +169,15 @@ class CounterStrike2UpdateBot:
         if chat is None:
             chat = self.chats.create_and_add(chat_id=chat_id)
             chat.chat_id_admin = update.message.from_user.id
+            self.spam_protector.update_chat_activity(chat)
             self.local_chat_store.save(self.chats)
 
         if not chat.is_running:
             chat.is_running = True
-            # TODO: Chat is not updated here
-            # running=true is not saved to file
             await update.message.reply_text(
                 text=const.WELCOME_MESSAGE_ENGLISH,
                 parse_mode=ParseMode.HTML)
+            self.local_chat_store.save(self.chats)
         else:
             await update.message.reply_text(
                 'Bot is already running for your chat!')
