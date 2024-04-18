@@ -4,12 +4,12 @@ from unittest.mock import patch
 
 import pytest
 
-from cs2posts.crawler import CounterStrike2NetCrawler
+from cs2posts.crawler import CounterStrike2Crawler
 
 
 @pytest.fixture
 def crawler():
-    return CounterStrike2NetCrawler()
+    return CounterStrike2Crawler()
 
 
 @pytest.fixture

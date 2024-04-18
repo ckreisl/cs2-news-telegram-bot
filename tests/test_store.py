@@ -15,22 +15,34 @@ from cs2posts.store import Post
 def data_latest():
     return {
         "update": {
-            "gid": "12341122312",
-            "posterid": "76561199571358539",
-            "headline": "Release Notes for 1/4/2024",
-            "posttime": 1704407492,
-            "updatetime": 1704407760,
-            "body": "fixture_body_update",
-            "event_type": 12
+            "gid": "5762994032385146001",
+            "title": "Release Notes for 4/16/2024",
+            "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5762994032385146001",
+            "is_external_url": True,
+            "author": "Vitaliy",
+            "contents": "[ MISC ]\n[list]\n[*] Fixed a bug where bomb can sometimes disappear from the radar\n[*] Allow scraping or removing stickers by selecting the sticker icons under the weapon\n[*] Allow deleting empty storage units that have an assigned label\n[*] Fixed Workshop tools from crashing when compiling maps that contain instances\n[/list]",
+            "feedlabel": "Community Announcements",
+            "date": 1713310428,
+            "feedname": "steam_community_announcements",
+            "feed_type": 1,
+            "appid": 730,
+            "tags": [
+                "patchnotes"
+            ]
         },
         "news": {
-            "gid": "1234567890",
-            "posterid": "76561197971400048",
-            "headline": "A Call to Arms",
-            "posttime": 1707265365,
-            "updatetime": 1707347147,
-            "body": "fixtre_body_news",
-            "event_type": 13
+            "gid": "5756237364302520223",
+            "title": "Copenhagen Major Champions",
+            "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5756237364302520223",
+            "is_external_url": True,
+            "author": "Piggles ULTRAPRO",
+            "contents": "[img]https://clan.akamai.steamstatic.com/images/3381077/75c3204fcb2874385f7c3e1dafeb00003b76502e.png[/img]\nCongratulations to Natus Vincere, the first CS2 Major Champions!\n\nPlaying in front of a sold-out arena and with over 1.8 million viewers watching around the world, NAVI and FaZe met in the Grand Final of one of the most hotly-contested Counter-Strike Majors of all time. Trading map wins in Ancient and Mirage, the teams moved to Inferno for the decider. There, b1t, jL, Aleksib, iM, and w0nderful put on a dominating performance to earn the trophy and title of Major Champions.\n\nTo celebrate their achievement, the Copenhagen 2024 Major Champions Capsule is now available for purchase. The capsule features autographs for each member of the winning team in paper, glitter, holo, and gold. 50% of the proceeds go to the players and organizations.\n\nAnd with that, the Copenhagen Major has come to a close. See you next time in Shanghai!",
+            "feedlabel": "Community Announcements",
+            "date": 1712103491,
+            "feedname": "steam_community_announcements",
+            "feed_type": 1,
+            "appid": 730,
+            "tags": []
         }
     }
 
@@ -69,10 +81,10 @@ def test_local_latest_post_store_load(local_latest_post_store, data_latest):
 
 
 def test_local_latest_post_store_save(local_latest_post_store, data_latest):
-    expected_temp_update_title = data_latest["news"]["headline"]
+    expected_temp_update_title = data_latest["news"]["title"]
 
-    data_latest["update"]["headline"] = "New Update headline"
-    data_latest["news"]["headline"] = "New News headline"
+    data_latest["update"]["title"] = "New Update headline"
+    data_latest["news"]["title"] = "New News headline"
 
     actual_post_update = Post(**data_latest["update"])
     actual_post_news = Post(**data_latest["news"])
@@ -81,13 +93,13 @@ def test_local_latest_post_store_save(local_latest_post_store, data_latest):
     content = local_latest_post_store.load()
 
     # News headline should not be changed
-    assert content["news"]["headline"] == expected_temp_update_title
-    assert content["update"]["headline"] == "New Update headline"
+    assert content["news"]["title"] == expected_temp_update_title
+    assert content["update"]["title"] == "New Update headline"
 
     local_latest_post_store.save(actual_post_news)
 
     content = local_latest_post_store.load()
-    assert content["news"]["headline"] == "New News headline"
+    assert content["news"]["title"] == "New News headline"
 
 
 def test_local_latest_post_store_get_latest_news_post(local_latest_post_store, data_latest):

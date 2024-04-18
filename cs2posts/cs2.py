@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from cs2posts.post import EventType
+from cs2posts.post import FeedType
 from cs2posts.post import Post
 
 
 logger = logging.getLogger(__name__)
 
 
-class CounterStrikeNetPosts:
+class CounterStrike2Posts:
 
     INITIAL_EPOCH_TIME_CS2 = 1679503828
 
@@ -21,30 +21,31 @@ class CounterStrikeNetPosts:
         if posts is None or posts == {}:
             return
 
-        if 'events' not in posts:
+        if 'appnews' not in posts:
             return
 
-        for event in posts['events']:
+        posts = posts['appnews']
 
-            event_type = EventType(event['event_type'])
-            if event_type == EventType.NOT_DEFINED:
-                logger.warning(
-                    f"Unknown event type: {event['event_type']}"
-                    f" for post with gid: {event['gid']}"
-                    f" with headline: {event['announcement_body']['headline']}")
+        if 'newsitems' not in posts:
+            return
+
+        posts = posts['newsitems']
+
+        for post in posts:
+            feed_type = FeedType(post['feed_type'])
+            # TODO: We ignore external feeds for now
+            # Since there is no parser enabled
+            if feed_type == FeedType.EXTERN:
+                logger.info(
+                    f"Ignoring external feed: {post['gid']}"
+                    f" with headline: {post['title']}"
+                    f" and url: {post['url']}")
                 continue
 
-            self.__posts.append(
-                Post(event['gid'],
-                     event['announcement_body']['posterid'],
-                     event['announcement_body']['headline'],
-                     event['announcement_body']['posttime'],
-                     event['announcement_body']['updatetime'],
-                     event['announcement_body']['body'],
-                     event_type.value))
+            self.__posts.append(Post(**post))
 
     @classmethod
-    def create(cls, posts: dict[str, Any]) -> CounterStrikeNetPosts:
+    def create(cls, posts: dict[str, Any]) -> CounterStrike2Posts:
         return cls(posts)
 
     @property
@@ -53,12 +54,12 @@ class CounterStrikeNetPosts:
 
     @property
     def news_posts(self) -> list[Post]:
-        return list(filter(lambda x: (x.posttime >= self.INITIAL_EPOCH_TIME_CS2) and x.is_news(),
+        return list(filter(lambda x: (x.date >= self.INITIAL_EPOCH_TIME_CS2) and x.is_news(),
                            self.__posts))
 
     @property
     def update_posts(self) -> list[Post]:
-        return list(filter(lambda x: (x.posttime >= self.INITIAL_EPOCH_TIME_CS2) and x.is_update(),
+        return list(filter(lambda x: (x.date >= self.INITIAL_EPOCH_TIME_CS2) and x.is_update(),
                            self.__posts))
 
     @property

@@ -9,17 +9,24 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-class CounterStrike2NetCrawler:
+class WebCrawler:
+    pass
+
+
+class SteamAPICrawler(WebCrawler):
+    pass
+
+
+class CounterStrike2Crawler(SteamAPICrawler):
 
     def __init__(self) -> None:
-        self.url = "https://store.steampowered.com/" \
-            "events/ajaxgetpartnereventspageable/" \
-            "?clan_accountid=0" \
-            "&appid=730" \
-            "&offset=0" \
+        super().__init__()
+        # https://developer.valvesoftware.com/wiki/Steam_Web_API
+        # maxlength=0 to get whole content
+        self.url = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/" \
+            "?appid=730" \
             "&count=%s" \
-            "&l=english" \
-            "&origin=https://www.counter-strike.net"
+            "&maxlength=0"
 
     def _validate_args(self, **kwargs: dict[str, Any]) -> None:
         if "count" in kwargs and kwargs["count"] < 0:

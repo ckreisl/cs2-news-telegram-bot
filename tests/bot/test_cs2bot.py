@@ -16,29 +16,38 @@ from cs2posts.post import Post
 
 def create_update_post():
     return Post(gid="1337",
-                posterid="42",
-                headline="Update Post",
-                posttime=1234567890,
-                updatetime=9876543210,
-                body="This is a test message.",
-                event_type=12)
+                title="Update Post",
+                url="http://test.com",
+                is_external_url=True,
+                author="Test author",
+                contents="Test body",
+                feedlabel="Test label",
+                feedname="Test feed",
+                date=1234567890,
+                feed_type=1,
+                appid=730,
+                tags=["patchnotes"],)
 
 
 def create_news_post():
-    return Post(gid="1338",
-                posterid="32",
-                headline="News Post",
-                posttime=1234567890,
-                updatetime=9876543210,
-                body="This is a test message.",
-                event_type=13)
+    return Post(gid="gid",
+                title="title",
+                url="url",
+                is_external_url=True,
+                author="author",
+                contents="contents",
+                feedlabel="feedlabel",
+                feedname="feedname",
+                date=1234567890,
+                feed_type=1,
+                appid=730)
 
 
 @pytest.fixture
 @patch('cs2posts.bot.spam.SpamProtector')
 @patch('cs2posts.store.LocalChatStore')
 @patch('cs2posts.store.LocalLatestPostStore')
-@patch('cs2posts.crawler.CounterStrike2NetCrawler')
+@patch('cs2posts.crawler.CounterStrike2Crawler')
 def bot(mocked_crawler, mocked_post_store, mocked_chat_store, mocked_spam_protector):
     mocked_spam_protector.check = AsyncMock()
     mocked_spam_protector.strike = AsyncMock()
