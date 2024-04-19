@@ -66,7 +66,7 @@ class ImageContainer:
     def __init__(self, post: Post) -> None:
         self.__post = post
         self.__matches = re.findall(
-            re.compile(r'\[img\](.*?)\[/img\]'), self.post.body)
+            re.compile(r'\[img\](.*?)\[/img\]'), self.post.contents)
         self.__url = None if self.is_empty() else self.__matches[0]
 
         if self.__url is not None:
@@ -84,7 +84,7 @@ class ImageContainer:
     def caption(self) -> str | None:
         if self.is_empty():
             return None
-        return f"<b>{self.post.headline}</b> ({self.post.posttime_as_datetime})"
+        return f"<b>{self.post.title}</b> ({self.post.date_as_datetime})"
 
     def is_empty(self) -> bool:
         if self.__matches is None:
@@ -120,22 +120,22 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
         self.image = ImageContainer(post)
 
-        parser = Steam2TelegramHTML(post.body)
+        parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
         if not self.image.is_empty():
             parser.add_parser(parser=SteamNewsImageParser, priority=2)
         parser.add_parser(parser=SteamNewsYoutubeParser, priority=3)
 
-        url = f"https://www.counter-strike.net/newsentry/{post.gid}"
-
         msg = ""
         if not self.image.is_valid():
-            msg += f"<b>{post.headline}</b>\n"
-            msg += f"({post.posttime_as_datetime})\n\n"
+            msg += f"<b>{post.title}</b>\n"
+            msg += f"({post.date_as_datetime})\n\n"
 
         msg += parser.parse()
         msg += "\n\n"
-        msg += f"Source: <a href='{url}'>{url}</a>"
+        msg += f"(Author: {post.author})"
+        msg += "\n\n"
+        msg += f"Source: <a href='{post.url}'>{post.url}</a>"
 
         super().__init__(msg)
 
@@ -159,18 +159,17 @@ class CounterStrikeUpdateMessage(TelegramMessage):
 
     def __init__(self, post: Post) -> None:
 
-        parser = Steam2TelegramHTML(post.body)
+        parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
         parser.add_parser(parser=SteamUpdateHeadingParser, priority=2)
 
-        url = "https://www.counter-strike.net/news/updates"
-
-        msg = f"<b>{post.headline}</b>\n"
-        msg += f"({post.posttime_as_datetime})\n"
+        msg = f"<b>{post.title}</b>\n"
+        msg += f"({post.date_as_datetime})\n"
         msg += "\n"
         msg += parser.parse()
-        msg += "\n"
-        msg += f"Source: <a href='{url}'>{url}</a>"
+        msg += f"(Author: {post.author})"
+        msg += "\n\n"
+        msg += f"Source: <a href='{post.url}'>{post.url}</a>"
 
         super().__init__(msg)
 
@@ -191,4 +190,4 @@ class TelegramMessageFactory:
             return CounterStrikeNewsMessage(post)
         if post.is_update():
             return CounterStrikeUpdateMessage(post)
-        raise ValueError(f"Unknown post type {post.event_type=}")
+        raise ValueError(f"Unknown post type {post.title=} {post.url=}")

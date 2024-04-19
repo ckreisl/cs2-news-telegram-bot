@@ -21,8 +21,8 @@ from cs2posts.bot.message import TelegramMessage
 from cs2posts.bot.message import TelegramMessageFactory
 from cs2posts.bot.options import Options
 from cs2posts.bot.spam import SpamProtector
-from cs2posts.crawler import CounterStrike2NetCrawler
-from cs2posts.cs2 import CounterStrikeNetPosts
+from cs2posts.crawler import CounterStrike2Crawler
+from cs2posts.cs2 import CounterStrike2Posts
 from cs2posts.post import Post
 from cs2posts.store import LocalChatStore
 from cs2posts.store import LocalLatestPostStore
@@ -63,7 +63,7 @@ class CounterStrike2UpdateBot:
                     .token(kwargs['token'])
                     .build())
 
-        self.crawler: CounterStrike2NetCrawler = kwargs['crawler']
+        self.crawler: CounterStrike2Crawler = kwargs['crawler']
         self.spam_protector: SpamProtector = kwargs['spam_protector']
         self.local_post_store: LocalLatestPostStore = kwargs['local_post_store']
         self.local_chat_store: LocalChatStore = kwargs['local_chat_store']
@@ -98,7 +98,7 @@ class CounterStrike2UpdateBot:
             logger.info('No post data found. Fetching latest posts...')
             # TODO: What happens here if crawler fails?
             data = self.crawler.crawl()
-            posts = CounterStrikeNetPosts(data)
+            posts = CounterStrike2Posts(data)
             self.local_post_store.save(posts.latest_update_post)
             self.local_post_store.save(posts.latest_news_post)
 
@@ -265,11 +265,11 @@ class CounterStrike2UpdateBot:
 
         if not post.is_newer_than(self.latest_news_post):
             logger.info(
-                f'No new news post found latest_news_post=[{post.headline}]')
+                f'No new news post found latest_news_post=[{post.title}]')
             return
 
         logger.info(
-            f'New news post found latest_news_post=[{post.headline}]')
+            f'New news post found latest_news_post=[{post.title}]')
 
         self.latest_news_post = post
         await self.send_post_to_chats(context, post=post)
@@ -280,11 +280,11 @@ class CounterStrike2UpdateBot:
 
         if not post.is_newer_than(self.latest_update_post):
             logger.info(
-                f'No new update post found latest_update_post=[{post.headline}]')
+                f'No new update post found latest_update_post=[{post.title}]')
             return
 
         logger.info(
-            f'New update post found latest_update_post=[{post.headline}]')
+            f'New update post found latest_update_post=[{post.title}]')
 
         self.latest_update_post = post
         await self.send_post_to_chats(context, post=post)
@@ -297,7 +297,7 @@ class CounterStrike2UpdateBot:
             logger.error(f'Could not fetch latest posts: {e}')
             return
 
-        posts = CounterStrikeNetPosts.create(data)
+        posts = CounterStrike2Posts.create(data)
 
         if posts.is_empty():
             logger.info(f'No post(s) found in latest crawl: {posts}')

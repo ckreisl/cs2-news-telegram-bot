@@ -2,62 +2,72 @@ from __future__ import annotations
 
 import pytest
 
-from cs2posts.cs2 import CounterStrikeNetPosts
+from cs2posts.cs2 import CounterStrike2Posts
 
 
 @pytest.fixture
 def crawler_data():
     return {
-        "events": [
-            {
-                "event_type": 13,
-                "gid": 1,
-                "announcement_body": {
-                    "posterid": 1,
-                    "headline": "headline",
-                    "posttime": 1679503829,
-                    "updatetime": 1,
-                    "body": "body"
+        "appnews": {
+            "appid": 730,
+            "newsitems": [
+                {
+                    "gid": "5141476355659151610",
+                    "title": "Your Time is Now",
+                    "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5141476355659151610",
+                    "is_external_url": True,
+                    "author": "Piggles ULTRAPRO",
+                    "contents": "Content News",
+                    "feedlabel": "Community Announcements",
+                    "date": 1693524157,
+                    "feedname": "steam_community_announcements",
+                    "feed_type": 1,
+                    "appid": 730
+                },
+                {
+                    "gid": "5124585319846885283",
+                    "title": "Release Notes for 8/2/2023",
+                    "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5124585319846885283",
+                    "is_external_url": True,
+                    "author": "jo",
+                    "contents": "Content Update",
+                    "feedlabel": "Community Announcements",
+                    "date": 1691013634,
+                    "feedname": "steam_community_announcements",
+                    "feed_type": 1,
+                    "appid": 730,
+                    "tags": [
+                        "patchnotes"
+                    ]
                 }
-            },
-            {
-                "event_type": 12,
-                "gid": 2,
-                "announcement_body": {
-                    "posterid": 2,
-                    "headline": "headline",
-                    "posttime": 1679503830,
-                    "updatetime": 2,
-                    "body": "body"
-                }
-            }
-        ]
+            ]
+        }
     }
 
 
 @pytest.fixture
 def cs2_posts(crawler_data):
-    return CounterStrikeNetPosts(crawler_data)
+    return CounterStrike2Posts(crawler_data)
 
 
 def test_cs2_net_post_empty():
-    cs2_posts = CounterStrikeNetPosts({})
+    cs2_posts = CounterStrike2Posts({})
     assert len(cs2_posts.posts) == 0
     assert cs2_posts.is_empty()
 
 
 def test_cs2_net_post_none():
-    cs2_posts = CounterStrikeNetPosts({})
+    cs2_posts = CounterStrike2Posts({})
     assert len(cs2_posts.posts) == 0
 
 
 def test_cs2_net_post_no_events():
-    cs2_posts = CounterStrikeNetPosts({'not_events': 'not_events'})
+    cs2_posts = CounterStrike2Posts({'not_events': 'not_events'})
     assert len(cs2_posts.posts) == 0
 
 
 def test_cs2_net_post_unknown_event_type():
-    cs2_posts = CounterStrikeNetPosts(
+    cs2_posts = CounterStrike2Posts(
         {'events': [
             {
                 'event_type': 999,
@@ -83,64 +93,74 @@ def test_cs2_net_update_posts(cs2_posts):
 
 
 def test_cs2_net_latest(cs2_posts):
-    assert cs2_posts.latest.gid == 1
-    assert cs2_posts.latest_news_post.gid == 1
-    assert cs2_posts.latest_update_post.gid == 2
+    assert cs2_posts.latest.gid == "5141476355659151610"
+    assert cs2_posts.latest_news_post.gid == "5141476355659151610"
+    assert cs2_posts.latest_update_post.gid == "5124585319846885283"
 
 
 def test_cs2_net_oldest(cs2_posts):
-    assert cs2_posts.oldest.gid == 2
+    assert cs2_posts.oldest.gid == "5124585319846885283"
 
-    cs2_posts = CounterStrikeNetPosts(None)
+    cs2_posts = CounterStrike2Posts(None)
     assert cs2_posts.oldest is None
 
 
 def test_cs2_net_oldest_news(cs2_posts):
-    assert cs2_posts.oldest_news_post.gid == 1
+    assert cs2_posts.oldest_news_post.gid == "5141476355659151610"
 
-    cs2_posts = CounterStrikeNetPosts(None)
+    cs2_posts = CounterStrike2Posts(None)
     assert cs2_posts.oldest_news_post is None
 
 
 def test_cs2_net_oldest_update(cs2_posts):
-    assert cs2_posts.oldest_update_post.gid == 2
+    assert cs2_posts.oldest_update_post.gid == "5124585319846885283"
 
-    cs2_posts = CounterStrikeNetPosts(None)
+    cs2_posts = CounterStrike2Posts(None)
     assert cs2_posts.oldest_update_post is None
 
 
 def test_cs2_net_is_latest_post_news(cs2_posts):
     assert cs2_posts.is_latest_post_news()
 
-    cs2_posts = CounterStrikeNetPosts(None)
+    cs2_posts = CounterStrike2Posts(None)
     assert not cs2_posts.is_latest_post_news()
 
 
 def test_cs2_net_is_latest_post_update(cs2_posts):
     assert cs2_posts.is_latest_post_update() is False
 
-    cs2_posts = CounterStrikeNetPosts(None)
+    cs2_posts = CounterStrike2Posts(None)
     assert not cs2_posts.is_latest_post_update()
 
 
 def test_cs2_net_posts_json(cs2_posts):
     assert cs2_posts.posts_json == [
         {
-            'gid': 1,
-            'posterid': 1,
-            'headline': 'headline',
-            'posttime': 1679503829,
-            'updatetime': 1,
-            'body': 'body',
-            'event_type': 13
+            'gid': '5141476355659151610',
+            'title': 'Your Time is Now',
+            'url': 'https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5141476355659151610',
+            'is_external_url': True,
+            'author': 'Piggles ULTRAPRO',
+            'contents': 'Content News',
+            'feedlabel': 'Community Announcements',
+            'date': 1693524157,
+            'feedname': 'steam_community_announcements',
+            'feed_type': 1,
+            'appid': 730,
+            'tags': []
         },
         {
-            'gid': 2,
-            'posterid': 2,
-            'headline': 'headline',
-            'posttime': 1679503830,
-            'updatetime': 2,
-            'body': 'body',
-            'event_type': 12
+            'gid': '5124585319846885283',
+            'title': 'Release Notes for 8/2/2023',
+            'url': 'https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5124585319846885283',
+            'is_external_url': True,
+            'author': 'jo',
+            'contents': 'Content Update',
+            'feedlabel': 'Community Announcements',
+            'date': 1691013634,
+            'feedname': 'steam_community_announcements',
+            'feed_type': 1,
+            'appid': 730,
+            'tags': ['patchnotes']
         }
     ]

@@ -2,17 +2,16 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from dataclasses import dataclass
+from dataclasses import field
 from datetime import datetime
 from enum import Enum
 from typing import Any
 from zoneinfo import ZoneInfo
 
 
-class EventType(Enum):
-    UPDATE = 12
-    NEWS = 13
-    SPECIAL = 14
-    EVENTS = 28
+class FeedType(Enum):
+    EXTERN = 0
+    INTERN = 1
     NOT_DEFINED = -1
 
     @classmethod
@@ -23,38 +22,45 @@ class EventType(Enum):
 @dataclass
 class Post:
     gid: str
-    posterid: str
-    headline: str
-    posttime: int
-    updatetime: int
-    body: str
-    event_type: int
+    title: str
+    url: str
+    is_external_url: bool
+    author: str
+    contents: str
+    feedlabel: str
+    date: int
+    feedname: str
+    feed_type: int
+    appid: int
+    # can be empty from crawled data
+    tags: list[str] = field(default_factory=list)
 
     @property
-    def posttime_as_datetime(self, tz: ZoneInfo = ZoneInfo('UTC')) -> datetime:
+    def date_as_datetime(self, tz: ZoneInfo = ZoneInfo('UTC')) -> datetime:
         # Do not return a timezone-aware datetime object
-        return datetime.fromtimestamp(self.posttime, tz=tz).replace(tzinfo=None)
+        return datetime.fromtimestamp(self.date, tz=tz).replace(tzinfo=None)
 
     def to_dict(self) -> dict:
         return asdict(self)
 
     def is_update(self) -> bool:
-        return EventType(self.event_type) == EventType.UPDATE
+        return "patchnotes" in self.tags or "Release Notes" in self.title
 
     def is_news(self) -> bool:
-        return ((EventType(self.event_type) == EventType.NEWS) or  # noqa
-                (EventType(self.event_type) == EventType.SPECIAL) or  # noqa
-                (EventType(self.event_type) == EventType.EVENTS))
+        return not self.is_update()
 
     def is_newer_than(self, other: Post) -> bool:
         if other is None:
             return False
-        return self.posttime > other.posttime
+        return self.date > other.date
 
     def is_older_eq_than(self, other: Post) -> bool:
         if other is None:
             return False
-        return self.posttime <= other.posttime
+        return self.date <= other.date
+
+    def get_feed_type(self) -> FeedType:
+        return FeedType(self.feed_type)
 
     def __getitem__(self, key: str) -> Any:
         return self.to_dict()[key]

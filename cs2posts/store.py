@@ -8,7 +8,6 @@ from typing import Any
 
 from cs2posts.bot.chats import Chat
 from cs2posts.bot.chats import Chats
-from cs2posts.post import EventType
 from cs2posts.post import Post
 
 
@@ -78,30 +77,31 @@ class LocalLatestPostStore(LocalStore):
 
         super().__init__(filepath)
 
-    def save(self, data: Post) -> None:
+    def save(self, post: Post) -> None:
         content = self.load()
 
-        event_type = EventType(data.event_type)
+        if post.is_news():
+            key = "news"
+        elif post.is_update():
+            key = "update"
+        else:
+            return
 
-        # TODO: quick fix to store always "news"
-        if event_type in [EventType.EVENTS, EventType.SPECIAL]:
-            event_type = EventType.NEWS
-
-        content[event_type.name.lower()] = data.to_dict()
+        content[key] = post.to_dict()
 
         with open(self.filepath, "w") as fs:
             json.dump(content, fs, indent=4)
 
     def get_latest_news_post(self) -> Post:
-        return Post(**self.load()[EventType.NEWS.name.lower()])
+        return Post(**self.load()['news'])
 
     def get_latest_update_post(self) -> Post:
-        return Post(**self.load()[EventType.UPDATE.name.lower()])
+        return Post(**self.load()['update'])
 
     def get_latest_post(self) -> Post:
         news = self.get_latest_news_post()
         update = self.get_latest_update_post()
-        return news if news.posttime > update.posttime else update
+        return news if news.date > update.date else update
 
 
 class LocalChatStore(LocalStore):

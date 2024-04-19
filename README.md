@@ -7,7 +7,7 @@
 
 This is a simple Telegram bot providing you the latest posts (news, updates, events) about Counter Strike 2. Stay up to date about the game by retrieving automatic update messages from the bot via Telegram.
 
-The data is crawled from the official website of [Counter Strike 2](https://www.counter-strike.net/).
+The data is crawled from the official steam web api (https://steamcommunity.com/dev).
 
 
 > [!IMPORTANT]

@@ -7,3 +7,6 @@ __pycache__
 htmlcov
 .coverage
 .pytest_cache
+
+pytest.xml
+coverage.xml
