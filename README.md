@@ -1,6 +1,6 @@
 <p align="center">
   <img alt="Logo" width="300px" height="300px" src="./images/logo.png" />
-  <h1 align="center">Counter-Strike 2 Posts Telegram Bot</h1>
+  <h1 align="center">Counter-Strike 2 News Telegram Bot</h1>
 </p>
 
 [![CI](https://github.com/ckreisl/cs2-posts-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ckreisl/cs2-posts-telegram-bot/actions/workflows/ci.yml)
