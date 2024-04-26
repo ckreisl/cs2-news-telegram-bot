@@ -5,6 +5,7 @@ import logging
 from telegram import Update
 from telegram.constants import ChatType
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.error import Forbidden
 from telegram.ext import Application
 from telegram.ext import CallbackContext
@@ -338,6 +339,13 @@ class CounterStrike2UpdateBot:
 
         try:
             await msg.send(context.bot, chat_id=chat.chat_id)
+        except BadRequest as e:
+            logger.error(f'Bad request for {chat.chat_id=}')
+            if e.message == 'Chat not found':
+                logger.error(
+                    f'Chat not found we delete the chat {chat.chat_id=}')
+                self.chats.remove(chat)
+            logger.error(f"Reason: {e}")
         except Forbidden as e:
             logger.error(
                 f'Bot is blocked by user we delete the chat {chat.chat_id=}')

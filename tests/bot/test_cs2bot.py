@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from telegram import Update
 from telegram.constants import ChatType
+from telegram.error import BadRequest
 from telegram.error import Forbidden
 
 from cs2posts.bot.chats import Chat
@@ -494,6 +495,36 @@ async def test_cs2_bot_send_message(bot):
     mocked_msg.send.assert_called_once_with(
         mocked_context.bot, chat_id=chat.chat_id)
     mocked_msg.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_send_message_raises_bad_request_chat_not_found(bot):
+    mocked_context = AsyncMock()
+    mocked_context.bot = AsyncMock()
+    mocked_msg = AsyncMock()
+    mocked_msg.send = AsyncMock()
+    mocked_msg.send.side_effect = BadRequest("Chat not found")
+    chat = Chat(42)
+
+    await bot.send_message(mocked_context, mocked_msg, chat)
+    mocked_msg.send.assert_called_once_with(
+        mocked_context.bot, chat_id=chat.chat_id)
+    bot.chats.remove.assert_called_once_with(chat)
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_send_message_raises_bad_request(bot):
+    mocked_context = AsyncMock()
+    mocked_context.bot = AsyncMock()
+    mocked_msg = AsyncMock()
+    mocked_msg.send = AsyncMock()
+    mocked_msg.send.side_effect = BadRequest("something")
+    chat = Chat(42)
+
+    await bot.send_message(mocked_context, mocked_msg, chat)
+    mocked_msg.send.assert_called_once_with(
+        mocked_context.bot, chat_id=chat.chat_id)
+    bot.chats.remove.assert_not_called()
 
 
 @pytest.mark.asyncio
