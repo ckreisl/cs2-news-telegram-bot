@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from cs2posts.crawler import CounterStrike2Crawler
+from cs2posts.crawler import CRAWLER_REQUEST_TIMEOUT
 
 
 @pytest.fixture
@@ -23,7 +24,8 @@ def test_crawler_input_args_valid(crawler, mock_get):
     mock_get.return_value.ok = True
     mock_get.return_value.text = '{"foo": "bar"}'
     crawler.crawl(count=expected_count)
-    mock_get.assert_called_once_with(crawler.url % expected_count)
+    mock_get.assert_called_once_with(
+        crawler.url % expected_count, timeout=CRAWLER_REQUEST_TIMEOUT)
 
 
 def test_crawler_input_args_not_valid(crawler):

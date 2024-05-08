@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+REQUESTS_TIMEOUT = 3
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 
 WELCOME_MESSAGE_ENGLISH = """\
