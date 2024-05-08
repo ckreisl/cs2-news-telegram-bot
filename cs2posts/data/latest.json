@@ -1,3 +1,32 @@
 {
-    
+    "update": {
+        "gid": "5768625435389943954",
+        "title": "Release Notes for 5/7/2024",
+        "url": "https://steamcommunity.com/games/CSGO/announcements/detail/4213757668844649533",
+        "is_external_url": true,
+        "author": "FletcherDunnValve",
+        "contents": "[ MISC ]\n[list]\n[*] Fixed a visual bug where sniper rifle viewmodels could be visible at the edge of the scope screen overlay.\n[*] Fixed a bug that prevented HE grenade explosions from breaking the vents in de_nuke.\n[*] Fixed an issue where viewmodels would sometimes emit double shell eject effects.\n[*] Minor performance improvements\n[/list]\n",
+        "feedlabel": "Community Announcements",
+        "date": 1715125929,
+        "feedname": "steam_community_announcements",
+        "feed_type": 1,
+        "appid": 730,
+        "tags": [
+            "patchnotes"
+        ]
+    },
+    "news": {
+        "gid": "5759616966666137028",
+        "title": "On The Other Hand...",
+        "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5759616966666137028",
+        "is_external_url": true,
+        "author": "gautam",
+        "contents": "Today's update includes a bunch of quality-of-life improvements that touch upon every part of the game, from maps to UI to gameplay. A few highlights are below, but check out the [url=https://store.steampowered.com/news/app/730/view/4202497395513061959]release notes[/url] to see what's new!\n\n[video webm=https://clan.akamai.steamstatic.com/images/3381077/758e01194008b2d20797a378de390cdc24305cf9.webm mp4=https://clan.akamai.steamstatic.com/images/3381077/1a9b430c3ae10f5ec94a27d24f87187618d1919a.mp4 poster=https://clan.akamai.steamstatic.com/images/3381077/2723ea38b9ba52592038731f15e5e9ba512be979.png autoplay=true controls=false][/video]\nLefties rejoice! Players can now redeploy their weapons, swapping between the left and right hand. You can set your preferred handedness in the settings menu and then switch hands temporarily mid-round with a key press (H on US Keyboards by default).\n\n[img]https://clan.akamai.steamstatic.com/images/3381077/897b47892c65929ccd471ccff7d5aa65696eeb6f.png[/img]\nThe buy menu has a few new tricks. To help you decide whether to buy or save, the top right of the buy menu now features the minimum amount of money you're guaranteed to have next round (thanks Kadomos). And at the bottom you'll find the new 'Dropped Weapons' panel, where you can see (and directly pick up) any weapons that you or teammates have dropped in the buy zone.\n\n[video webm=https://clan.akamai.steamstatic.com/images/3381077/ce366b2eaaf9211f367b50eec46533f8f99ba207.webm mp4=https://clan.akamai.steamstatic.com/images/3381077/e14db7419e60d31e09ed7d199683561d061bbc17.mp4 poster=https://clan.akamai.steamstatic.com/images/3381077/f1462b7eefe16c70d61291b8676b1a404688da37.png autoplay=true controls=false][/video]\nThere are several more HUD/UI changes in today's update. For those of you who have memorized a library of grenade line-ups, a line-up reticle will appear shortly after you pull the pin (you can even customize the delay for each grenade type). And if you've had trouble navigating through smoke, set a Radar Map Alternate Zoom and add a Toggle Radar Zoom key binding, which will let you switch between zoom levels during a round.\n\n[img]https://clan.akamai.steamstatic.com/images/3381077/ac9e7e5f1f6386cfec4de86e771a6fdc7206471c.png[/img]\nWe've updated the Active Duty map pool (for both Premier and competitions), removing Overpass and bringing back Dust II. And there are changes to many other maps, including significant changes to Inferno.\n\nJump right into a match and see what's new, or practice with your friends--practice matches and workshop maps can now be launched with members of your party.",
+        "feedlabel": "Community Announcements",
+        "date": 1714088149,
+        "feedname": "steam_community_announcements",
+        "feed_type": 1,
+        "appid": 730,
+        "tags": []
+    }
 }

@@ -1,3 +1,15 @@
 {
-    "chats": []
+    "chats": [
+        {
+            "chat_id": 10320841,
+            "chat_id_admin": 10320841,
+            "strikes": 0,
+            "is_running": true,
+            "is_banned": false,
+            "is_removed_while_banned": false,
+            "is_news_interested": true,
+            "is_update_interested": true,
+            "last_activity": "2024-05-08T19:58:33.638300"
+        }
+    ]
 }
