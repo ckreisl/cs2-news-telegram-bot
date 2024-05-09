@@ -9,6 +9,9 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+CRAWLER_REQUEST_TIMEOUT = 3
+
+
 class WebCrawler:
     pass
 
@@ -39,7 +42,8 @@ class CounterStrike2Crawler(SteamAPICrawler):
         self._validate_args(count=count)
 
         try:
-            response = requests.get(self.url % count)
+            response = requests.get(
+                self.url % count, timeout=CRAWLER_REQUEST_TIMEOUT)
         except Exception as e:
             logger.error(f'Could not fetch data due to {e}')
             raise

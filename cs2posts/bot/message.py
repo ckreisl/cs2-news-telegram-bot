@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import abc
 import logging
-import re
 
-import requests
 from telegram.constants import ParseMode
 
 from cs2posts.bot.constants import TELEGRAM_MAX_MESSAGE_LENGTH
+from cs2posts.bot.content import ContentExtractor
+from cs2posts.bot.content import Image
+from cs2posts.bot.content import TextBlock
+from cs2posts.bot.content import Video
+from cs2posts.bot.utils import Utils
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
-from cs2posts.parser.steam_news_image import SteamNewsImageParser
-from cs2posts.parser.steam_news_youtube import SteamNewsYoutubeParser
 from cs2posts.parser.steam_update_heading import SteamUpdateHeadingParser
 from cs2posts.post import Post
 
@@ -23,7 +24,7 @@ class TelegramMessage:
 
     def __init__(self, message: str) -> None:
         self.__message = message
-        self.__messages = self.split()
+        self.__messages = self.split(message)
 
     @property
     def message(self) -> str:
@@ -33,12 +34,12 @@ class TelegramMessage:
     def messages(self) -> list[str]:
         return self.__messages
 
-    def split(self) -> list[str]:
+    def split(self, message: str) -> list[str]:
 
-        if len(self.message) < TELEGRAM_MAX_MESSAGE_LENGTH:
-            return [self.message]
+        if len(message) < TELEGRAM_MAX_MESSAGE_LENGTH:
+            return [message]
 
-        lines = self.message.split('\n')
+        lines = message.split('\n')
         chunks = []
         chunk = ''
 
@@ -59,105 +60,93 @@ class TelegramMessage:
         raise NotImplementedError("Method not implemented")
 
 
-class ImageContainer:
-
-    STEAM_CLAN_IMAGE: str = "https://clan.akamai.steamstatic.com/images/"
-
-    def __init__(self, post: Post) -> None:
-        self.__post = post
-        self.__matches = re.findall(
-            re.compile(r'\[img\](.*?)\[/img\]'), self.post.contents)
-        self.__url = None if self.is_empty() else self.__matches[0]
-
-        if self.__url is not None:
-            self.__url = self.resolve_image_url()
-
-    @property
-    def post(self) -> Post:
-        return self.__post
-
-    @property
-    def url(self) -> str | None:
-        return self.__url
-
-    @property
-    def caption(self) -> str | None:
-        if self.is_empty():
-            return None
-        return f"<b>{self.post.title}</b> ({self.post.date_as_datetime})"
-
-    def is_empty(self) -> bool:
-        if self.__matches is None:
-            return True
-        return len(self.__matches) == 0
-
-    def resolve_image_url(self) -> str:
-        return self.url.replace("{STEAM_CLAN_IMAGE}", self.STEAM_CLAN_IMAGE)
-
-    def is_valid_url(self) -> bool:
-        if self.is_empty():
-            return False
-
-        if not self.url.startswith("http"):
-            return False
-
-        try:
-            response = requests.get(self.url)
-        except Exception as e:
-            logger.error(f"Failed to get image from {self.url}: {e}")
-            return False
-
-        return response.ok
-
-    def is_valid(self) -> bool:
-        return self.is_valid_url()
-
-
 class CounterStrikeNewsMessage(TelegramMessage):
 
     def __init__(self, post: Post) -> None:
         self.post = post
-
-        self.image = ImageContainer(post)
-
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
-        if not self.image.is_empty():
-            parser.add_parser(parser=SteamNewsImageParser, priority=2)
-        parser.add_parser(parser=SteamNewsYoutubeParser, priority=3)
 
-        msg = ""
-        if not self.image.is_valid():
-            msg += f"<b>{post.title}</b>\n"
-            msg += f"({post.date_as_datetime})\n\n"
+        self.content = ContentExtractor.extract_message_blocks(parser.parse())
+        self.__add_footer()
 
-        msg += parser.parse()
-        msg += "\n\n"
-        msg += f"(Author: {post.author})"
-        msg += "\n\n"
-        msg += f"Source: <a href='{post.url}'>{post.url}</a>"
+    def __add_footer(self) -> None:
+        url = Utils.get_redirected_url(self.post.url)
+        footer = (
+            f"\n\n(Author: {self.post.author})\n\n"
+            f"Source: <a href='{url}'>Link</a>"
+        )
 
-        super().__init__(msg)
+        if isinstance(self.content[-1], TextBlock):
+            self.content[-1].text += footer
+        else:
+            self.content.append(TextBlock(
+                text_pos_start=self.content[-1].text_pos_end + 1,
+                text_pos_end=len(footer),
+                is_heading=False,
+                text=footer))
 
-    async def send(self, bot, chat_id: int) -> None:
-        if self.image.is_valid():
-            await bot.send_photo(
-                chat_id=chat_id,
-                photo=self.image.url,
-                caption=self.image.caption,
-                parse_mode=ParseMode.HTML)
+    def get_header(self) -> str:
+        return f"<b>{self.post.title}</b>\n({self.post.date_as_datetime})"
 
-        for msg in self.messages:
+    async def send_message(self, bot, chat_id: int, message: TextBlock) -> None:
+        if message.is_heading:
+            message.text = self.get_header() + "\n\n" + message.text
+
+        for text in self.split(message.text):
             await bot.send_message(
                 chat_id=chat_id,
-                text=msg,
+                text=text,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True)
+
+    async def send_image(self, bot, chat_id: int, image: Image) -> None:
+        image_url = ContentExtractor.extract_url(image.url)
+
+        if not Utils.is_valid_url(image_url):
+            logger.error(
+                f"Not sending image due to invalid image URL {image_url=}")
+            return
+
+        caption = self.get_header() if image.is_heading else None
+        await bot.send_photo(
+            chat_id=chat_id,
+            photo=image_url,
+            caption=caption,
+            parse_mode=ParseMode.HTML)
+
+    async def send_video(self, bot, chat_id: int, video: Video) -> None:
+        video_url = ContentExtractor.extract_url(video.mp4)
+
+        if not Utils.is_valid_url(video_url):
+            logger.error(
+                f"Not sending video due to invalid video URL {video_url=}")
+            return
+
+        thumbnail_url = ContentExtractor.extract_url(video.poster)
+        caption = self.get_header() if video.is_heading else None
+        await bot.send_video(
+            chat_id=chat_id,
+            video=video_url,
+            thumbnail=thumbnail_url,
+            caption=caption,
+            supports_streaming=True,
+            parse_mode=ParseMode.HTML)
+
+    async def send(self, bot, chat_id: int) -> None:
+        for content in self.content:
+            if isinstance(content, TextBlock):
+                await self.send_message(bot, chat_id, content)
+            elif isinstance(content, Image):
+                await self.send_image(bot, chat_id, content)
+            elif isinstance(content, Video):
+                await self.send_video(bot, chat_id, content)
 
 
 class CounterStrikeUpdateMessage(TelegramMessage):
 
     def __init__(self, post: Post) -> None:
+        post.url = Utils.get_redirected_url(post.url)
 
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
@@ -169,7 +158,7 @@ class CounterStrikeUpdateMessage(TelegramMessage):
         msg += parser.parse()
         msg += f"(Author: {post.author})"
         msg += "\n\n"
-        msg += f"Source: <a href='{post.url}'>{post.url}</a>"
+        msg += f"Source: <a href='{post.url}'>Link</a>"
 
         super().__init__(msg)
 
