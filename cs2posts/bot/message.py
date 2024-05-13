@@ -10,6 +10,7 @@ from cs2posts.bot.content import ContentExtractor
 from cs2posts.bot.content import Image
 from cs2posts.bot.content import TextBlock
 from cs2posts.bot.content import Video
+from cs2posts.bot.content import Youtube
 from cs2posts.bot.utils import Utils
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
@@ -64,6 +65,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
     def __init__(self, post: Post) -> None:
         self.post = post
+        post.contents = "[previewyoutube=s6BNHro0vSg;full][/previewyoutube]"
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
 
@@ -133,6 +135,18 @@ class CounterStrikeNewsMessage(TelegramMessage):
             supports_streaming=True,
             parse_mode=ParseMode.HTML)
 
+    async def send_youtube_video(self, bot, chat_id: int, youtube: Youtube) -> None:
+        text: str = ""
+        if youtube.is_heading:
+            text = self.get_header() + "\n\n"
+        text += f"<a href='{youtube.get_url()}'>{youtube.get_url()}</a>"
+
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=False)
+
     async def send(self, bot, chat_id: int) -> None:
         for content in self.content:
             if isinstance(content, TextBlock):
@@ -141,6 +155,8 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 await self.send_image(bot, chat_id, content)
             elif isinstance(content, Video):
                 await self.send_video(bot, chat_id, content)
+            elif isinstance(content, Youtube):
+                await self.send_youtube_video(bot, chat_id, content)
 
 
 class CounterStrikeUpdateMessage(TelegramMessage):

@@ -21,6 +21,14 @@ class Video(Content):
 
 
 @dataclass
+class Youtube(Content):
+    url: str
+
+    def get_url(self) -> str:
+        return f"https://www.youtube.com/watch?v={self.url}"
+
+
+@dataclass
 class Image(Content):
     url: str
 
@@ -47,6 +55,15 @@ class ContentExtractor:
                 poster=result.group(3),
                 autoplay=result.group(4) == "true",
                 controls=result.group(5) == "true"))
+
+        youtube_pattern = r"\[previewyoutube=([^;]+);.*?\]\[/previewyoutube\]"
+        matches = re.finditer(youtube_pattern, text)
+        for result in matches:
+            videos.append(Youtube(
+                text_pos_start=result.start(),
+                text_pos_end=result.end(),
+                is_heading=False,
+                url=result.group(1)))
 
         return videos
 
