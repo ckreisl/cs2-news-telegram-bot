@@ -65,7 +65,6 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
     def __init__(self, post: Post) -> None:
         self.post = post
-        post.contents = "[previewyoutube=s6BNHro0vSg;full][/previewyoutube]"
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
 
