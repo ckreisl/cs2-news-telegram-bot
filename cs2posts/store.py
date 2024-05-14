@@ -84,6 +84,8 @@ class LocalLatestPostStore(LocalStore):
             key = "news"
         elif post.is_update():
             key = "update"
+        elif post.is_external():
+            key = "external"
         else:
             return
 
@@ -98,10 +100,14 @@ class LocalLatestPostStore(LocalStore):
     def get_latest_update_post(self) -> Post:
         return Post(**self.load()['update'])
 
+    def get_latest_external_post(self) -> Post:
+        return Post(**self.load()['external'])
+
     def get_latest_post(self) -> Post:
         news = self.get_latest_news_post()
         update = self.get_latest_update_post()
-        return news if news.date > update.date else update
+        external = self.get_latest_external_post()
+        return max(news, update, external, key=lambda x: x.date)
 
 
 class LocalChatStore(LocalStore):

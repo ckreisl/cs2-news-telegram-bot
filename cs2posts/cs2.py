@@ -33,13 +33,12 @@ class CounterStrike2Posts:
 
         for post in posts:
             feed_type = FeedType(post['feed_type'])
-            # TODO: We ignore external feeds for now
-            # Since there is no parser enabled
-            if feed_type == FeedType.EXTERN:
+            if feed_type not in [FeedType.INTERN, FeedType.EXTERN]:
                 logger.info(
-                    f"Ignoring external feed: {post['gid']}"
+                    f"Ignoring feed: {post['gid']}"
                     f" with headline: {post['title']}"
-                    f" and url: {post['url']}")
+                    f" and url: {post['url']}"
+                    f" {feed_type=}")
                 continue
 
             self.__posts.append(Post(**post))
@@ -63,6 +62,11 @@ class CounterStrike2Posts:
                            self.__posts))
 
     @property
+    def external_posts(self) -> list[Post]:
+        return list(filter(lambda x: (x.date >= self.INITIAL_EPOCH_TIME_CS2) and x.is_external(),
+                           self.__posts))
+
+    @property
     def posts_json(self) -> list[dict]:
         return list(map(lambda x: x.to_dict(), self.__posts))
 
@@ -79,6 +83,10 @@ class CounterStrike2Posts:
         return self.update_posts[0] if self.update_posts else None
 
     @property
+    def latest_external_post(self) -> Post | None:
+        return self.external_posts[0] if self.external_posts else None
+
+    @property
     def oldest(self) -> Post | None:
         return self.__posts[-1] if self.__posts else None
 
@@ -90,6 +98,10 @@ class CounterStrike2Posts:
     def oldest_update_post(self) -> Post | None:
         return self.update_posts[-1] if self.update_posts else None
 
+    @property
+    def oldest_external_post(self) -> Post | None:
+        return self.external_posts[-1] if self.external_posts else None
+
     def is_latest_post_news(self) -> bool:
         if self.latest is None:
             return False
@@ -99,6 +111,11 @@ class CounterStrike2Posts:
         if self.latest is None:
             return False
         return self.latest.is_update()
+
+    def is_latest_post_external(self) -> bool:
+        if self.latest is None:
+            return False
+        return self.latest.is_external()
 
     def is_empty(self) -> bool:
         return len(self.__posts) == 0

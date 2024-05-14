@@ -77,6 +77,7 @@ class CounterStrike2UpdateBot:
             CommandHandler('help', self.help),
             CommandHandler('news', self.news),
             CommandHandler('update', self.update),
+            CommandHandler('external', self.external),
             CommandHandler('latest', self.latest),
             MessageHandler(
                 filters.StatusUpdate.NEW_CHAT_MEMBERS, self.new_chat_member),
@@ -102,10 +103,12 @@ class CounterStrike2UpdateBot:
             posts = CounterStrike2Posts(data)
             self.local_post_store.save(posts.latest_update_post)
             self.local_post_store.save(posts.latest_news_post)
+            self.local_post_store.save(posts.latest_external_post)
 
         self.latest_post: Post = self.local_post_store.get_latest_post()
         self.latest_news_post: Post = self.local_post_store.get_latest_news_post()
         self.latest_update_post: Post = self.local_post_store.get_latest_update_post()
+        self.latest_external_post: Post = self.local_post_store.get_latest_external_post()
         self.chats: Chats = self.local_chat_store.load()
         self.options.set_chats(self.chats)
         self.options.set_chats_store(self.local_chat_store)
@@ -234,6 +237,7 @@ class CounterStrike2UpdateBot:
                "/latest - Sends the latest post\n"
                "/news - Sends the latest news post\n"
                "/update - Sends the latest update post\n"
+               "/external - Sends the latest external post\n"
                "/help - Prints this help message\n"
                "/options - Configure Options <b>(only admins)</b>")
 
@@ -258,6 +262,13 @@ class CounterStrike2UpdateBot:
         logger.info('Sending latest update post to chats ...')
         chat = self.chats.get(update.message.chat_id)
         msg = TelegramMessageFactory.create(self.latest_update_post)
+        await self.send_message(context=context, msg=msg, chat=chat)
+
+    @spam_protected
+    async def external(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        logger.info('Sending latest external post to chat ...')
+        chat = self.chats.get(update.message.chat_id)
+        msg = TelegramMessageFactory.create(self.latest_external_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     async def _post_checker_news(self, context: CallbackContext, post: Post) -> None:

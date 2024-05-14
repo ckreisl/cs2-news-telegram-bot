@@ -186,6 +186,26 @@ class CounterStrikeUpdateMessage(TelegramMessage):
                 disable_web_page_preview=True)
 
 
+class CounterStrikeExternalMessage(TelegramMessage):
+
+    def __init__(self, post: Post) -> None:
+        post.url = Utils.get_redirected_url(post.url)
+
+        parser = Steam2TelegramHTML(post.contents)
+        msg = parser.parse()
+        # TODO: Implement a parser for external posts
+
+        super().__init__(msg)
+
+    async def send(self, bot, chat_id: int) -> None:
+        for msg in self.messages:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=msg,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True)
+
+
 class TelegramMessageFactory:
 
     @staticmethod
@@ -194,4 +214,6 @@ class TelegramMessageFactory:
             return CounterStrikeNewsMessage(post)
         if post.is_update():
             return CounterStrikeUpdateMessage(post)
+        if post.is_external():
+            return CounterStrikeExternalMessage(post)
         raise ValueError(f"Unknown post type {post.title=} {post.url=}")
