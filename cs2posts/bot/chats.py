@@ -17,6 +17,7 @@ class Chat:
     is_removed_while_banned: bool = False
     is_news_interested: bool = True
     is_update_interested: bool = True
+    is_external_news_interested: bool = True
     last_activity: datetime = datetime(1970, 1, 1)
 
     @classmethod
@@ -34,6 +35,7 @@ class Chat:
             "is_removed_while_banned": self.is_removed_while_banned,
             "is_news_interested": self.is_news_interested,
             "is_update_interested": self.is_update_interested,
+            "is_external_news_interested": self.is_external_news_interested,
             "last_activity": self.last_activity.isoformat()
         }
 
@@ -88,6 +90,9 @@ class Chats:
 
     def get_running_and_interested_in_updates(self) -> list[Chat]:
         return [chat for chat in self.__chats.values() if chat.is_running and chat.is_update_interested]
+
+    def get_running_and_interested_in_external_news(self) -> list[Chat]:
+        return [chat for chat in self.__chats.values() if chat.is_running and chat.is_external_news_interested]
 
     def __contains__(self, chat: Chat) -> bool:
         return chat.chat_id in self.__chats

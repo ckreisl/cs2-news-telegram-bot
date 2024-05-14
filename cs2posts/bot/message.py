@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 
+from bs4 import BeautifulSoup
 from telegram.constants import ParseMode
 
 from cs2posts.bot.constants import TELEGRAM_MAX_MESSAGE_LENGTH
@@ -190,10 +191,17 @@ class CounterStrikeExternalMessage(TelegramMessage):
 
     def __init__(self, post: Post) -> None:
         post.url = Utils.get_redirected_url(post.url)
+        self.post = post
 
-        parser = Steam2TelegramHTML(post.contents)
-        msg = parser.parse()
-        # TODO: Implement a parser for external posts
+        # TODO: We skip the <img> or <a> (link) tag for now
+        soup = BeautifulSoup(post.contents, "html.parser")
+
+        msg = f"<b>{post.title}</b>\n"
+        msg += f"({post.date_as_datetime})\n"
+        msg += "\n"
+        msg += soup.get_text()
+        msg += "\n\n"
+        msg += f"Source: <a href='{post.url}'>Link</a>"
 
         super().__init__(msg)
 
@@ -203,7 +211,7 @@ class CounterStrikeExternalMessage(TelegramMessage):
                 chat_id=chat_id,
                 text=msg,
                 parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)
+                disable_web_page_preview=False)
 
 
 class TelegramMessageFactory:

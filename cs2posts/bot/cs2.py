@@ -301,6 +301,21 @@ class CounterStrike2UpdateBot:
         self.latest_update_post = post
         await self.send_post_to_chats(context, post=post)
 
+    async def _post_checker_external(self, context: CallbackContext, post: Post) -> None:
+        if post is None:
+            return
+
+        if not post.is_newer_than(self.latest_external_post):
+            logger.info(
+                f'No new external post found latest_external_post=[{post.title}]')
+            return
+
+        logger.info(
+            f'New external post found latest_external_post=[{post.title}]')
+
+        self.latest_external_post = post
+        await self.send_post_to_chats(context, post=post)
+
     async def post_checker(self, context: CallbackContext) -> None:
         logger.info('Crawling latest posts ...')
         try:
@@ -317,9 +332,11 @@ class CounterStrike2UpdateBot:
 
         latest_news_post = posts.latest_news_post
         latest_update_post = posts.latest_update_post
+        latest_external_post = posts.latest_external_post
 
         await self._post_checker_news(context, latest_news_post)
         await self._post_checker_update(context, latest_update_post)
+        await self._post_checker_external(context, latest_external_post)
 
         self.latest_post = self.latest_post if self.latest_post.is_older_eq_than(
             posts.latest) else posts.latest
@@ -332,6 +349,8 @@ class CounterStrike2UpdateBot:
             chats = self.chats.get_running_and_interested_in_news()
         elif post.is_update():
             chats = self.chats.get_running_and_interested_in_updates()
+        elif post.is_external():
+            chats = self.chats.get_running_and_interested_in_external_news()
         else:
             logger.error(
                 f'Unknown post type {post.to_dict()}. Not sending any message.')

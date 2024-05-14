@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class ButtonData(Enum):
     UPDATE = "UPDATE"
     NEWS = "NEWS"
+    EXTERNAL_NEWS = "EXTERNAL_NEWS"
     CLOSE = "CLOSE"
 
 
@@ -47,6 +48,7 @@ class OptionsMessageFactory:
 
         btn_updates_text = "Disable" if chat.is_update_interested else "Enable"
         btn_news_text = "Disable" if chat.is_news_interested else "Enable"
+        btn_external_news_text = "Disable" if chat.is_external_news_interested else "Enable"
 
         keyboard = [
             [
@@ -54,6 +56,10 @@ class OptionsMessageFactory:
                                      callback_data=ButtonData.UPDATE.value),
                 InlineKeyboardButton(f"{btn_news_text} News",
                                      callback_data=ButtonData.NEWS.value),
+            ],
+            [
+                InlineKeyboardButton(f"{btn_external_news_text} External News",
+                                     callback_data=ButtonData.EXTERNAL_NEWS.value),
             ],
             [
                 InlineKeyboardButton("Close",
@@ -74,14 +80,18 @@ class OptionsMessageFactory:
             chat.is_update_interested)
         icon_is_news_interested = IconGenerator.get_enabled_icon(
             chat.is_news_interested)
+        icon_is_external_news_interested = IconGenerator.get_enabled_icon(
+            chat.is_external_news_interested)
 
         text_enabled_update = "enabled" if chat.is_update_interested else "disabled"
         text_enabled_news = "enabled" if chat.is_news_interested else "disabled"
+        text_enabled_external_news = "enabled" if chat.is_external_news_interested else "disabled"
 
         return (f"<b>Options</b>\n\n"
                 "Handle the automatically send Counter-Strike post notifications.\n\n"
                 f"{icon_is_update_interested} - Send Update Posts ({text_enabled_update})\n"
-                f"{icon_is_news_interested} - Send News Posts ({text_enabled_news})\n\n"
+                f"{icon_is_news_interested} - Send News Posts ({text_enabled_news})\n"
+                f"{icon_is_external_news_interested} - Send External News Posts ({text_enabled_external_news})\n\n"
                 f"Select an option to change, or press 'Close' to keep everything as it is.")
 
 
@@ -149,6 +159,10 @@ class Options:
 
         if btn is ButtonData.NEWS:
             chat.is_news_interested = not chat.is_news_interested
+            self.__store.save(self.chats)
+
+        if btn is ButtonData.EXTERNAL_NEWS:
+            chat.is_external_news_interested = not chat.is_external_news_interested
             self.__store.save(self.chats)
 
         await self.update(context, query, chat)
