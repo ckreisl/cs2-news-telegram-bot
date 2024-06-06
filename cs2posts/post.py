@@ -47,7 +47,10 @@ class Post:
         return "patchnotes" in self.tags or "Release Notes" in self.title
 
     def is_news(self) -> bool:
-        return not self.is_update()
+        return not self.is_update() and not self.is_external()
+
+    def is_external(self) -> bool:
+        return FeedType(self.feed_type) == FeedType.EXTERN
 
     def is_newer_than(self, other: Post) -> bool:
         if other is None:

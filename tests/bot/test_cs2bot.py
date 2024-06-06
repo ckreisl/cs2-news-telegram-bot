@@ -464,6 +464,7 @@ async def test_cs2_bot_send_unknown_post_to_chats(bot):
     mocked_post = Mock()
     mocked_post.is_news.return_value = False
     mocked_post.is_update.return_value = False
+    mocked_post.is_external.return_value = False
     bot.send_message = AsyncMock()
 
     with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:

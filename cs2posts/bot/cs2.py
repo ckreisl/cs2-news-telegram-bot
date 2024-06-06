@@ -77,6 +77,7 @@ class CounterStrike2UpdateBot:
             CommandHandler('help', self.help),
             CommandHandler('news', self.news),
             CommandHandler('update', self.update),
+            CommandHandler('external', self.external),
             CommandHandler('latest', self.latest),
             MessageHandler(
                 filters.StatusUpdate.NEW_CHAT_MEMBERS, self.new_chat_member),
@@ -102,10 +103,12 @@ class CounterStrike2UpdateBot:
             posts = CounterStrike2Posts(data)
             self.local_post_store.save(posts.latest_update_post)
             self.local_post_store.save(posts.latest_news_post)
+            self.local_post_store.save(posts.latest_external_post)
 
         self.latest_post: Post = self.local_post_store.get_latest_post()
         self.latest_news_post: Post = self.local_post_store.get_latest_news_post()
         self.latest_update_post: Post = self.local_post_store.get_latest_update_post()
+        self.latest_external_post: Post = self.local_post_store.get_latest_external_post()
         self.chats: Chats = self.local_chat_store.load()
         self.options.set_chats(self.chats)
         self.options.set_chats_store(self.local_chat_store)
@@ -234,6 +237,7 @@ class CounterStrike2UpdateBot:
                "/latest - Sends the latest post\n"
                "/news - Sends the latest news post\n"
                "/update - Sends the latest update post\n"
+               "/external - Sends the latest external post\n"
                "/help - Prints this help message\n"
                "/options - Configure Options <b>(only admins)</b>")
 
@@ -258,6 +262,13 @@ class CounterStrike2UpdateBot:
         logger.info('Sending latest update post to chats ...')
         chat = self.chats.get(update.message.chat_id)
         msg = TelegramMessageFactory.create(self.latest_update_post)
+        await self.send_message(context=context, msg=msg, chat=chat)
+
+    @spam_protected
+    async def external(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        logger.info('Sending latest external post to chat ...')
+        chat = self.chats.get(update.message.chat_id)
+        msg = TelegramMessageFactory.create(self.latest_external_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     async def _post_checker_news(self, context: CallbackContext, post: Post) -> None:
@@ -290,6 +301,21 @@ class CounterStrike2UpdateBot:
         self.latest_update_post = post
         await self.send_post_to_chats(context, post=post)
 
+    async def _post_checker_external(self, context: CallbackContext, post: Post) -> None:
+        if post is None:
+            return
+
+        if not post.is_newer_than(self.latest_external_post):
+            logger.info(
+                f'No new external post found latest_external_post=[{post.title}]')
+            return
+
+        logger.info(
+            f'New external post found latest_external_post=[{post.title}]')
+
+        self.latest_external_post = post
+        await self.send_post_to_chats(context, post=post)
+
     async def post_checker(self, context: CallbackContext) -> None:
         logger.info('Crawling latest posts ...')
         try:
@@ -306,9 +332,11 @@ class CounterStrike2UpdateBot:
 
         latest_news_post = posts.latest_news_post
         latest_update_post = posts.latest_update_post
+        latest_external_post = posts.latest_external_post
 
         await self._post_checker_news(context, latest_news_post)
         await self._post_checker_update(context, latest_update_post)
+        await self._post_checker_external(context, latest_external_post)
 
         self.latest_post = self.latest_post if self.latest_post.is_older_eq_than(
             posts.latest) else posts.latest
@@ -321,6 +349,8 @@ class CounterStrike2UpdateBot:
             chats = self.chats.get_running_and_interested_in_news()
         elif post.is_update():
             chats = self.chats.get_running_and_interested_in_updates()
+        elif post.is_external():
+            chats = self.chats.get_running_and_interested_in_external_news()
         else:
             logger.error(
                 f'Unknown post type {post.to_dict()}. Not sending any message.')
