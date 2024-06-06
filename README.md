@@ -36,15 +36,16 @@ To use [@CS2PostsBot](https://t.me/CS2PostsBot), simply start a chat with the bo
 * `/start` - Start the bot
 * `/stop` - Stop the bot
 * `/help` - Get a list of available commands
-* `/news` - Get the latest news posts
-* `/updates` - Get the latest updates posts
-* `/latest` - Get the latest post (news & updates)
+* `/news` - Get the latest news post
+* `/updates` - Get the latest update post
+* `/external` - Sends the latest external post
+* `/latest` - Get the latest post
 * `/options` - Option to enable / disable news or updates posts (admin only)
 
 
 ### Adding the Bot to a Group
 
-Adding the bot to a group is possible. The person adding the bot to the group will be the admin of the bot. Which means only the admin can use the `/options` command to enable / disable news or updates posts for the group chat.
+Adding the bot to a group is possible. The person adding the bot to the group will be the admin of the bot. Which means only the admin can use the `/options` command to enable / disable news, updates or external news posts for the group chat.
 
 To prevent spamming a spam protection is implemented. After 3 (default) strikes the chat will be banned and receives a timeout. This affects the whole chat not only the user who spammed.
 
