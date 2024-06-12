@@ -77,7 +77,7 @@ class Chats:
         return chat
 
     def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
-        self.chats.remove(chat)
+        self.remove(chat)
         chat.chat_id = new_chat_id
         self.add(chat)
         return chat
