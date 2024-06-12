@@ -76,6 +76,12 @@ class Chats:
         self.add(chat)
         return chat
 
+    def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
+        self.chats.remove(chat)
+        chat.chat_id = new_chat_id
+        self.add(chat)
+        return chat
+
     def get_running_chats(self) -> list[Chat]:
         return [chat for chat in self.__chats.values() if chat.is_running]
 
