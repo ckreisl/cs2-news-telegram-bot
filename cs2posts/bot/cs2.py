@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.constants import ChatType
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
+from telegram.error import ChatMigrated
 from telegram.error import Forbidden
 from telegram.ext import Application
 from telegram.ext import CallbackContext
@@ -83,6 +84,8 @@ class CounterStrike2UpdateBot:
                 filters.StatusUpdate.NEW_CHAT_MEMBERS, self.new_chat_member),
             MessageHandler(
                 filters.StatusUpdate.LEFT_CHAT_MEMBER, self.left_chat_member),
+            MessageHandler(
+                filters.StatusUpdate.MIGRATE, self.migrate_chat),
         ])
 
         # self.app.add_error_handler(self.error)
@@ -162,6 +165,27 @@ class CounterStrike2UpdateBot:
         logger.info('Removing chat from chat list...')
         self.chats.remove(chat)
         self.local_chat_store.save(self.chats)
+
+    async def migrate_chat(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message.migrate_from_chat_id is None:
+            # Someone two events are fired for the same chat migration
+            # ignore the second event where migrate_from_chat_id is None
+            return
+
+        logger.info(
+            f'Migrating chat from {update.message.migrate_from_chat_id} to {update.message.chat_id} ...')
+
+        chat = self.chats.get(update.message.migrate_from_chat_id)
+        if chat is None:
+            if self.chats.get(update.message.chat_id) is not None:
+                logger.info('Chat already migrated. Nothing to do.')
+                return
+            return
+
+        logger.info(f'Chat migrated to {update.message.chat_id} ...')
+        chat = self.chats.migrate(chat, update.message.chat_id)
+        self.local_chat_store.save(self.chats)
+        logger.info("Chat migrated successfully.")
 
     @spam_protected
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -381,6 +405,13 @@ class CounterStrike2UpdateBot:
                 f'Bot is blocked by user we delete the chat {chat.chat_id=}')
             logger.error(f"Reason: {e}")
             self.chats.remove(chat)
+        except ChatMigrated as e:
+            logger.error(
+                f'Chat migrated we update the chat {chat.chat_id=}')
+            logger.error(f"Reason: {e}")
+            chat = self.chats.migrate(chat, e.new_chat_id)
+            self.local_chat_store.save(self.chats)
+            await self.send_message(context, msg, chat)
         except Exception as e:
             logger.exception(f'Could not send message to chat {chat.chat_id=}')
             logger.exception(f"Reason: {e}")
