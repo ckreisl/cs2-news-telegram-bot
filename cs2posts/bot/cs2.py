@@ -327,6 +327,8 @@ class CounterStrike2UpdateBot:
 
     async def _post_checker_external(self, context: CallbackContext, post: Post) -> None:
         if post is None:
+            logger.info(
+                f'No external {post=} found latest_external_post=[{self.latest_external_post.title}]')
             return
 
         if not post.is_newer_than(self.latest_external_post):
