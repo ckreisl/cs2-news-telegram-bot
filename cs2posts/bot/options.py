@@ -89,12 +89,12 @@ class OptionsMessageFactory:
 
         return (f"<b>Options</b>\n\n"
                 "Handle the automatically send Counter-Strike post notifications.\n\n"
-                f"{icon_is_update_interested} - Send Update Posts ({
-                    text_enabled_update})\n"
-                f"{icon_is_news_interested} - Send News Posts ({
-                    text_enabled_news})\n"
-                f"{icon_is_external_news_interested} - Send External News Posts ({
-                    text_enabled_external_news})\n\n"
+                f"{icon_is_update_interested} - Send Update Posts ("
+                f"{text_enabled_update})\n"
+                f"{icon_is_news_interested} - Send News Posts ("
+                f"{text_enabled_news})\n"
+                f"{icon_is_external_news_interested} - Send External News Posts ("
+                f"{text_enabled_external_news})\n\n"
                 f"Select an option to change, or press 'Close' to keep everything as it is.")
 
 
