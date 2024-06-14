@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
 import pytest
+from telegram.constants import ParseMode
 
 from cs2posts.bot import settings
 from cs2posts.bot.chats import Chat
@@ -139,19 +140,25 @@ async def test_spam_protector_strike(spam_protector, chat):
     chat.is_banned = False
     await spam_protector.strike(mock_bot, chat)
     assert chat.strikes == 1
-    assert await mock_bot.send_message.called_once_with(
-        chat.chat_id,
-        SpamProtectorMessages.warning(chat, settings.CHAT_MAX_STRIKES))
+    mock_bot.send_message.assert_called_once_with(
+        chat_id=chat.chat_id,
+        text=SpamProtectorMessages.warning(chat, settings.CHAT_MAX_STRIKES),
+        parse_mode=ParseMode.HTML)
+    mock_bot.reset_mock()
 
     await spam_protector.strike(mock_bot, chat)
     assert chat.strikes == 2
-    assert await mock_bot.send_message.called_once_with(
-        chat.chat_id,
-        SpamProtectorMessages.warning(chat, settings.CHAT_MAX_STRIKES))
+    mock_bot.send_message.assert_called_once_with(
+        chat_id=chat.chat_id,
+        text=SpamProtectorMessages.warning(chat, settings.CHAT_MAX_STRIKES),
+        parse_mode=ParseMode.HTML)
+    mock_bot.reset_mock()
 
     await spam_protector.strike(mock_bot, chat)
     assert chat.strikes == 3
-    assert await mock_bot.send_message.called_once_with(
-        chat.chat_id,
-        SpamProtectorMessages.banned(chat, settings.CHAT_BAN_TIMEOUT_SECONDS, settings.CHAT_MAX_STRIKES))
+    mock_bot.send_message.assert_called_once_with(
+        chat_id=chat.chat_id,
+        text=SpamProtectorMessages.banned(
+            chat, settings.CHAT_BAN_TIMEOUT_SECONDS, settings.CHAT_MAX_STRIKES),
+        parse_mode=ParseMode.HTML)
     assert chat.is_banned

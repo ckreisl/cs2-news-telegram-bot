@@ -111,5 +111,5 @@ async def test_telegram_message_send_update(mocked_cs2_update_post):
 
     await msg.send(bot=mocked_bot, chat_id=1337)
 
-    assert mocked_bot.send_photo.not_called
-    assert mocked_bot.send_message.called
+    mocked_bot.send_photo.assert_not_called()
+    mocked_bot.send_message.assert_called()
