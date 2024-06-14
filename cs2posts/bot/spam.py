@@ -22,7 +22,7 @@ class SpamProtectorMessages:
 
     @staticmethod
     def banned(chat: Chat, timout: int, max_strikes: int) -> str:
-        return f"<b>Strike ({chat.strikes}/{max_strikes})</b> Chat is now <b>banned</b> for spamming (Timeout: {int(timout/60)} mins)."
+        return f"<b>Strike ({chat.strikes}/{max_strikes})</b> Chat is now <b>banned</b> for spamming (Timeout: {int(timout / 60)} mins)."
 
 
 class SpamProtector:

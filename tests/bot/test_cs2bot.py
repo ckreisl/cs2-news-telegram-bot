@@ -64,14 +64,14 @@ def bot(mocked_crawler, mocked_post_store, mocked_chat_store, mocked_spam_protec
 
 def test_cs2_bot_init_no_files(bot):
     bot.local_chat_store.is_empty.return_value = True
-    bot.local_chat_store.is_empty.called_once()
-    bot.local_chat_store.save.called_once()
+    bot.local_chat_store.is_empty.assert_called()
+    bot.local_chat_store.save.assert_called()
 
     bot.local_post_store.is_empty.return_value = True
-    bot.local_post_store.is_empty.called_once()
-    bot.crawler.crawl.called_once()
-    bot.local_post_store.save.called_once()
-    bot.local_chat_store.save.called_once()
+    bot.local_post_store.is_empty.assert_called()
+    bot.crawler.crawl.assert_called()
+    bot.local_post_store.save.assert_called()
+    bot.local_chat_store.save.assert_called()
 
     # TODO finish up setup
 
@@ -163,8 +163,8 @@ async def test_cs2_bot_left_chat_member_bot_left(bot):
     bot.local_chat_store.reset_mock()
     await bot.left_chat_member(mocked_update, mocked_context)
 
-    bot.chats.remove.called_once_with(chat)
-    bot.local_chat_store.save.called_once()
+    bot.chats.remove.assert_called_once_with(chat)
+    bot.local_chat_store.save.assert_called_once()
 
 
 @pytest.mark.asyncio
