@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from cs2posts.bot.chats import Chat
 from cs2posts.bot.chats import Chats
-from cs2posts.store import LocalChatStore
-from cs2posts.store import LocalLatestPostStore
-from cs2posts.store import Post
+from cs2posts.db import ChatDatabase
+from cs2posts.db import PostDatabase
+from cs2posts.post import Post
 
 
 @pytest.fixture
@@ -48,14 +46,14 @@ def data_latest():
 
 
 @pytest.fixture
-def local_latest_post_store(tmp_path, data_latest):
-    filepath = tmp_path / "latest.json"
+def post_database(tmp_path, data_latest):
+    filepath = tmp_path / "test_posts.db"
 
-    with open(filepath, "w") as fs:
-        json.dump(data_latest, fs)
+    db = PostDatabase(filepath)
+    db.save(Post(**data_latest["update"]))
+    db.save(Post(**data_latest["news"]))
 
-    store = LocalLatestPostStore(filepath)
-    yield store
+    yield db
 
 
 @pytest.fixture
@@ -64,23 +62,18 @@ def data_chats():
 
 
 @pytest.fixture
-def local_chat_store(tmp_path, data_chats):
-    filepath = tmp_path / "chats.json"
+def chats_database(tmp_path, data_chats):
+    filepath = tmp_path / "test_chats.db"
 
-    with open(filepath, "w") as fs:
-        json.dump(data_chats, fs)
+    db = ChatDatabase(filepath)
+    chats = data_chats["chats"]
+    for chat in chats:
+        db.save(chat)
 
-    store = LocalChatStore(filepath)
-    yield store
-
-
-def test_local_latest_post_store_load(local_latest_post_store, data_latest):
-    content = local_latest_post_store.load()
-    assert isinstance(content, dict)
-    assert content == data_latest
+    yield db
 
 
-def test_local_latest_post_store_save(local_latest_post_store, data_latest):
+def test_post_database_save(post_database, data_latest):
     expected_temp_update_title = data_latest["news"]["title"]
 
     data_latest["update"]["title"] = "New Update headline"
@@ -89,44 +82,44 @@ def test_local_latest_post_store_save(local_latest_post_store, data_latest):
     actual_post_update = Post(**data_latest["update"])
     actual_post_news = Post(**data_latest["news"])
 
-    local_latest_post_store.save(actual_post_update)
-    content = local_latest_post_store.load()
+    post_database.save(actual_post_update)
+    content = post_database.load()
 
     # News headline should not be changed
     assert content["news"]["title"] == expected_temp_update_title
     assert content["update"]["title"] == "New Update headline"
 
-    local_latest_post_store.save(actual_post_news)
+    post_database.save(actual_post_news)
 
-    content = local_latest_post_store.load()
+    content = post_database.load()
     assert content["news"]["title"] == "New News headline"
 
 
-def test_local_latest_post_store_get_latest_news_post(local_latest_post_store, data_latest):
-    actual_post = local_latest_post_store.get_latest_news_post()
+def test_post_database_get_latest_news_post(post_database, data_latest):
+    actual_post = post_database.get_latest_news_post()
     expected_post = Post(**data_latest["news"])
     assert actual_post == expected_post
 
 
-def test_local_latest_post_store_get_latest_update_post(local_latest_post_store, data_latest):
-    actual_post = local_latest_post_store.get_latest_update_post()
+def test_post_database_get_latest_update_post(post_database, data_latest):
+    actual_post = post_database.get_latest_update_post()
     expected_post = Post(**data_latest["update"])
     assert actual_post == expected_post
 
 
-def test_local_chat_store_load(local_chat_store, data_chats):
-    chats = local_chat_store.load()
+def test_chats_database_load(chats_database, data_chats):
+    chats = Chats(chats_database.load())
     assert isinstance(chats, Chats)
     assert len(chats) == 2
     assert Chat(1337) in chats
     assert Chat(42) in chats
 
 
-def test_local_chat_store_save(local_chat_store):
+def test_chats_database_save(chats_database):
     chats = [Chat(41), Chat(1338)]
     chats_expected = Chats(chats=chats)
-    local_chat_store.save(chats=chats_expected)
-    actual_chats = local_chat_store.load()
+    chats_database.save(chats=chats_expected)
+    actual_chats = chats_database.load()
 
     for chat in chats:
         assert chat in actual_chats

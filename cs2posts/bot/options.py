@@ -15,7 +15,7 @@ from telegram.ext import ContextTypes
 
 from cs2posts.bot.chats import Chat
 from cs2posts.bot.chats import Chats
-from cs2posts.store import Store
+from cs2posts.db import Database
 
 
 logger = logging.getLogger(__name__)
@@ -101,8 +101,10 @@ class OptionsMessageFactory:
 class Options:
 
     def __init__(self, app: Application) -> None:
+        # TODO: Chats not required anymore in memory?
+        # Maybe move directly to DB connection?
         self.__chats = None
-        self.__store = None
+        self.__db = None
 
         app.add_handler(CommandHandler("options", self.options))
         app.add_handler(CallbackQueryHandler(self.button))
@@ -112,14 +114,14 @@ class Options:
         return self.__chats
 
     @property
-    def store(self) -> Store:
-        return self.__store
+    def database(self) -> Database:
+        return self.__db
 
     def set_chats(self, chats: Chats) -> None:
         self.__chats = chats
 
-    def set_chats_store(self, store: Store) -> None:
-        self.__store = store
+    def set_chat_db(self, db: Database) -> None:
+        self.__db = db
 
     async def options(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
@@ -158,15 +160,15 @@ class Options:
 
         if btn is ButtonData.UPDATE:
             chat.is_update_interested = not chat.is_update_interested
-            self.__store.save(self.chats)
+            self.__db.save(chat)
 
         if btn is ButtonData.NEWS:
             chat.is_news_interested = not chat.is_news_interested
-            self.__store.save(self.chats)
+            self.__db.save(chat)
 
         if btn is ButtonData.EXTERNAL_NEWS:
             chat.is_external_news_interested = not chat.is_external_news_interested
-            self.__store.save(self.chats)
+            self.__db.save(chat)
 
         await self.update(context, query, chat)
 

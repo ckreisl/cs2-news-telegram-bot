@@ -46,16 +46,16 @@ def create_news_post():
 
 @pytest.fixture
 @patch('cs2posts.bot.spam.SpamProtector')
-@patch('cs2posts.store.LocalChatStore')
-@patch('cs2posts.store.LocalLatestPostStore')
+@patch('cs2posts.db.ChatDatabase')
+@patch('cs2posts.db.PostDatabase')
 @patch('cs2posts.crawler.CounterStrike2Crawler')
-def bot(mocked_crawler, mocked_post_store, mocked_chat_store, mocked_spam_protector):
+def bot(mocked_crawler, mocked_post_db, mocked_chat_db, mocked_spam_protector):
     mocked_spam_protector.check = AsyncMock()
     mocked_spam_protector.strike = AsyncMock()
     bot = CounterStrike2UpdateBot(
         token='test_token',
-        local_chat_store=mocked_chat_store,
-        local_post_store=mocked_post_store,
+        chat_db=mocked_chat_db,
+        post_db=mocked_post_db,
         crawler=mocked_crawler,
         spam_protector=mocked_spam_protector)
     bot.chats = Mock()
@@ -63,15 +63,11 @@ def bot(mocked_crawler, mocked_post_store, mocked_chat_store, mocked_spam_protec
 
 
 def test_cs2_bot_init_no_files(bot):
-    bot.local_chat_store.is_empty.return_value = True
-    bot.local_chat_store.is_empty.assert_called()
-    bot.local_chat_store.save.assert_called()
-
-    bot.local_post_store.is_empty.return_value = True
-    bot.local_post_store.is_empty.assert_called()
+    bot.post_db.is_empty.return_value = True
+    bot.post_db.is_empty.assert_called()
     bot.crawler.crawl.assert_called()
-    bot.local_post_store.save.assert_called()
-    bot.local_chat_store.save.assert_called()
+    bot.post_db.save.assert_called()
+    bot.chat_db.save.assert_called()
 
     # TODO finish up setup
 

@@ -25,9 +25,9 @@ from cs2posts.bot.options import Options
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.crawler import CounterStrike2Crawler
 from cs2posts.cs2 import CounterStrike2Posts
+from cs2posts.db import ChatDatabase
+from cs2posts.db import PostDatabase
 from cs2posts.post import Post
-from cs2posts.store import LocalChatStore
-from cs2posts.store import LocalLatestPostStore
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,8 @@ def spam_protected(func):
         await self.spam_protector.check(context.bot, chat)
         if chat is not None and chat.is_banned:
             return
+        if chat is not None:
+            self.chat_db.save(chat)
         return await func(self, update, context)
     return wrapper
 
@@ -67,8 +69,8 @@ class CounterStrike2UpdateBot:
 
         self.crawler: CounterStrike2Crawler = kwargs['crawler']
         self.spam_protector: SpamProtector = kwargs['spam_protector']
-        self.local_post_store: LocalLatestPostStore = kwargs['local_post_store']
-        self.local_chat_store: LocalChatStore = kwargs['local_chat_store']
+        self.post_db: PostDatabase = kwargs['post_db']
+        self.chat_db: ChatDatabase = kwargs['chat_db']
 
         self.options = Options(app=self.app)
 
@@ -93,28 +95,25 @@ class CounterStrike2UpdateBot:
         self.__init_data()
 
     def __init_data(self) -> None:
-        if self.local_chat_store.is_empty():
-            logger.info('No chat data found. Creating new chat data...')
-            self.local_chat_store.save(Chats())
 
-        if self.local_post_store.is_empty():
+        if self.post_db.is_empty():
             # TODO: Maybe ensure that there is a latest update and news post
             # As of now we just fetch 100 items.
             logger.info('No post data found. Fetching latest posts...')
             # TODO: What happens here if crawler fails?
             data = self.crawler.crawl()
             posts = CounterStrike2Posts(data)
-            self.local_post_store.save(posts.latest_update_post)
-            self.local_post_store.save(posts.latest_news_post)
-            self.local_post_store.save(posts.latest_external_post)
+            self.post_db.save(posts.latest_update_post)
+            self.post_db.save(posts.latest_news_post)
+            self.post_db.save(posts.latest_external_post)
 
-        self.latest_post: Post = self.local_post_store.get_latest_post()
-        self.latest_news_post: Post = self.local_post_store.get_latest_news_post()
-        self.latest_update_post: Post = self.local_post_store.get_latest_update_post()
-        self.latest_external_post: Post = self.local_post_store.get_latest_external_post()
-        self.chats: Chats = self.local_chat_store.load()
+        self.latest_post: Post = self.post_db.get_latest_post()
+        self.latest_news_post: Post = self.post_db.get_latest_news_post()
+        self.latest_update_post: Post = self.post_db.get_latest_update_post()
+        self.latest_external_post: Post = self.post_db.get_latest_external_post()
+        self.chats: Chats = Chats(self.chat_db.load())
         self.options.set_chats(self.chats)
-        self.options.set_chats_store(self.local_chat_store)
+        self.options.set_chat_db(self.chat_db)
 
     async def post_init(self, application: Application) -> None:
         logger.info('Post init bot...')
@@ -125,11 +124,12 @@ class CounterStrike2UpdateBot:
     async def post_shutdown(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info('Shutting down bot...')
         logger.info('Saving posts ...')
-        self.local_post_store.save(self.latest_news_post)
-        self.local_post_store.save(self.latest_update_post)
+        self.post_db.save(self.latest_news_post)
+        self.post_db.save(self.latest_update_post)
 
         logger.info('Saving chats...')
-        self.local_chat_store.save(self.chats)
+        for chat in self.chats:
+            self.chat_db.save(chat)
 
     async def new_chat_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info(f'New chat member {update.message.new_chat_members} ...')
@@ -146,7 +146,7 @@ class CounterStrike2UpdateBot:
                 logger.info('Chat not found. Creating new chat...')
                 chat = self.chats.create_and_add(
                     chat_id=update.message.chat_id)
-                self.local_chat_store.save(self.chats)
+                self.chat_db.save(chat)
 
             chat.chat_id_admin = update.message.from_user.id
 
@@ -164,7 +164,7 @@ class CounterStrike2UpdateBot:
 
         logger.info('Removing chat from chat list...')
         self.chats.remove(chat)
-        self.local_chat_store.save(self.chats)
+        self.chat_db.save(chat)
 
     async def migrate_chat(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if update.message.migrate_from_chat_id is None:
@@ -184,7 +184,7 @@ class CounterStrike2UpdateBot:
 
         logger.info(f'Chat migrated to {update.message.chat_id} ...')
         chat = self.chats.migrate(chat, update.message.chat_id)
-        self.local_chat_store.save(self.chats)
+        self.chat_db.save(chat)
         logger.info("Chat migrated successfully.")
 
     @spam_protected
@@ -198,14 +198,14 @@ class CounterStrike2UpdateBot:
             chat = self.chats.create_and_add(chat_id=chat_id)
             chat.chat_id_admin = update.message.from_user.id
             self.spam_protector.update_chat_activity(chat)
-            self.local_chat_store.save(self.chats)
+            self.chat_db.save(chat)
 
         if not chat.is_running:
             chat.is_running = True
             await update.message.reply_text(
                 text=const.WELCOME_MESSAGE_ENGLISH,
                 parse_mode=ParseMode.HTML)
-            self.local_chat_store.save(self.chats)
+            self.chat_db.save(chat)
         else:
             await update.message.reply_text(
                 'Bot is already running for your chat!')
@@ -243,7 +243,7 @@ class CounterStrike2UpdateBot:
 
         if chat_type == ChatType.PRIVATE:
             self.chats.remove(chat)
-            self.local_chat_store.save(self.chats)
+            self.chat_db.save(chat)
             return
 
     @spam_protected
@@ -412,7 +412,7 @@ class CounterStrike2UpdateBot:
                 f'Chat migrated we update the chat {chat.chat_id=}')
             logger.error(f"Reason: {e}")
             chat = self.chats.migrate(chat, e.new_chat_id)
-            self.local_chat_store.save(self.chats)
+            self.chat_db.save(chat)
             await self.send_message(context, msg, chat)
         except Exception as e:
             logger.exception(f'Could not send message to chat {chat.chat_id=}')
