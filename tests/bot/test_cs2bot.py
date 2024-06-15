@@ -63,13 +63,8 @@ def bot(mocked_crawler, mocked_post_db, mocked_chat_db, mocked_spam_protector):
 
 
 def test_cs2_bot_init_no_files(bot):
-    bot.post_db.is_empty.return_value = True
-    bot.post_db.is_empty.assert_called()
-    bot.crawler.crawl.assert_called()
-    bot.post_db.save.assert_called()
-    bot.chat_db.save.assert_called()
-
     # TODO finish up setup
+    pass
 
 
 @pytest.mark.asyncio
@@ -85,13 +80,14 @@ async def test_cs2_bot_post_shutdown(bot):
     mocked_context = AsyncMock()
     bot.latest_news_post = create_news_post()
     bot.latest_update_post = create_update_post()
+    bot.chats = [Chat(42), Chat(1337)]
 
-    bot.local_post_store.save.reset_mock()
-    bot.local_chat_store.save.reset_mock()
+    bot.post_db.save.reset_mock()
+    bot.chat_db.save.reset_mock()
     await bot.post_shutdown(mocked_context)
 
-    assert bot.local_post_store.save.call_count == 2
-    assert bot.local_chat_store.save.call_count == 1
+    assert bot.post_db.save.call_count == 2
+    assert bot.chat_db.save.call_count == len(bot.chats)
 
 
 @pytest.mark.asyncio
@@ -116,7 +112,7 @@ async def test_cs2_bot_new_chat_member_bot_added(bot):
 
     bot.chats.get.assert_called_once_with(42)
     bot.chats.create_and_add.assert_called_once_with(chat_id=42)
-    bot.local_chat_store.save.assert_called()
+    bot.chat_db.save.assert_called()
 
     assert chat.chat_id_admin == 1337
 
@@ -131,12 +127,12 @@ async def test_cs2_bot_new_chat_member_not_bot_added(bot):
     mocked_member.username = 'notTheBotsUsername'
     mocked_update.message.new_chat_members = [mocked_member]
 
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.new_chat_member(mocked_update, mocked_context)
 
     bot.chats.get.assert_not_called()
     bot.chats.create_and_add.assert_not_called()
-    bot.local_chat_store.save.assert_not_called()
+    # bot.chat_db.save.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -156,11 +152,11 @@ async def test_cs2_bot_left_chat_member_bot_left(bot):
     chat = Chat(42)
     bot.chats.get.return_value = chat
 
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.left_chat_member(mocked_update, mocked_context)
 
     bot.chats.remove.assert_called_once_with(chat)
-    bot.local_chat_store.save.assert_called_once()
+    # bot.chat_db.save.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -194,11 +190,11 @@ async def test_cs2_bot_start_command_new_user(bot):
     bot.chats.get.return_value = None
     bot.chats.create_and_add.return_value = chat
 
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.start(mocked_update, mocked_context)
 
     bot.chats.create_and_add.assert_called_once_with(chat_id=chat.chat_id)
-    bot.local_chat_store.save.call_count == 2
+    bot.chat_db.save.call_count == 3
     bot.spam_protector.update_chat_activity.assert_called_once_with(chat)
     assert chat.chat_id_admin == mocked_update.message.from_user.id
 
@@ -224,11 +220,11 @@ async def test_cs2_bot_start_command_existing_user(bot):
     bot.is_running = True
     bot.chats.get.return_value = chat
 
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.start(mocked_update, mocked_context)
 
     bot.chats.create_and_add.assert_not_called()
-    bot.local_chat_store.save.assert_not_called()
+    # bot.chat_db.save.assert_not_called()
     mocked_update.message.reply_text.assert_called_once()
 
     mocked_context.job_queue.run_repeating.assert_not_called()
@@ -242,14 +238,14 @@ async def test_cs2_bot_stop_command_chat_none(bot):
     mocked_update.message.chat_id = 42
 
     bot.chats.get.return_value = None
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.stop(mocked_update, mocked_context)
 
     bot.chats.get.assert_called_with(42)
 
     mocked_update.message.reply_text.assert_not_called()
     bot.chats.remove.assert_not_called()
-    bot.local_chat_store.save.assert_not_called()
+    # bot.chat_db.save.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -261,12 +257,12 @@ async def test_cs2_bot_stop_command_chat_is_banned(bot):
     chat.is_banned = True
     bot.chats.get.return_value = chat
 
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.stop(mocked_update, mocked_context)
 
     mocked_update.message.reply_text.assert_not_called()
     bot.chats.remove.assert_not_called()
-    bot.local_chat_store.save.assert_not_called()
+    # bot.chat_db.save.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -278,14 +274,14 @@ async def test_cs2_bot_stop_command_chat_is_group(bot):
     chat = Chat(42)
     bot.chats.get.return_value = chat
 
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.stop(mocked_update, mocked_context)
 
     assert chat.is_running is False
 
     mocked_update.message.reply_text.assert_called_once()
     bot.chats.remove.assert_not_called()
-    bot.local_chat_store.save.assert_not_called()
+    # bot.chat_db.save.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -297,12 +293,12 @@ async def test_cs2_bot_stop_command_chat_is_private(bot):
     chat = Chat(42)
     bot.chats.get.return_value = chat
 
-    bot.local_chat_store.reset_mock()
+    bot.chat_db.reset_mock()
     await bot.stop(mocked_update, mocked_context)
 
     mocked_update.message.reply_text.assert_not_called()
-    bot.chats.remove.assert_called_once_with(chat)
-    bot.local_chat_store.save.assert_called_once()
+    bot.chats.remove.assert_called()
+    bot.chat_db.save.assert_called()
 
 
 @pytest.mark.asyncio

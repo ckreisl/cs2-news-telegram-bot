@@ -58,7 +58,7 @@ def post_database(tmp_path, data_latest):
 
 @pytest.fixture
 def data_chats():
-    return {"chats": [Chat(1337).to_json(), Chat(42).to_json()]}
+    return {"chats": [Chat(1337), Chat(42)]}
 
 
 @pytest.fixture
@@ -83,16 +83,17 @@ def test_post_database_save(post_database, data_latest):
     actual_post_news = Post(**data_latest["news"])
 
     post_database.save(actual_post_update)
-    content = post_database.load()
+    latest_update_post = post_database.get_latest_update_post()
+    latest_news_post = post_database.get_latest_news_post()
 
     # News headline should not be changed
-    assert content["news"]["title"] == expected_temp_update_title
-    assert content["update"]["title"] == "New Update headline"
+    assert latest_news_post.title == expected_temp_update_title
+    assert latest_update_post.title == "New Update headline"
 
     post_database.save(actual_post_news)
 
-    content = post_database.load()
-    assert content["news"]["title"] == "New News headline"
+    latest_news_post = post_database.get_latest_news_post()
+    assert latest_news_post.title == "New News headline"
 
 
 def test_post_database_get_latest_news_post(post_database, data_latest):
@@ -118,8 +119,9 @@ def test_chats_database_load(chats_database, data_chats):
 def test_chats_database_save(chats_database):
     chats = [Chat(41), Chat(1338)]
     chats_expected = Chats(chats=chats)
-    chats_database.save(chats=chats_expected)
-    actual_chats = chats_database.load()
+    for chat in chats_expected:
+        chats_database.save(chat=chat)
+    actual_chats = Chats(chats_database.load())
 
     for chat in chats:
         assert chat in actual_chats
