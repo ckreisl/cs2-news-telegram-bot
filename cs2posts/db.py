@@ -4,6 +4,7 @@ import abc
 import json
 import logging
 import sqlite3
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -232,3 +233,170 @@ class ChatDatabase(SQLite):
 
     def is_empty(self, table_name: str) -> bool:
         return super().is_empty(table_name)
+
+    def get(self, chat_id: int) -> Chat | None:
+        if not self.exists(chat_id):
+            return None
+
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE chat_id = ?
+            """, (chat_id,))
+            return Chat.from_json(dict(cursor.fetchone()))
+
+    def add(self, chat: Chat) -> Chat:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.execute("""
+                INSERT INTO chats (
+                    chat_id,
+                    chat_id_admin,
+                    strikes,
+                    is_running,
+                    is_banned,
+                    is_removed_while_banned,
+                    is_news_interested,
+                    is_update_interested,
+                    is_external_news_interested,
+                    last_activity
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                chat.chat_id,
+                chat.chat_id_admin,
+                chat.strikes,
+                chat.is_running,
+                chat.is_banned,
+                chat.is_removed_while_banned,
+                chat.is_news_interested,
+                chat.is_update_interested,
+                chat.is_external_news_interested,
+                chat.last_activity.isoformat()
+            ))
+            conn.commit()
+        return chat
+
+    def remove(self, chat: Chat) -> None:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.execute("""
+                DELETE FROM chats WHERE chat_id = ?
+            """, (chat.chat_id,))
+            conn.commit()
+
+    def update(self, chat: Chat) -> None:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.execute("""
+                UPDATE chats SET
+                    chat_id_admin = ?,
+                    strikes = ?,
+                    is_running = ?,
+                    is_banned = ?,
+                    is_removed_while_banned = ?,
+                    is_news_interested = ?,
+                    is_update_interested = ?,
+                    is_external_news_interested = ?,
+                    last_activity = ?
+                WHERE chat_id = ?
+            """, (
+                chat.chat_id_admin,
+                chat.strikes,
+                chat.is_running,
+                chat.is_banned,
+                chat.is_removed_while_banned,
+                chat.is_news_interested,
+                chat.is_update_interested,
+                chat.is_external_news_interested,
+                chat.last_activity.isoformat(),
+                chat.chat_id
+            ))
+            conn.commit()
+
+    def exists(self, chat_id: Chat) -> bool:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.execute("""
+                SELECT COUNT(*) FROM chats WHERE chat_id = ?
+            """, (chat_id,))
+            return cursor.fetchone()[0] == 1
+
+    def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
+        chat.chat_id = new_chat_id
+        self.update(chat)
+        return chat
+
+    def get_running_chats(self) -> list[Chat]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE is_running = 1
+            """)
+            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+
+    def get_interested_in_news_chats(self) -> list[Chat]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE is_news_interested = 1
+            """)
+            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+
+    def get_interested_in_updates_chats(self) -> list[Chat]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE is_update_interested = 1
+            """)
+            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+
+    def get_interested_in_external_news_chats(self) -> list[Chat]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE is_external_news_interested = 1
+            """)
+            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+
+    def get_running_and_interested_in_news_chats(self) -> list[Chat]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE is_running = 1 AND is_news_interested = 1
+            """)
+            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+
+    def get_running_and_interested_in_updates_chats(self) -> list[Chat]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE is_running = 1 AND is_update_interested = 1
+            """)
+            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+
+    def get_running_and_interested_in_external_news_chats(self) -> list[Chat]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats WHERE is_running = 1 AND is_external_news_interested = 1
+            """)
+            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+
+    def __contains__(self, chat: Chat) -> bool:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.execute("""
+                SELECT COUNT(*) FROM chats WHERE chat_id = ?
+            """, (chat.chat_id,))
+            return cursor.fetchone()[0] == 1
+
+    def __iter__(self) -> Generator[Chat, None, None]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM chats
+            """)
+            for row in cursor.fetchall():
+                yield Chat.from_json(dict(row))
+
+    def __len__(self) -> int:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.execute("""
+                SELECT COUNT(*) FROM chats
+            """)
+            return cursor.fetchone()[0]
