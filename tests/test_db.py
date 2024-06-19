@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from cs2posts.bot.chats import Chat
-from cs2posts.bot.chats import Chats
 from cs2posts.db import ChatDatabase
 from cs2posts.db import PostDatabase
 from cs2posts.post import Post
@@ -41,6 +40,20 @@ def data_latest():
             "feed_type": 1,
             "appid": 730,
             "tags": []
+        },
+        "external": {
+            "gid": "5759616966667952408",
+            "title": "Lefties unite! Counter-Strike 2 now lets you swap hands",
+            "url": "https://steamstore-a.akamaihd.net/news/externalpost/GamingOnLinux/5759616966667952408",
+            "is_external_url": True,
+            "author": "",
+            "contents": "<p><p>All you Lefties out there can finally get properly represented, in Counter-Strike 2 that is, as there's now the ability to swap your weapons into the other hand.</p><p><img src=\"https://www.gamingonlinux.com/uploads/articles/tagline_images/350555862id24405gol.jpg\" alt /></p><p>Read the full article here: https://www.gamingonlinux.com/2024/04/lefties-unite-counter-strike-2-now-lets-you-swap-hands</p></p>",
+            "feedlabel": "GamingOnLinux",
+            "date": 1714131032,
+            "feedname": "GamingOnLinux",
+            "feed_type": 0,
+            "appid": 730,
+            "tags": []
         }
     }
 
@@ -52,6 +65,7 @@ def post_database(tmp_path, data_latest):
     db = PostDatabase(filepath)
     db.save(Post(**data_latest["update"]))
     db.save(Post(**data_latest["news"]))
+    db.save(Post(**data_latest["external"]))
 
     yield db
 
@@ -62,15 +76,18 @@ def data_chats():
 
 
 @pytest.fixture
-def chats_database(tmp_path, data_chats):
+def chats_empty_database(tmp_path):
     filepath = tmp_path / "test_chats.db"
-
     db = ChatDatabase(filepath)
-    chats = data_chats["chats"]
-    for chat in chats:
-        db.save(chat)
-
     yield db
+
+
+@pytest.fixture
+def chats_database(chats_empty_database, data_chats):
+    for chat in data_chats["chats"]:
+        chats_empty_database.save(chat)
+
+    yield chats_empty_database
 
 
 def test_post_database_save(post_database, data_latest):
@@ -78,9 +95,11 @@ def test_post_database_save(post_database, data_latest):
 
     data_latest["update"]["title"] = "New Update headline"
     data_latest["news"]["title"] = "New News headline"
+    data_latest["external"]["title"] = "New External headline"
 
     actual_post_update = Post(**data_latest["update"])
     actual_post_news = Post(**data_latest["news"])
+    actual_post_external = Post(**data_latest["external"])
 
     post_database.save(actual_post_update)
     latest_update_post = post_database.get_latest_update_post()
@@ -95,6 +114,9 @@ def test_post_database_save(post_database, data_latest):
     latest_news_post = post_database.get_latest_news_post()
     assert latest_news_post.title == "New News headline"
 
+    post_database.save(actual_post_external)
+    assert post_database.get_latest_external_post().title == "New External headline"
+
 
 def test_post_database_get_latest_news_post(post_database, data_latest):
     actual_post = post_database.get_latest_news_post()
@@ -108,20 +130,19 @@ def test_post_database_get_latest_update_post(post_database, data_latest):
     assert actual_post == expected_post
 
 
-def test_chats_database_load(chats_database, data_chats):
-    chats = Chats(chats_database.load())
-    assert isinstance(chats, Chats)
+def test_chats_database_load(chats_database):
+    chats = chats_database.load()
+    assert isinstance(chats, list)
     assert len(chats) == 2
     assert Chat(1337) in chats
     assert Chat(42) in chats
 
 
-def test_chats_database_save(chats_database):
-    chats = [Chat(41), Chat(1338)]
-    chats_expected = Chats(chats=chats)
-    for chat in chats_expected:
-        chats_database.save(chat=chat)
-    actual_chats = Chats(chats_database.load())
+def test_chats_database_save(chats_empty_database):
+    expected_chats = [Chat(41), Chat(1338)]
+    for chat in expected_chats:
+        chats_empty_database.save(chat=chat)
+    actual_chats = chats_empty_database.load()
 
-    for chat in chats:
-        assert chat in actual_chats
+    assert len(expected_chats) == len(actual_chats)
+    assert actual_chats == expected_chats
