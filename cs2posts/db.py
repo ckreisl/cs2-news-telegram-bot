@@ -92,6 +92,9 @@ class PostDatabase(SQLite):
             conn.commit()
 
     def save(self, post: Post) -> None:
+        if post is None:
+            return
+
         with sqlite3.connect(self.filepath) as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO posts (
@@ -125,6 +128,14 @@ class PostDatabase(SQLite):
                 str(post.get_type())
             ))
             conn.commit()
+
+    def load(self) -> list[Post]:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT * FROM posts
+            """)
+            return [self._convert_row_to_post(row) for row in cursor.fetchall()]
 
     def _convert_row_to_post(self, row: sqlite3.Row) -> Post:
         if row is None:
@@ -195,6 +206,9 @@ class ChatDatabase(SQLite):
             conn.commit()
 
     def save(self, chat: Chat) -> None:
+        if chat is None:
+            return
+
         with sqlite3.connect(self.filepath) as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO chats (

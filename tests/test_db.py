@@ -59,15 +59,19 @@ def data_latest():
 
 
 @pytest.fixture
-def post_database(tmp_path, data_latest):
+def post_empty_database(tmp_path):
     filepath = tmp_path / "test_posts.db"
-
     db = PostDatabase(filepath)
-    db.save(Post(**data_latest["update"]))
-    db.save(Post(**data_latest["news"]))
-    db.save(Post(**data_latest["external"]))
-
     yield db
+
+
+@pytest.fixture
+def post_database(post_empty_database, data_latest):
+    post_empty_database.save(Post(**data_latest["update"]))
+    post_empty_database.save(Post(**data_latest["news"]))
+    post_empty_database.save(Post(**data_latest["external"]))
+
+    yield post_empty_database
 
 
 @pytest.fixture
@@ -88,6 +92,14 @@ def chats_database(chats_empty_database, data_chats):
         chats_empty_database.save(chat)
 
     yield chats_empty_database
+
+
+def test_post_database_save_with_none(post_empty_database):
+    post_empty_database.save(None)
+    assert post_empty_database.load() == []
+    assert post_empty_database.get_latest_news_post() is None
+    assert post_empty_database.get_latest_update_post() is None
+    assert post_empty_database.get_latest_external_post() is None
 
 
 def test_post_database_save(post_database, data_latest):
@@ -130,6 +142,18 @@ def test_post_database_get_latest_update_post(post_database, data_latest):
     assert actual_post == expected_post
 
 
+def test_post_database_load(post_database, data_latest):
+    actual_posts = post_database.load()
+    assert isinstance(actual_posts, list)
+    assert len(actual_posts) == 3
+    expected_posts = [
+        Post(**data_latest["update"]),
+        Post(**data_latest["news"]),
+        Post(**data_latest["external"]),
+    ]
+    assert actual_posts == expected_posts
+
+
 def test_chats_database_load(chats_database):
     chats = chats_database.load()
     assert isinstance(chats, list)
@@ -139,6 +163,10 @@ def test_chats_database_load(chats_database):
 
 
 def test_chats_database_save(chats_empty_database):
+    assert chats_empty_database.load() == []
+    chats_empty_database.save(None)
+    assert chats_empty_database.load() == []
+
     expected_chats = [Chat(41), Chat(1338)]
     for chat in expected_chats:
         chats_empty_database.save(chat=chat)
