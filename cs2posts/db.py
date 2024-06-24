@@ -26,15 +26,15 @@ class Database:
 
     @abc.abstractmethod
     def create(self, *, overwrite=False) -> None:
-        pass
+        pass  # pragma: no cover
 
     @abc.abstractmethod
     def save(self, data: Any) -> None:
-        pass
+        pass  # pragma: no cover
 
     @abc.abstractmethod
     def is_empty(self, table_name: str) -> bool:
-        pass
+        pass  # pragma: no cover
 
 
 class SQLite(Database):
@@ -245,8 +245,8 @@ class ChatDatabase(SQLite):
             """)
             return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
 
-    def is_empty(self, table_name: str) -> bool:
-        return super().is_empty(table_name)
+    def is_empty(self) -> bool:
+        return super().is_empty("chats")
 
     def get(self, chat_id: int) -> Chat | None:
         if not self.exists(chat_id):
@@ -332,8 +332,9 @@ class ChatDatabase(SQLite):
             return cursor.fetchone()[0] == 1
 
     def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
+        self.remove(chat)
         chat.chat_id = new_chat_id
-        self.update(chat)
+        self.add(chat)
         return chat
 
     def get_running_chats(self) -> list[Chat]:

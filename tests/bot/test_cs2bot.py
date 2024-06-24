@@ -159,6 +159,27 @@ async def test_cs2_bot_left_chat_member_not_bot_left(bot):
 
 
 @pytest.mark.asyncio
+async def test_cs2_bot_migrate_chat(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+
+    mocked_update.message.migrate_from_chat_id = None
+    await bot.migrate_chat(mocked_update, mocked_context)
+    bot.chat_db.migrate.assert_not_called()
+    bot.chat_db.reset_mock()
+
+    chat = Chat(42)
+    mocked_update.message.migrate_from_chat_id = 42
+    bot.chat_db.get.side_effect = [None, chat, chat]
+    await bot.migrate_chat(mocked_update, mocked_context)
+    bot.chat_db.migrate.assert_not_called()
+
+    mocked_update.message.chat_id = 1337
+    await bot.migrate_chat(mocked_update, mocked_context)
+    bot.chat_db.migrate.assert_called_once_with(chat, 1337)
+
+
+@pytest.mark.asyncio
 async def test_cs2_bot_start_command_new_user(bot):
     mocked_context = AsyncMock()
     mocked_context.bot = AsyncMock()
@@ -264,6 +285,20 @@ async def test_cs2_bot_stop_command_chat_is_group(bot):
     mocked_update.message.reply_text.assert_called_once()
     bot.chat_db.remove.assert_not_called()
     # bot.chat_db.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_stop_command_chat_is_private(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+    mocked_update.message.chat.type = ChatType.PRIVATE
+
+    chat = Chat(42)
+    bot.chat_db.get.return_value = chat
+
+    bot.chat_db.reset_mock()
+    await bot.stop(mocked_update, mocked_context)
+    bot.chat_db.remove.assert_called_once_with(chat)
 
 
 @pytest.mark.asyncio

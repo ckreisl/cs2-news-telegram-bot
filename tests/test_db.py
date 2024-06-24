@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from unittest.mock import Mock
+from unittest.mock import patch
+
 import pytest
 
 from cs2posts.bot.chats import Chat
 from cs2posts.db import ChatDatabase
 from cs2posts.db import PostDatabase
+from cs2posts.db import SQLite
 from cs2posts.post import Post
 
 
@@ -94,6 +98,26 @@ def chats_database(chats_empty_database, data_chats):
     yield chats_empty_database
 
 
+def test_database_is_empty(post_empty_database, chats_empty_database):
+    assert post_empty_database.is_empty()
+    assert chats_empty_database.is_empty()
+
+
+def test_database_is_not_empty(post_database, chats_database):
+    assert not post_database.is_empty()
+    assert not chats_database.is_empty()
+
+
+def test_post_database_get_latest_post_empty_db(post_empty_database):
+    assert post_empty_database.get_latest_post() is None
+
+
+def test_post_database_get_latest_post(post_database):
+    actual_latest_post = post_database.get_latest_post()
+    expected_latest_post = post_database.get_latest_external_post()
+    assert actual_latest_post == expected_latest_post
+
+
 def test_post_database_save_with_none(post_empty_database):
     post_empty_database.save(None)
     assert post_empty_database.load() == []
@@ -162,6 +186,47 @@ def test_chats_database_load(chats_database):
     assert Chat(42) in chats
 
 
+def test_chats_database_get(chats_database):
+    chat = chats_database.get(1337)
+    assert chat.chat_id == 1337
+    assert chat.strikes == 0
+    assert not chat.is_banned
+    chat = chats_database.get(43)
+    assert chat is None
+
+
+def test_chats_database_add(chats_empty_database):
+    chat = Chat(1337)
+    chats_empty_database.add(chat)
+    assert chats_empty_database.get(1337) == chat
+
+
+def test_chats_database_remove(chats_empty_database):
+    chat = Chat(1337)
+    chats_empty_database.add(chat)
+    assert chats_empty_database.get(1337) == chat
+    chats_empty_database.remove(chat)
+    assert chats_empty_database.get(1337) is None
+
+
+def test_chats_database_update(chats_empty_database):
+    chat = Chat(1337)
+    chats_empty_database.add(chat)
+    assert chat.strikes == 0
+    chat.strikes = 3
+    chats_empty_database.update(chat)
+    assert chats_empty_database.get(1337).strikes == 3
+
+
+def test_chats_database_migrate(chats_empty_database):
+    chat = Chat(1337)
+    chats_empty_database.add(chat)
+    assert chats_empty_database.get(1337) == chat
+    chat = chats_empty_database.migrate(chat, 42)
+    assert chats_empty_database.get(1337) is None
+    assert chats_empty_database.get(42) == chat
+
+
 def test_chats_database_save(chats_empty_database):
     assert chats_empty_database.load() == []
     chats_empty_database.save(None)
@@ -174,3 +239,118 @@ def test_chats_database_save(chats_empty_database):
 
     assert len(expected_chats) == len(actual_chats)
     assert actual_chats == expected_chats
+
+
+def test_chats_database_get_running_chats(chats_database):
+    chat = chats_database.get(1337)
+    assert not chat.is_running
+    chat.is_running = True
+    chats_database.update(chat)
+    assert len(chats_database.get_running_chats()) == 1
+    assert chats_database.get_running_chats()[0] == chat
+
+
+def test_chats_database_interested_in_news(chats_database):
+    assert len(chats_database.get_interested_in_news_chats()) == 2
+    chat = chats_database.get(1337)
+    chat.is_news_interested = False
+    chats_database.update(chat)
+    assert len(chats_database.get_interested_in_news_chats()) == 1
+
+
+def test_chats_database_interested_in_updates(chats_database):
+    assert len(chats_database.get_interested_in_updates_chats()) == 2
+    chat = chats_database.get(1337)
+    chat.is_update_interested = False
+    chats_database.update(chat)
+    assert len(chats_database.get_interested_in_updates_chats()) == 1
+
+
+def test_chats_database_interested_in_external_news(chats_database):
+    assert len(chats_database.get_interested_in_external_news_chats()) == 2
+    chat = chats_database.get(1337)
+    chat.is_external_news_interested = False
+    chats_database.update(chat)
+    assert len(chats_database.get_interested_in_external_news_chats()) == 1
+
+
+def test_chats_database_get_running_and_interested_in_news_chats(chats_database):
+    assert len(chats_database.get_running_and_interested_in_news_chats()) == 0
+    chat = chats_database.get(1337)
+    chat.is_running = True
+    chats_database.update(chat)
+    assert len(chats_database.get_running_and_interested_in_news_chats()) == 1
+
+
+def test_chats_database_get_running_and_interested_in_updates_chats(chats_database):
+    assert len(chats_database.get_running_and_interested_in_updates_chats()) == 0
+    chat = chats_database.get(1337)
+    chat.is_running = True
+    chat.is_update_interested = True
+    chats_database.update(chat)
+    assert len(chats_database.get_running_and_interested_in_updates_chats()) == 1
+
+
+def test_chats_database_get_running_and_interested_in_external_news_chats(chats_database):
+    assert len(
+        chats_database.get_running_and_interested_in_external_news_chats()) == 0
+    chat = chats_database.get(1337)
+    chat.is_running = True
+    chat.is_external_news_interested = True
+    chats_database.update(chat)
+    assert len(
+        chats_database.get_running_and_interested_in_external_news_chats()) == 1
+
+
+def test_chats_database_contains(chats_database):
+    assert Chat(1337) in chats_database
+    assert Chat(42) in chats_database
+    assert Chat(43) not in chats_database
+
+
+def test_chat_database_iter_chats(chats_database):
+    for chat in chats_database:
+        assert chat in chats_database
+
+
+def test_chat_database_len(chats_database):
+    assert len(chats_database) == 2
+    chat = Chat(43)
+    chats_database.add(chat)
+    assert len(chats_database) == 3
+    chats_database.remove(chat)
+    assert len(chats_database) == 2
+
+
+@patch('sqlite3.connect')
+def test_sqlite_class_create_db_does_not_exist(sqlite_mock):
+    mocked_path = Mock()
+    mocked_path.exists.return_value = False
+    SQLite(mocked_path)
+    sqlite_mock.assert_called_once_with(mocked_path)
+
+
+@patch('sqlite3.connect')
+def test_sqlite_class_create_db_exists(sqlite_mock):
+    mocked_path = Mock()
+    mocked_path.exists.return_value = True
+    db = SQLite(mocked_path)
+    sqlite_mock.assert_not_called()
+    db.create()
+    sqlite_mock.assert_not_called()
+
+
+@patch('sqlite3.connect')
+def test_sqlite_class_create_db_exists_overwrite(sqlite_mock):
+    mocked_path = Mock()
+    mocked_path.exists.return_value = False
+    db = SQLite(mocked_path)
+    sqlite_mock.assert_called_once_with(mocked_path)
+    sqlite_mock.reset_mock()
+    mocked_path.reset_mock()
+
+    mocked_path.exists.side_effect = [True, False]
+    db.create(overwrite=True)
+    mocked_path.unlink.assert_called_once()
+
+    sqlite_mock.assert_called_once_with(mocked_path)

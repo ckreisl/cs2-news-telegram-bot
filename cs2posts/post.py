@@ -78,7 +78,7 @@ class Post:
             return False
         return self.date > other.date
 
-    def is_older_eq_than(self, other: Post) -> bool:
+    def is_older_eq_than(self, other: Post | None) -> bool:
         if other is None:
             return False
         return self.date <= other.date
