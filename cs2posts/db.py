@@ -3,10 +3,10 @@ from __future__ import annotations
 import abc
 import json
 import logging
-import sqlite3
-from collections.abc import Generator
 from pathlib import Path
 from typing import Any
+
+import aiosqlite
 
 from cs2posts.bot.chats import Chat
 from cs2posts.post import Post
@@ -25,15 +25,15 @@ class Database:
         return self.__filepath
 
     @abc.abstractmethod
-    def create(self, *, overwrite=False) -> None:
+    async def create(self, *, overwrite=False) -> None:
         pass  # pragma: no cover
 
     @abc.abstractmethod
-    def save(self, data: Any) -> None:
+    async def save(self, data: Any) -> None:
         pass  # pragma: no cover
 
     @abc.abstractmethod
-    def is_empty(self, table_name: str) -> bool:
+    async def is_empty(self, table_name: str) -> bool:
         pass  # pragma: no cover
 
 
@@ -44,23 +44,21 @@ class SQLite(Database):
             filepath = Path(__file__).parent.parent / "sqlite.db"
 
         super().__init__(filepath)
-        self.create()
 
-    def is_empty(self, table_name: str) -> bool:
-        with sqlite3.connect(self.filepath) as conn:
-            cursor = conn.execute(f"""
-                SELECT COUNT(*) FROM {table_name}
-            """)
-            return cursor.fetchone()[0] == 0
+    async def is_empty(self, table_name: str) -> bool:
+        async with aiosqlite.connect(self.filepath) as conn:
+            async with conn.execute(f"""SELECT COUNT(*) FROM {table_name}""") as cursor:
+                result = await cursor.fetchone()
+                return result[0] == 0
 
-    def create(self, *, overwrite=False) -> None:
+    async def create(self, *, overwrite=False) -> None:
         if overwrite and self.filepath.exists():
             self.filepath.unlink()
 
         if self.filepath.exists():
             return
 
-        with sqlite3.connect(self.filepath):
+        async with aiosqlite.connect(self.filepath):
             pass
 
 
@@ -68,11 +66,10 @@ class PostDatabase(SQLite):
 
     def __init__(self, filepath: Path | None) -> None:
         super().__init__(filepath)
-        self.create_table()
 
-    def create_table(self) -> None:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.execute("""
+    async def create_table(self) -> None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS posts (
                     gid TEXT PRIMARY KEY NOT NULL,
                     title TEXT NOT NULL,
@@ -89,14 +86,14 @@ class PostDatabase(SQLite):
                     type TEXT NOT NULL
                 )
             """)
-            conn.commit()
+            await conn.commit()
 
-    def save(self, post: Post) -> None:
+    async def save(self, post: Post) -> None:
         if post is None:
             return
 
-        with sqlite3.connect(self.filepath) as conn:
-            conn.execute("""
+        async with aiosqlite.connect(self.filepath) as conn:
+            await conn.execute("""
                 INSERT OR REPLACE INTO posts (
                     gid,
                     title,
@@ -127,17 +124,17 @@ class PostDatabase(SQLite):
                 json.dumps(post.tags),
                 str(post.get_type())
             ))
-            conn.commit()
+            await conn.commit()
 
-    def load(self) -> list[Post]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def load(self) -> list[Post]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM posts
-            """)
-            return [self._convert_row_to_post(row) for row in cursor.fetchall()]
+            """) as cursor:
+                return [await self._convert_row_to_post(row) for row in await cursor.fetchall()]
 
-    def _convert_row_to_post(self, row: sqlite3.Row) -> Post:
+    async def _convert_row_to_post(self, row: aiosqlite.Row) -> Post:
         if row is None:
             return None
         data = dict(row)
@@ -145,51 +142,50 @@ class PostDatabase(SQLite):
         data['tags'] = json.loads(data['tags'])
         return Post(**data)
 
-    def get_latest_news_post(self) -> Post | None:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_latest_news_post(self) -> Post | None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM posts WHERE type = 'news' ORDER BY date DESC LIMIT 1
-            """)
-            return self._convert_row_to_post(cursor.fetchone())
+            """) as cursor:
+                return await self._convert_row_to_post(await cursor.fetchone())
 
-    def get_latest_update_post(self) -> Post | None:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_latest_update_post(self) -> Post | None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM posts WHERE type = 'update' ORDER BY date DESC LIMIT 1
-            """)
-        return self._convert_row_to_post(cursor.fetchone())
+            """) as cursor:
+                return await self._convert_row_to_post(await cursor.fetchone())
 
-    def get_latest_external_post(self) -> Post | None:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_latest_external_post(self) -> Post | None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM posts WHERE type = 'external' ORDER BY date DESC LIMIT 1
-            """)
-            return self._convert_row_to_post(cursor.fetchone())
+            """) as cursor:
+                return await self._convert_row_to_post(await cursor.fetchone())
 
-    def get_latest_post(self) -> Post:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_latest_post(self) -> Post:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM posts ORDER BY date DESC LIMIT 1
-            """)
-            return self._convert_row_to_post(cursor.fetchone())
+            """) as cursor:
+                return await self._convert_row_to_post(await cursor.fetchone())
 
-    def is_empty(self) -> bool:
-        return super().is_empty('posts')
+    async def is_empty(self) -> bool:
+        return await super().is_empty('posts')
 
 
 class ChatDatabase(SQLite):
 
     def __init__(self, filepath: Path | None) -> None:
         super().__init__(filepath)
-        self.create_table()
 
-    def create_table(self) -> None:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.execute("""
+    async def create_table(self) -> None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS chats (
                     chat_id INTEGER PRIMARY KEY NOT NULL,
                     chat_id_admin INTEGER NOT NULL,
@@ -203,14 +199,14 @@ class ChatDatabase(SQLite):
                     last_activity TEXT NOT NULL
                 )
             """)
-            conn.commit()
+            await conn.commit()
 
-    def save(self, chat: Chat) -> None:
+    async def save(self, chat: Chat) -> None:
         if chat is None:
             return
 
-        with sqlite3.connect(self.filepath) as conn:
-            conn.execute("""
+        async with aiosqlite.connect(self.filepath) as conn:
+            await conn.execute("""
                 INSERT OR REPLACE INTO chats (
                     chat_id,
                     chat_id_admin,
@@ -235,33 +231,33 @@ class ChatDatabase(SQLite):
                 chat.is_external_news_interested,
                 chat.last_activity.isoformat()
             ))
-            conn.commit()
+            await conn.commit()
 
-    def load(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def load(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def is_empty(self) -> bool:
-        return super().is_empty("chats")
+    async def is_empty(self) -> bool:
+        return await super().is_empty("chats")
 
-    def get(self, chat_id: int) -> Chat | None:
-        if not self.exists(chat_id):
+    async def get(self, chat_id: int) -> Chat | None:
+        if not await self.exists(chat_id):
             return None
 
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE chat_id = ?
-            """, (chat_id,))
-            return Chat.from_json(dict(cursor.fetchone()))
+            """, (chat_id,)) as cursor:
+                return Chat.from_json(dict(await cursor.fetchone()))
 
-    def add(self, chat: Chat) -> Chat:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.execute("""
+    async def add(self, chat: Chat) -> Chat:
+        async with aiosqlite.connect(self.filepath) as conn:
+            await conn.execute("""
                 INSERT INTO chats (
                     chat_id,
                     chat_id_admin,
@@ -286,19 +282,19 @@ class ChatDatabase(SQLite):
                 chat.is_external_news_interested,
                 chat.last_activity.isoformat()
             ))
-            conn.commit()
+            await conn.commit()
         return chat
 
-    def remove(self, chat: Chat) -> None:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.execute("""
+    async def remove(self, chat: Chat) -> None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            await conn.execute("""
                 DELETE FROM chats WHERE chat_id = ?
             """, (chat.chat_id,))
-            conn.commit()
+            await conn.commit()
 
-    def update(self, chat: Chat) -> None:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.execute("""
+    async def update(self, chat: Chat) -> None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            await conn.execute("""
                 UPDATE chats SET
                     chat_id_admin = ?,
                     strikes = ?,
@@ -322,96 +318,89 @@ class ChatDatabase(SQLite):
                 chat.last_activity.isoformat(),
                 chat.chat_id
             ))
-            conn.commit()
+            await conn.commit()
 
-    def exists(self, chat_id: Chat) -> bool:
-        with sqlite3.connect(self.filepath) as conn:
-            cursor = conn.execute("""
+    async def exists(self, chat_id: Chat) -> bool:
+        async with aiosqlite.connect(self.filepath) as conn:
+            async with conn.execute("""
                 SELECT COUNT(*) FROM chats WHERE chat_id = ?
-            """, (chat_id,))
-            return cursor.fetchone()[0] == 1
+            """, (chat_id,)) as cursor:
+                result = await cursor.fetchone()
+                return result[0] == 1
 
-    def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
-        self.remove(chat)
+    async def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
+        await self.remove(chat)
         chat.chat_id = new_chat_id
-        self.add(chat)
+        await self.add(chat)
         return chat
 
-    def get_running_chats(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_running_chats(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def get_interested_in_news_chats(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_interested_in_news_chats(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE is_news_interested = 1
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def get_interested_in_updates_chats(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_interested_in_updates_chats(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE is_update_interested = 1
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def get_interested_in_external_news_chats(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_interested_in_external_news_chats(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE is_external_news_interested = 1
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def get_running_and_interested_in_news_chats(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_running_and_interested_in_news_chats(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1 AND is_news_interested = 1
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def get_running_and_interested_in_updates_chats(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_running_and_interested_in_updates_chats(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1 AND is_update_interested = 1
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def get_running_and_interested_in_external_news_chats(self) -> list[Chat]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+    async def get_running_and_interested_in_external_news_chats(self) -> list[Chat]:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1 AND is_external_news_interested = 1
-            """)
-            return [Chat.from_json(dict(row)) for row in cursor.fetchall()]
+            """) as cursor:
+                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
 
-    def __contains__(self, chat: Chat) -> bool:
-        with sqlite3.connect(self.filepath) as conn:
-            cursor = conn.execute("""
+    async def contains(self, chat: Chat) -> bool:
+        async with aiosqlite.connect(self.filepath) as conn:
+            async with conn.execute("""
                 SELECT COUNT(*) FROM chats WHERE chat_id = ?
-            """, (chat.chat_id,))
-            return cursor.fetchone()[0] == 1
+            """, (chat.chat_id,)) as cursor:
+                result = await cursor.fetchone()
+                return result[0] == 1
 
-    def __iter__(self) -> Generator[Chat, None, None]:
-        with sqlite3.connect(self.filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
-                SELECT * FROM chats
-            """)
-            for row in cursor.fetchall():
-                yield Chat.from_json(dict(row))
-
-    def __len__(self) -> int:
-        with sqlite3.connect(self.filepath) as conn:
-            cursor = conn.execute("""
+    async def size(self) -> int:
+        async with aiosqlite.connect(self.filepath) as conn:
+            async with conn.execute("""
                 SELECT COUNT(*) FROM chats
-            """)
-            return cursor.fetchone()[0]
+            """) as cursor:
+                return (await cursor.fetchone())[0]

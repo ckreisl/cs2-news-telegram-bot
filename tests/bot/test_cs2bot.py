@@ -46,19 +46,20 @@ def create_news_post():
 
 @pytest.fixture
 @patch('cs2posts.bot.spam.SpamProtector')
-@patch('cs2posts.db.ChatDatabase')
-@patch('cs2posts.db.PostDatabase')
 @patch('cs2posts.crawler.CounterStrike2Crawler')
-def bot(mocked_crawler, mocked_post_db, mocked_chat_db, mocked_spam_protector):
+def bot(mocked_crawler, mocked_spam_protector):
     mocked_spam_protector.check = AsyncMock()
     mocked_spam_protector.strike = AsyncMock()
+    mocked_chat_db = AsyncMock()
+    mocked_post_db = AsyncMock()
+
     bot = CounterStrike2UpdateBot(
         token='test_token',
         chat_db=mocked_chat_db,
         post_db=mocked_post_db,
         crawler=mocked_crawler,
         spam_protector=mocked_spam_protector)
-    bot.chat_db = Mock()
+
     return bot
 
 

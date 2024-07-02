@@ -4,3 +4,4 @@ python-telegram-bot[job-queue]==21.3
 bbcode==1.1.0
 beautifulsoup4==4.12.3
 python-dotenv==1.0.1
+aiosqlite==0.20.0

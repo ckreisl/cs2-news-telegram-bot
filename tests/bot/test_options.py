@@ -14,7 +14,7 @@ from cs2posts.bot.options import Options
 @pytest.fixture
 def options():
     options = Options(Mock())
-    options.set_chat_db(Mock())
+    options.set_chat_db(AsyncMock())
     return options
 
 

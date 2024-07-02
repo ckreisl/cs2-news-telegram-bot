@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
 from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
 
 from cs2posts.bot.chats import Chat
 from cs2posts.db import ChatDatabase
@@ -62,18 +64,19 @@ def data_latest():
     }
 
 
-@pytest.fixture
-def post_empty_database(tmp_path):
+@pytest_asyncio.fixture
+async def post_empty_database(tmp_path):
     filepath = tmp_path / "test_posts.db"
     db = PostDatabase(filepath)
+    await db.create_table()
     yield db
 
 
-@pytest.fixture
-def post_database(post_empty_database, data_latest):
-    post_empty_database.save(Post(**data_latest["update"]))
-    post_empty_database.save(Post(**data_latest["news"]))
-    post_empty_database.save(Post(**data_latest["external"]))
+@pytest_asyncio.fixture
+async def post_database(post_empty_database, data_latest):
+    await post_empty_database.save(Post(**data_latest["update"]))
+    await post_empty_database.save(Post(**data_latest["news"]))
+    await post_empty_database.save(Post(**data_latest["external"]))
 
     yield post_empty_database
 
@@ -83,50 +86,61 @@ def data_chats():
     return {"chats": [Chat(1337), Chat(42)]}
 
 
-@pytest.fixture
-def chats_empty_database(tmp_path):
+@pytest_asyncio.fixture
+async def chats_empty_database(tmp_path):
     filepath = tmp_path / "test_chats.db"
     db = ChatDatabase(filepath)
+    await db.create_table()
     yield db
 
 
-@pytest.fixture
-def chats_database(chats_empty_database, data_chats):
+@pytest_asyncio.fixture
+async def chats_database(chats_empty_database, data_chats):
     for chat in data_chats["chats"]:
-        chats_empty_database.save(chat)
+        await chats_empty_database.save(chat)
 
     yield chats_empty_database
 
 
-def test_database_is_empty(post_empty_database, chats_empty_database):
-    assert post_empty_database.is_empty()
-    assert chats_empty_database.is_empty()
+@pytest.mark.asyncio
+async def test_database_is_empty(post_empty_database, chats_empty_database):
+    is_empty_post = await post_empty_database.is_empty()
+    assert is_empty_post
+    is_empty_chat = await chats_empty_database.is_empty()
+    assert is_empty_chat
 
 
-def test_database_is_not_empty(post_database, chats_database):
-    assert not post_database.is_empty()
-    assert not chats_database.is_empty()
+@pytest.mark.asyncio
+async def test_database_is_not_empty(post_database, chats_database):
+    post_db_empty = await post_database.is_empty()
+    assert not post_db_empty
+    chat_db_empty = await chats_database.is_empty()
+    assert not chat_db_empty
 
 
-def test_post_database_get_latest_post_empty_db(post_empty_database):
-    assert post_empty_database.get_latest_post() is None
+@pytest.mark.asyncio
+async def test_post_database_get_latest_post_empty_db(post_empty_database):
+    assert await post_empty_database.get_latest_post() is None
 
 
-def test_post_database_get_latest_post(post_database):
-    actual_latest_post = post_database.get_latest_post()
-    expected_latest_post = post_database.get_latest_external_post()
+@pytest.mark.asyncio
+async def test_post_database_get_latest_post(post_database):
+    actual_latest_post = await post_database.get_latest_post()
+    expected_latest_post = await post_database.get_latest_external_post()
     assert actual_latest_post == expected_latest_post
 
 
-def test_post_database_save_with_none(post_empty_database):
-    post_empty_database.save(None)
-    assert post_empty_database.load() == []
-    assert post_empty_database.get_latest_news_post() is None
-    assert post_empty_database.get_latest_update_post() is None
-    assert post_empty_database.get_latest_external_post() is None
+@pytest.mark.asyncio
+async def test_post_database_save_with_none(post_empty_database):
+    await post_empty_database.save(None)
+    assert await post_empty_database.load() == []
+    assert await post_empty_database.get_latest_news_post() is None
+    assert await post_empty_database.get_latest_update_post() is None
+    assert await post_empty_database.get_latest_external_post() is None
 
 
-def test_post_database_save(post_database, data_latest):
+@pytest.mark.asyncio
+async def test_post_database_save(post_database, data_latest):
     expected_temp_update_title = data_latest["news"]["title"]
 
     data_latest["update"]["title"] = "New Update headline"
@@ -137,37 +151,41 @@ def test_post_database_save(post_database, data_latest):
     actual_post_news = Post(**data_latest["news"])
     actual_post_external = Post(**data_latest["external"])
 
-    post_database.save(actual_post_update)
-    latest_update_post = post_database.get_latest_update_post()
-    latest_news_post = post_database.get_latest_news_post()
+    await post_database.save(actual_post_update)
+    latest_update_post = await post_database.get_latest_update_post()
+    latest_news_post = await post_database.get_latest_news_post()
 
     # News headline should not be changed
     assert latest_news_post.title == expected_temp_update_title
     assert latest_update_post.title == "New Update headline"
 
-    post_database.save(actual_post_news)
+    await post_database.save(actual_post_news)
 
-    latest_news_post = post_database.get_latest_news_post()
+    latest_news_post = await post_database.get_latest_news_post()
     assert latest_news_post.title == "New News headline"
 
-    post_database.save(actual_post_external)
-    assert post_database.get_latest_external_post().title == "New External headline"
+    await post_database.save(actual_post_external)
+    actual_latest_external_post_db = await post_database.get_latest_external_post()
+    assert actual_latest_external_post_db.title == "New External headline"
 
 
-def test_post_database_get_latest_news_post(post_database, data_latest):
-    actual_post = post_database.get_latest_news_post()
+@pytest.mark.asyncio
+async def test_post_database_get_latest_news_post(post_database, data_latest):
+    actual_post = await post_database.get_latest_news_post()
     expected_post = Post(**data_latest["news"])
     assert actual_post == expected_post
 
 
-def test_post_database_get_latest_update_post(post_database, data_latest):
-    actual_post = post_database.get_latest_update_post()
+@pytest.mark.asyncio
+async def test_post_database_get_latest_update_post(post_database, data_latest):
+    actual_post = await post_database.get_latest_update_post()
     expected_post = Post(**data_latest["update"])
     assert actual_post == expected_post
 
 
-def test_post_database_load(post_database, data_latest):
-    actual_posts = post_database.load()
+@pytest.mark.asyncio
+async def test_post_database_load(post_database, data_latest):
+    actual_posts = await post_database.load()
     assert isinstance(actual_posts, list)
     assert len(actual_posts) == 3
     expected_posts = [
@@ -178,179 +196,183 @@ def test_post_database_load(post_database, data_latest):
     assert actual_posts == expected_posts
 
 
-def test_chats_database_load(chats_database):
-    chats = chats_database.load()
+@pytest.mark.asyncio
+async def test_chats_database_load(chats_database):
+    chats = await chats_database.load()
     assert isinstance(chats, list)
     assert len(chats) == 2
     assert Chat(1337) in chats
     assert Chat(42) in chats
 
 
-def test_chats_database_get(chats_database):
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_get(chats_database):
+    chat = await chats_database.get(1337)
     assert chat.chat_id == 1337
     assert chat.strikes == 0
     assert not chat.is_banned
-    chat = chats_database.get(43)
+    chat = await chats_database.get(43)
     assert chat is None
 
 
-def test_chats_database_add(chats_empty_database):
+@pytest.mark.asyncio
+async def test_chats_database_add(chats_empty_database):
     chat = Chat(1337)
-    chats_empty_database.add(chat)
-    assert chats_empty_database.get(1337) == chat
+    await chats_empty_database.add(chat)
+    actual_chat = await chats_empty_database.get(1337)
+    assert actual_chat == chat
 
 
-def test_chats_database_remove(chats_empty_database):
+@pytest.mark.asyncio
+async def test_chats_database_remove(chats_empty_database):
     chat = Chat(1337)
-    chats_empty_database.add(chat)
-    assert chats_empty_database.get(1337) == chat
-    chats_empty_database.remove(chat)
-    assert chats_empty_database.get(1337) is None
+    await chats_empty_database.add(chat)
+    assert await chats_empty_database.get(1337) == chat
+    await chats_empty_database.remove(chat)
+    assert await chats_empty_database.get(1337) is None
 
 
-def test_chats_database_update(chats_empty_database):
+@pytest.mark.asyncio
+async def test_chats_database_update(chats_empty_database):
     chat = Chat(1337)
-    chats_empty_database.add(chat)
+    await chats_empty_database.add(chat)
     assert chat.strikes == 0
     chat.strikes = 3
-    chats_empty_database.update(chat)
-    assert chats_empty_database.get(1337).strikes == 3
+    await chats_empty_database.update(chat)
+    actual_chat = await chats_empty_database.get(1337)
+    assert actual_chat.strikes == 3
 
 
-def test_chats_database_migrate(chats_empty_database):
+@pytest.mark.asyncio
+async def test_chats_database_migrate(chats_empty_database):
     chat = Chat(1337)
-    chats_empty_database.add(chat)
-    assert chats_empty_database.get(1337) == chat
-    chat = chats_empty_database.migrate(chat, 42)
-    assert chats_empty_database.get(1337) is None
-    assert chats_empty_database.get(42) == chat
+    await chats_empty_database.add(chat)
+    assert await chats_empty_database.get(1337) == chat
+    chat = await chats_empty_database.migrate(chat, 42)
+    assert await chats_empty_database.get(1337) is None
+    assert await chats_empty_database.get(42) == chat
 
 
-def test_chats_database_save(chats_empty_database):
-    assert chats_empty_database.load() == []
-    chats_empty_database.save(None)
-    assert chats_empty_database.load() == []
+@pytest.mark.asyncio
+async def test_chats_database_save(chats_empty_database):
+    assert await chats_empty_database.load() == []
+    await chats_empty_database.save(None)
+    assert await chats_empty_database.load() == []
 
     expected_chats = [Chat(41), Chat(1338)]
     for chat in expected_chats:
-        chats_empty_database.save(chat=chat)
-    actual_chats = chats_empty_database.load()
+        await chats_empty_database.save(chat=chat)
+    actual_chats = await chats_empty_database.load()
 
     assert len(expected_chats) == len(actual_chats)
     assert actual_chats == expected_chats
 
 
-def test_chats_database_get_running_chats(chats_database):
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_get_running_chats(chats_database):
+    chat = await chats_database.get(1337)
     assert not chat.is_running
     chat.is_running = True
-    chats_database.update(chat)
-    assert len(chats_database.get_running_chats()) == 1
-    assert chats_database.get_running_chats()[0] == chat
+    await chats_database.update(chat)
+    assert len(await chats_database.get_running_chats()) == 1
+    acutal_running_chats = await chats_database.get_running_chats()
+    assert acutal_running_chats[0] == chat
 
 
-def test_chats_database_interested_in_news(chats_database):
-    assert len(chats_database.get_interested_in_news_chats()) == 2
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_interested_in_news(chats_database):
+    assert len(await chats_database.get_interested_in_news_chats()) == 2
+    chat = await chats_database.get(1337)
     chat.is_news_interested = False
-    chats_database.update(chat)
-    assert len(chats_database.get_interested_in_news_chats()) == 1
+    await chats_database.update(chat)
+    assert len(await chats_database.get_interested_in_news_chats()) == 1
 
 
-def test_chats_database_interested_in_updates(chats_database):
-    assert len(chats_database.get_interested_in_updates_chats()) == 2
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_interested_in_updates(chats_database):
+    assert len(await chats_database.get_interested_in_updates_chats()) == 2
+    chat = await chats_database.get(1337)
     chat.is_update_interested = False
-    chats_database.update(chat)
-    assert len(chats_database.get_interested_in_updates_chats()) == 1
+    await chats_database.update(chat)
+    assert len(await chats_database.get_interested_in_updates_chats()) == 1
 
 
-def test_chats_database_interested_in_external_news(chats_database):
-    assert len(chats_database.get_interested_in_external_news_chats()) == 2
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_interested_in_external_news(chats_database):
+    assert len(await chats_database.get_interested_in_external_news_chats()) == 2
+    chat = await chats_database.get(1337)
     chat.is_external_news_interested = False
-    chats_database.update(chat)
-    assert len(chats_database.get_interested_in_external_news_chats()) == 1
+    await chats_database.update(chat)
+    assert len(await chats_database.get_interested_in_external_news_chats()) == 1
 
 
-def test_chats_database_get_running_and_interested_in_news_chats(chats_database):
-    assert len(chats_database.get_running_and_interested_in_news_chats()) == 0
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_get_running_and_interested_in_news_chats(chats_database):
+    assert len(await chats_database.get_running_and_interested_in_news_chats()) == 0
+    chat = await chats_database.get(1337)
     chat.is_running = True
-    chats_database.update(chat)
-    assert len(chats_database.get_running_and_interested_in_news_chats()) == 1
+    await chats_database.update(chat)
+    assert len(await chats_database.get_running_and_interested_in_news_chats()) == 1
 
 
-def test_chats_database_get_running_and_interested_in_updates_chats(chats_database):
-    assert len(chats_database.get_running_and_interested_in_updates_chats()) == 0
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_get_running_and_interested_in_updates_chats(chats_database):
+    assert len(await chats_database.get_running_and_interested_in_updates_chats()) == 0
+    chat = await chats_database.get(1337)
     chat.is_running = True
     chat.is_update_interested = True
-    chats_database.update(chat)
-    assert len(chats_database.get_running_and_interested_in_updates_chats()) == 1
+    await chats_database.update(chat)
+    assert len(await chats_database.get_running_and_interested_in_updates_chats()) == 1
 
 
-def test_chats_database_get_running_and_interested_in_external_news_chats(chats_database):
-    assert len(
-        chats_database.get_running_and_interested_in_external_news_chats()) == 0
-    chat = chats_database.get(1337)
+@pytest.mark.asyncio
+async def test_chats_database_get_running_and_interested_in_external_news_chats(chats_database):
+    assert len(await chats_database.get_running_and_interested_in_external_news_chats()) == 0
+    chat = await chats_database.get(1337)
     chat.is_running = True
     chat.is_external_news_interested = True
-    chats_database.update(chat)
-    assert len(
-        chats_database.get_running_and_interested_in_external_news_chats()) == 1
+    await chats_database.update(chat)
+    assert len(await chats_database.get_running_and_interested_in_external_news_chats()) == 1
 
 
-def test_chats_database_contains(chats_database):
-    assert Chat(1337) in chats_database
-    assert Chat(42) in chats_database
-    assert Chat(43) not in chats_database
+@pytest.mark.asyncio
+async def test_chats_database_contains(chats_database):
+    assert await chats_database.contains(Chat(1337))
+    assert not await chats_database.contains(Chat(43))
+    assert await chats_database.contains(Chat(42))
 
 
-def test_chat_database_iter_chats(chats_database):
-    for chat in chats_database:
-        assert chat in chats_database
-
-
-def test_chat_database_len(chats_database):
-    assert len(chats_database) == 2
+@pytest.mark.asyncio
+async def test_chat_database_len(chats_database):
+    assert await chats_database.size() == 2
     chat = Chat(43)
-    chats_database.add(chat)
-    assert len(chats_database) == 3
-    chats_database.remove(chat)
-    assert len(chats_database) == 2
+    await chats_database.add(chat)
+    assert await chats_database.size() == 3
+    await chats_database.remove(chat)
+    assert await chats_database.size() == 2
 
 
-@patch('sqlite3.connect')
-def test_sqlite_class_create_db_does_not_exist(sqlite_mock):
-    mocked_path = Mock()
-    mocked_path.exists.return_value = False
-    SQLite(mocked_path)
-    sqlite_mock.assert_called_once_with(mocked_path)
-
-
-@patch('sqlite3.connect')
-def test_sqlite_class_create_db_exists(sqlite_mock):
+@pytest.mark.asyncio
+@patch('aiosqlite.connect')
+async def test_sqlite_class_create_db_exists(sqlite_mock):
     mocked_path = Mock()
     mocked_path.exists.return_value = True
     db = SQLite(mocked_path)
     sqlite_mock.assert_not_called()
-    db.create()
+    await db.create()
     sqlite_mock.assert_not_called()
 
 
-@patch('sqlite3.connect')
-def test_sqlite_class_create_db_exists_overwrite(sqlite_mock):
+@pytest.mark.asyncio
+@patch('aiosqlite.connect')
+async def test_sqlite_class_create_db_exists_overwrite(sqlite_mock):
     mocked_path = Mock()
-    mocked_path.exists.return_value = False
-    db = SQLite(mocked_path)
-    sqlite_mock.assert_called_once_with(mocked_path)
-    sqlite_mock.reset_mock()
-    mocked_path.reset_mock()
-
     mocked_path.exists.side_effect = [True, False]
-    db.create(overwrite=True)
-    mocked_path.unlink.assert_called_once()
+    db = SQLite(mocked_path)
 
+    sqlite_mock.__aenter__.return_value.execute = AsyncMock()
+    sqlite_mock.__aexit__ = AsyncMock()
+
+    await db.create(overwrite=True)
+    mocked_path.unlink.assert_called_once()
     sqlite_mock.assert_called_once_with(mocked_path)

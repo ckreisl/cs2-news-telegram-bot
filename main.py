@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from cs2posts.bot import settings
@@ -25,6 +26,10 @@ def main() -> int:
         post_db=PostDatabase(settings.POST_DB_FILEPATH),
         chat_db=ChatDatabase(settings.CHAT_DB_FILEPATH),
         token=settings.TELEGRAM_TOKEN)
+
+    asyncio.get_event_loop().run_until_complete(
+        cs2_update_bot.async_init())
+
     cs2_update_bot.run()
 
     return 0

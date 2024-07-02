@@ -114,7 +114,7 @@ class Options:
 
     async def options(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
-        chat = self.chats_db.get(update.message.chat_id)
+        chat = await self.chats_db.get(update.message.chat_id)
         if chat is None:
             return
 
@@ -135,7 +135,7 @@ class Options:
         query = update.callback_query
         await query.answer()
 
-        chat = self.chats_db.get(query.message.chat_id)
+        chat = await self.chats_db.get(query.message.chat_id)
         if chat is None:
             return
 
@@ -149,15 +149,15 @@ class Options:
 
         if btn is ButtonData.UPDATE:
             chat.is_update_interested = not chat.is_update_interested
-            self.chats_db.update(chat)
+            await self.chats_db.update(chat)
 
         if btn is ButtonData.NEWS:
             chat.is_news_interested = not chat.is_news_interested
-            self.chats_db.update(chat)
+            await self.chats_db.update(chat)
 
         if btn is ButtonData.EXTERNAL_NEWS:
             chat.is_external_news_interested = not chat.is_external_news_interested
-            self.chats_db.update(chat)
+            await self.chats_db.update(chat)
 
         await self.update(context, query, chat)
 
