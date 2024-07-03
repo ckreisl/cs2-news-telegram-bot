@@ -454,6 +454,29 @@ async def test_cs2_bot_send_update_post_to_chats(bot):
 
 
 @pytest.mark.asyncio
+async def test_cs2_bot_send_external_post_to_chats(bot):
+    mocked_context = AsyncMock()
+    mocked_post = Mock()
+    mocked_post.is_news.return_value = False
+    mocked_post.is_update.return_value = False
+    mocked_post.is_external.return_value = True
+    bot.chat_db.get_running_and_interested_in_news_chats.return_value = [
+        Chat(13)]
+    bot.chat_db.get_running_and_interested_in_updates_chats.return_value = [
+        Chat(42)]
+    bot.send_message = AsyncMock()
+
+    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+        mocked_msg = Mock()
+        mocked_factory.return_value = mocked_msg
+        await bot.send_post_to_chats(mocked_context, mocked_post)
+        bot.chat_db.get_running_and_interested_in_updates_chats.assert_not_called()
+        bot.chat_db.get_running_and_interested_in_news_chats.assert_not_called()
+        mocked_factory.assert_called_once_with(post=mocked_post)
+        bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_cs2_bot_send_unknown_post_to_chats(bot):
     mocked_context = AsyncMock()
     mocked_post = Mock()

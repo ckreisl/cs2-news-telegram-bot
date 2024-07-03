@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from cs2posts.bot.constants import TELEGRAM_MAX_MESSAGE_LENGTH
+from cs2posts.bot.message import CounterStrikeExternalMessage
 from cs2posts.bot.message import CounterStrikeNewsMessage
 from cs2posts.bot.message import CounterStrikeUpdateMessage
 from cs2posts.bot.message import TelegramMessage
@@ -45,6 +46,22 @@ def mocked_cs2_news_post():
         appid=730)
 
 
+@pytest.fixture
+def mocked_cs2_external_news():
+    return Post(
+        gid="1339",
+        title="Some News",
+        is_external_url=True,
+        url="https://www.counter-strike.net/newsentry/1339",
+        author="",
+        contents="<a href='https://example.com'>Link</a> External News",
+        date=1234567890,
+        feedlabel="feedlabel",
+        feedname="feedname",
+        feed_type=0,
+        appid=730)
+
+
 def test_telegram_message_msg_not_split():
     telegram_msg = TelegramMessage("Hello World")
     assert telegram_msg.message == "Hello World"
@@ -71,7 +88,7 @@ def test_counter_strike_update_message(mocked_cs2_update_post):
         assert msg.message == expected
 
 
-def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post):
+def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post, mocked_cs2_external_news):
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
@@ -81,11 +98,8 @@ def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post):
         msg = TelegramMessageFactory.create(mocked_cs2_update_post)
         assert isinstance(msg, CounterStrikeUpdateMessage)
 
-    # TODO: We consider everything as news if not Release or patchnotes in tags is given
-    """
-    with pytest.raises(ValueError):
-        TelegramMessageFactory.create(mocked_cs2_news_post)
-    """
+        msg = TelegramMessageFactory.create(mocked_cs2_external_news)
+        assert isinstance(msg, CounterStrikeExternalMessage)
 
 
 @pytest.mark.asyncio

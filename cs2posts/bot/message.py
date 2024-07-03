@@ -70,7 +70,21 @@ class CounterStrikeNewsMessage(TelegramMessage):
         parser.add_parser(parser=SteamListParser, priority=1)
 
         self.content = ContentExtractor.extract_message_blocks(parser.parse())
+        self.__add_header()
         self.__add_footer()
+
+    def __add_header(self) -> None:
+        if (isinstance(self.content[0], Image) or  # noqa
+            isinstance(self.content[0], Video) or  # noqa
+            isinstance(self.content[0], Youtube)):  # noqa
+            # Ignore header we set it as caption
+            return
+
+        header = self.get_header()
+        if isinstance(self.content[0], TextBlock):
+            if self.content[0].is_heading and header not in self.content[0].text:
+                self.content[0].text = self.get_header() + "\n\n" + \
+                    self.content[0].text
 
     def __add_footer(self) -> None:
         url = Utils.get_redirected_url(self.post.url)
@@ -92,9 +106,6 @@ class CounterStrikeNewsMessage(TelegramMessage):
         return f"<b>{self.post.title}</b>\n({self.post.date_as_datetime})"
 
     async def send_message(self, bot, chat_id: int, message: TextBlock) -> None:
-        if message.is_heading:
-            message.text = self.get_header() + "\n\n" + message.text
-
         for text in self.split(message.text):
             await bot.send_message(
                 chat_id=chat_id,
