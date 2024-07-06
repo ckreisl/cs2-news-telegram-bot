@@ -35,7 +35,7 @@ class CounterStrike2Crawler(SteamAPICrawler):
         if "count" in kwargs and kwargs["count"] < 0:
             raise ValueError('Count must be greater than 0!')
 
-    def crawl(self, *, count: int | None = None) -> dict[str, Any]:
+    async def crawl(self, *, count: int | None = None) -> dict[str, Any]:
         if count is None:
             count = 100
 

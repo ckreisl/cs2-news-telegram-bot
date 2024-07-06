@@ -56,6 +56,10 @@ class Post:
     # can be empty from crawled data
     tags: list[str] = field(default_factory=list)
 
+    @classmethod
+    def from_json(cls, json: dict[str, str]) -> Post:
+        return cls(**json)
+
     @property
     def date_as_datetime(self, tz: ZoneInfo = ZoneInfo('UTC')) -> datetime:
         # Do not return a timezone-aware datetime object

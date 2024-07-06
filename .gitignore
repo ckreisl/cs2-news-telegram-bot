@@ -11,4 +11,5 @@ htmlcov
 pytest.xml
 coverage.xml
 
+backups/
 *.db

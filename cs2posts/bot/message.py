@@ -256,7 +256,7 @@ class CounterStrikeExternalMessage(TelegramMessage):
 class TelegramMessageFactory:
 
     @staticmethod
-    def create(post: Post) -> TelegramMessage:
+    async def create(post: Post) -> TelegramMessage:
         if post.is_news():
             return CounterStrikeNewsMessage(post)
         if post.is_update():

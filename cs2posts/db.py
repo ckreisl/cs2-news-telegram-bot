@@ -36,6 +36,14 @@ class Database:
     async def is_empty(self, table_name: str) -> bool:
         pass  # pragma: no cover
 
+    @abc.abstractmethod
+    async def import_from_json(self, filepath: Path) -> None:
+        pass  # pragma: no cover
+
+    @abc.abstractmethod
+    async def backup(self, filepath: Path) -> bool:
+        pass  # pragma: no cover
+
 
 class SQLite(Database):
 
@@ -60,6 +68,12 @@ class SQLite(Database):
 
         async with aiosqlite.connect(self.filepath):
             pass
+
+    async def backup(self, filepath: Path) -> None:
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        async with aiosqlite.connect(self.filepath) as conn:
+            async with aiosqlite.connect(filepath) as backup_conn:
+                await conn.backup(backup_conn)
 
 
 class PostDatabase(SQLite):
@@ -134,6 +148,23 @@ class PostDatabase(SQLite):
             """) as cursor:
                 return [await self._convert_row_to_post(row) for row in await cursor.fetchall()]
 
+    async def is_empty(self) -> bool:
+        return await super().is_empty('posts')
+
+    async def import_from_json(self, filepath: Path) -> None:
+        await self.create_table()
+
+        with open(filepath, encoding='utf-8') as fs:
+            posts = json.load(fs)
+
+        # Backwards compatibility from old .json format
+        if posts.get('news') is not None:
+            await self.save(Post.from_json(posts['news']))
+        if posts.get('update') is not None:
+            await self.save(Post.from_json(posts['update']))
+        if posts.get('external') is not None:
+            await self.save(Post.from_json(posts['external']))
+
     async def _convert_row_to_post(self, row: aiosqlite.Row) -> Post:
         if row is None:
             return None
@@ -173,9 +204,6 @@ class PostDatabase(SQLite):
                 SELECT * FROM posts ORDER BY date DESC LIMIT 1
             """) as cursor:
                 return await self._convert_row_to_post(await cursor.fetchone())
-
-    async def is_empty(self) -> bool:
-        return await super().is_empty('posts')
 
 
 class ChatDatabase(SQLite):
@@ -319,6 +347,19 @@ class ChatDatabase(SQLite):
                 chat.chat_id
             ))
             await conn.commit()
+
+    async def import_from_json(self, filepath: Path) -> None:
+        await self.create_table()
+
+        with open(filepath, encoding='utf-8') as fs:
+            chats = json.load(fs)
+
+        # Backwards compatibility from old .json format
+        if chats.get('chats') is not None:
+            chats = chats['chats']
+
+        for chat in chats:
+            await self.add(Chat.from_json(chat))
 
     async def exists(self, chat_id: Chat) -> bool:
         async with aiosqlite.connect(self.filepath) as conn:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from telegram import Update
 from telegram.constants import ChatType
@@ -93,12 +94,26 @@ class CounterStrike2UpdateBot:
         self.is_running = False
 
     async def async_init(self) -> None:
+        if settings.IMPORT_CHATS_FROM_JSON is not None:
+            try:
+                await self.chat_db.import_from_json(
+                    Path(settings.IMPORT_CHATS_FROM_JSON))
+            except Exception as e:
+                logger.error(f'Could not import chats from json: {e}')
+
+        if settings.IMPORT_POSTS_FROM_JSON is not None:
+            try:
+                await self.post_db.import_from_json(
+                    Path(settings.IMPORT_POSTS_FROM_JSON))
+            except Exception as e:
+                logger.error(f'Could not import posts from json: {e}')
+
         if await self.post_db.is_empty():
             # TODO: Maybe ensure that there is a latest update and news post
             # As of now we just fetch 100 items.
             logger.info('No post data found. Fetching latest posts...')
             # TODO: What happens here if crawler fails?
-            data = self.crawler.crawl()
+            data = await self.crawler.crawl()
             posts = CounterStrike2Posts(data)
             await self.post_db.save(posts.latest_update_post)
             await self.post_db.save(posts.latest_news_post)
@@ -215,6 +230,10 @@ class CounterStrike2UpdateBot:
             callback=self.post_checker,
             interval=settings.CS2_UPDATE_CHECK_INTERVAL)
 
+        context.job_queue.run_repeating(
+            callback=self.backup_chats_db,
+            interval=settings.CHAT_DB_BACKUP_INTERVAL)
+
         self.is_running = True
 
     @spam_protected
@@ -265,28 +284,28 @@ class CounterStrike2UpdateBot:
     async def latest(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info('Sending latest saved post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = TelegramMessageFactory.create(self.latest_post)
+        msg = await TelegramMessageFactory.create(self.latest_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     @spam_protected
     async def news(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info('Sending latest news post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = TelegramMessageFactory.create(self.latest_news_post)
+        msg = await TelegramMessageFactory.create(self.latest_news_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     @spam_protected
     async def update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info('Sending latest update post to chats ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = TelegramMessageFactory.create(self.latest_update_post)
+        msg = await TelegramMessageFactory.create(self.latest_update_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     @spam_protected
     async def external(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info('Sending latest external post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = TelegramMessageFactory.create(self.latest_external_post)
+        msg = await TelegramMessageFactory.create(self.latest_external_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     async def _post_checker_news(self, context: CallbackContext, post: Post) -> None:
@@ -342,7 +361,7 @@ class CounterStrike2UpdateBot:
     async def post_checker(self, context: CallbackContext) -> None:
         logger.info('Crawling latest posts ...')
         try:
-            data = self.crawler.crawl(count=10)
+            data = await self.crawler.crawl(count=10)
         except Exception as e:
             logger.error(f'Could not fetch latest posts: {e}')
             return
@@ -374,7 +393,7 @@ class CounterStrike2UpdateBot:
                 f'Unknown post type {post.to_dict()}. Not sending any message.')
             return
 
-        msg = TelegramMessageFactory.create(post=post)
+        msg = await TelegramMessageFactory.create(post=post)
 
         for chat in chats:
             await self.send_message(context=context, msg=msg, chat=chat)
@@ -408,6 +427,16 @@ class CounterStrike2UpdateBot:
         except Exception as e:
             logger.exception(f'Could not send message to chat {chat.chat_id=}')
             logger.exception(f"Reason: {e}")
+
+    async def backup_chats_db(self, context: CallbackContext) -> None:
+        logger.info('Backing up chat database ...')
+
+        filepath = settings.CHAT_DB_BACKUP_FILEPATH
+        if filepath is None:
+            filepath = Path(__file__).parent.parent.parent / \
+                "backups" / "backup.db"
+
+        await self.chat_db.backup(filepath)
 
     async def error(self, update: Update, context: CallbackContext) -> None:
         logger.error(f'Update {update} caused error {context.error}')

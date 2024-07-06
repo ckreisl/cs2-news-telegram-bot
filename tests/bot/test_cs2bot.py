@@ -205,7 +205,7 @@ async def test_cs2_bot_start_command_new_user(bot):
     # assert chat.is_running
     mocked_update.message.reply_text.assert_called_once()
 
-    mocked_context.job_queue.run_repeating.assert_called_once()
+    mocked_context.job_queue.run_repeating.call_count == 2
     assert bot.is_running
 
 

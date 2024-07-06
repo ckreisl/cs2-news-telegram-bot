@@ -88,17 +88,18 @@ def test_counter_strike_update_message(mocked_cs2_update_post):
         assert msg.message == expected
 
 
-def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post, mocked_cs2_external_news):
+@pytest.mark.asyncio
+async def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post, mocked_cs2_external_news):
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
-        msg = TelegramMessageFactory.create(mocked_cs2_news_post)
+        msg = await TelegramMessageFactory.create(mocked_cs2_news_post)
         assert isinstance(msg, CounterStrikeNewsMessage)
 
-        msg = TelegramMessageFactory.create(mocked_cs2_update_post)
+        msg = await TelegramMessageFactory.create(mocked_cs2_update_post)
         assert isinstance(msg, CounterStrikeUpdateMessage)
 
-        msg = TelegramMessageFactory.create(mocked_cs2_external_news)
+        msg = await TelegramMessageFactory.create(mocked_cs2_external_news)
         assert isinstance(msg, CounterStrikeExternalMessage)
 
 
@@ -106,7 +107,7 @@ def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post, 
 async def test_telegram_message_send_news(mocked_cs2_news_post):
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
-        msg = TelegramMessageFactory.create(mocked_cs2_news_post)
+        msg = await TelegramMessageFactory.create(mocked_cs2_news_post)
 
         mocked_bot = AsyncMock()
         await msg.send(bot=mocked_bot, chat_id=1337)
@@ -120,7 +121,7 @@ async def test_telegram_message_send_update(mocked_cs2_update_post):
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
-        msg = TelegramMessageFactory.create(mocked_cs2_update_post)
+        msg = await TelegramMessageFactory.create(mocked_cs2_update_post)
         mocked_bot = AsyncMock()
 
     await msg.send(bot=mocked_bot, chat_id=1337)
