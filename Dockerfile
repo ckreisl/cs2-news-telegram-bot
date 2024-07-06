@@ -1,5 +1,10 @@
 FROM python:3.11-slim
 
+RUN groupadd -g 1000 dev && \
+    useradd -u 1000 -g dev -m dev
+
+USER dev
+
 WORKDIR /app
 
 COPY requirements.txt .
