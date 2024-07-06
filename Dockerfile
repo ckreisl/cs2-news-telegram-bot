@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 
+RUN apt-get update && apt-get install -y sqlite3
+
 RUN groupadd -g 1000 dev && \
     useradd -u 1000 -g dev -m dev
 
