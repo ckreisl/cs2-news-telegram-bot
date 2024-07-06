@@ -97,12 +97,12 @@ class CounterStrike2UpdateBot:
         if not self.post_db.filepath.exists():
             logger.info('Post database not found. Creating new one...')
             await self.post_db.create()
-            await self.post_db.create_table()
+        await self.post_db.create_table()
 
         if not self.chat_db.filepath.exists():
             logger.info('Chat database not found. Creating new one...')
             await self.chat_db.create()
-            await self.chat_db.create_table()
+        await self.chat_db.create_table()
 
         if settings.IMPORT_CHATS_FROM_JSON is not None:
             try:
