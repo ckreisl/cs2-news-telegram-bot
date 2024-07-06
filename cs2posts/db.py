@@ -49,7 +49,9 @@ class SQLite(Database):
 
     def __init__(self, filepath: Path | None) -> None:
         if filepath is None:
-            filepath = Path(__file__).parent.parent / "sqlite.db"
+            filepath = Path(__file__).parent.parent / "database"
+            filepath.mkdir(parents=True, exist_ok=True)
+            filepath /= "sqlite.db"
 
         super().__init__(filepath)
 

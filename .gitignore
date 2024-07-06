@@ -12,4 +12,6 @@ pytest.xml
 coverage.xml
 
 backups/
+database/
+
 *.db
