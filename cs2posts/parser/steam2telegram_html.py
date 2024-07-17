@@ -20,6 +20,10 @@ STEAM_FORMAT = {
         'pattern': r'\[h3\](.*?)\[/h3\]',
         'replace': r'<b>\1</b>',
     },
+    "dash": {
+        'pattern': r'&ndash;',
+        'replace': r'—',
+    },
 }
 
 
