@@ -135,7 +135,7 @@ class ContentExtractor:
                 left = text_blocks[i]
                 right = text_blocks[i + 1]
 
-                if left.text.endswith('>') and right.text.startswith('<'):
+                if left.text.endswith('>') and right.text.startswith('</a>'):
                     blocks.append(TextBlock(
                         text_pos_start=left.text_pos_start,
                         text_pos_end=right.text_pos_end,
@@ -162,5 +162,6 @@ class ContentExtractor:
 
     @staticmethod
     def is_url(text: str) -> bool:
-        url_pattern = re.compile(r'^(https?|ftp)://[^\s/$.?#].[^\s]*$')
+        url_regex = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+        url_pattern = re.compile(url_regex)
         return re.match(url_pattern, text) is not None
