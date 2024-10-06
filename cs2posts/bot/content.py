@@ -94,7 +94,7 @@ class ContentExtractor:
 
         for c in content:
             if c.text_pos_start == 0:
-                text_pos = c.text_pos_end + 1
+                text_pos = c.text_pos_end
                 continue
 
             blocks.append(TextBlock(
@@ -103,7 +103,7 @@ class ContentExtractor:
                 is_heading=False,
                 text=text[text_pos:c.text_pos_start].strip()))
 
-            text_pos = c.text_pos_end + 1
+            text_pos = c.text_pos_end
 
         blocks.append(TextBlock(
             text_pos_start=text_pos,
@@ -119,6 +119,33 @@ class ContentExtractor:
         images = ContentExtractor.extract_images(text)
         texts = ContentExtractor.extract_text_block(text, images, videos)
 
+        # TODO: Refactor this
+        # New Steam news if image is clickable the link contains an image
+        def combine_text_blocks(text_blocks: list[TextBlock]) -> list[TextBlock]:
+
+            if len(text_blocks) == 0:
+                return text_blocks
+
+            if len(text_blocks) == 1:
+                return text_blocks
+
+            blocks = []
+
+            for i in range(0, len(text_blocks) - 1):
+                left = text_blocks[i]
+                right = text_blocks[i + 1]
+
+                if left.text.endswith('>') and right.text.startswith('</a>'):
+                    blocks.append(TextBlock(
+                        text_pos_start=left.text_pos_start,
+                        text_pos_end=right.text_pos_end,
+                        is_heading=left.is_heading,
+                        text=left.text + "\nImage Link" + right.text))
+
+            return blocks
+
+        texts = combine_text_blocks(texts)
+
         content: list[Content] = [*videos, *images, *texts]
         content.sort(key=lambda file: file.text_pos_start)
 
@@ -128,5 +155,13 @@ class ContentExtractor:
 
     @staticmethod
     def extract_url(text: str) -> str | None:
+        if ContentExtractor.is_url(text):
+            return text
         m = re.search(r'href="([^"]+)"', text)
         return m.group(1) if m else None
+
+    @staticmethod
+    def is_url(text: str) -> bool:
+        url_regex = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+        url_pattern = re.compile(url_regex)
+        return re.match(url_pattern, text) is not None
