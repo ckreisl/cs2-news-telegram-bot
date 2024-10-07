@@ -7,7 +7,7 @@ from cs2posts.parser.parser import Parser
 
 class SteamUpdateHeadingParser(Parser):
 
-    HEADING_REGEX = r'\[([A-Z0-9&\s]+)\]'
+    HEADING_REGEX = r'\[([a-zA-Z0-9&\s]+)\]'
 
     def __init__(self, text: str):
         super().__init__(text)
