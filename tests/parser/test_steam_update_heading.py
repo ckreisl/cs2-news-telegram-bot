@@ -34,3 +34,8 @@ def test_steam_update_heading_parser_no_heading(steam_parser):
 def test_steam_update_heading_parser_multiple(steam_parser):
     steam_parser.text = "\n[INVENTORY & ITEMS]\n"
     assert steam_parser.parse() == "\n<b>[INVENTORY & ITEMS]</b>\n"
+
+
+def test_steam_update_heading_parser_vacnet(steam_parser):
+    steam_parser.text = "\n[ VacNet ]\n"
+    assert steam_parser.parse() == "\n<b>[ VacNet ]</b>\n"
