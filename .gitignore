@@ -15,3 +15,5 @@ backups/
 database/
 
 *.db
+.tox
+.mypy_cache

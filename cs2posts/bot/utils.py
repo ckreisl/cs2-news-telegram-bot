@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 class Utils:
 
     @staticmethod
-    def is_valid_url(url: str, timeout: int = REQUESTS_TIMEOUT) -> bool:
+    def is_valid_url(url: str | None, timeout: int = REQUESTS_TIMEOUT) -> bool:
+        if not url:
+            return False
+
         if not url.startswith("http"):
             return False
 

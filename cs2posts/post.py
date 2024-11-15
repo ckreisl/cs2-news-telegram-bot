@@ -65,7 +65,7 @@ class Post:
         # Do not return a timezone-aware datetime object
         return datetime.fromtimestamp(self.date, tz=tz).replace(tzinfo=None)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     def is_update(self) -> bool:
