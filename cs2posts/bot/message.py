@@ -183,6 +183,7 @@ class CounterStrikeUpdateMessage(TelegramMessage):
         msg += f"({post.date_as_datetime})\n"
         msg += "\n"
         msg += parser.parse()
+        msg += "\n\n" if not msg.endswith("\n\n") else ""
         msg += f"(Author: {post.author})"
         msg += "\n\n"
         msg += f"Source: <a href='{post.url}'>Link</a>"
