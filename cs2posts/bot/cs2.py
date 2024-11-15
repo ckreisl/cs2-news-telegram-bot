@@ -153,6 +153,9 @@ class CounterStrike2UpdateBot:
         await self.post_db.save(self.latest_external_post)
 
     async def new_chat_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update is None or update.message is None:
+            return
+
         logger.info(f'New chat member {update.message.new_chat_members} ...')
         logger.info(f"Username: {update.message.from_user.username}")
 
@@ -171,6 +174,9 @@ class CounterStrike2UpdateBot:
             await self.chat_db.add(chat)
 
     async def left_chat_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update is None or update.message is None:
+            return
+
         logger.info(f'Left chat member {update.message.left_chat_member} ...')
 
         if update.message.left_chat_member.username != self.username:

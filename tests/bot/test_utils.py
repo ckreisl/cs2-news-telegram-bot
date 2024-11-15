@@ -13,6 +13,10 @@ def test_is_valid_url_valid():
     assert is_valid
 
 
+def test_is_valid_url_invalid_url_none():
+    assert not Utils.is_valid_url(None)
+
+
 def test_is_valid_url_invalid():
     url = "example.com"
     assert not Utils.is_valid_url(url)

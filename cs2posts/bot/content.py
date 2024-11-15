@@ -41,29 +41,53 @@ class TextBlock(Content):
 class ContentExtractor:
 
     @staticmethod
-    def extract_videos(text: str) -> list[Video]:
-        pattern = r"\[video webm=(.*?) mp4=(.*?) poster=(.*?) autoplay=(.*?) controls=(.*?)\]\[/video\]"
-        matches = re.finditer(pattern, text)
+    def extract_youtube(text: str) -> list[Youtube]:
         videos = []
-        for result in matches:
-            videos.append(Video(
-                text_pos_start=result.start(),
-                text_pos_end=result.end(),
-                is_heading=False,
-                webm=result.group(1),
-                mp4=result.group(2),
-                poster=result.group(3),
-                autoplay=result.group(4) == "true",
-                controls=result.group(5) == "true"))
 
         youtube_pattern = r"\[previewyoutube=([^;]+);.*?\]\[/previewyoutube\]"
         matches = re.finditer(youtube_pattern, text)
+
         for result in matches:
             videos.append(Youtube(
                 text_pos_start=result.start(),
                 text_pos_end=result.end(),
                 is_heading=False,
                 url=result.group(1)))
+
+        return videos
+
+    @staticmethod
+    def extract_videos(text: str) -> list[Video]:
+        videos = []
+
+        video_pattern = re.compile(r'\[video\s+(.*?)\]\[/video\]', re.DOTALL)
+        matches = re.finditer(video_pattern, text)
+
+        patterns = {
+            'mp4': r'mp4=<a[^>]+href="([^"]+)">',
+            'webm': r'webm=<a[^>]+href="([^"]+)">',
+            'poster': r'poster=<a[^>]+href="([^"]+)">',
+            'autoplay': r'autoplay=([^\s\]]+)',
+            'controls': r'controls=([^\s\]]+)'
+        }
+
+        for result in matches:
+            attr = {}
+            for key, pattern in patterns.items():
+                match = re.search(pattern, result[0])
+                if not match:
+                    continue
+                attr[key] = match.group(1)
+
+            videos.append(Video(
+                text_pos_start=result.start(),
+                text_pos_end=result.end(),
+                is_heading=False,
+                webm=attr.get('webm', ''),
+                mp4=attr.get('mp4', ''),
+                poster=attr.get('poster', ''),
+                autoplay=attr.get('autoplay', 'false') == "true",
+                controls=attr.get('controls', 'false') == "true"))
 
         return videos
 
@@ -82,8 +106,8 @@ class ContentExtractor:
         return images
 
     @staticmethod
-    def extract_text_block(text: str, images: list[Image], videos: list[Video]) -> list[Content]:
-        content: list[Content] = [*videos, *images]
+    def extract_text_block(text: str, images: list[Image], videos: list[Video], youtube: list[Youtube]) -> list[Content]:
+        content: list[Content] = [*videos, *youtube, *images]
         content.sort(key=lambda file: file.text_pos_start)
 
         if len(content) == 0:
@@ -115,9 +139,10 @@ class ContentExtractor:
 
     @staticmethod
     def extract_message_blocks(text: str) -> list[Content]:
+        youtube = ContentExtractor.extract_youtube(text)
         videos = ContentExtractor.extract_videos(text)
         images = ContentExtractor.extract_images(text)
-        texts = ContentExtractor.extract_text_block(text, images, videos)
+        texts = ContentExtractor.extract_text_block(text, images, videos, youtube)
 
         # TODO: Refactor this
         # New Steam news if image is clickable the link contains an image
@@ -131,9 +156,13 @@ class ContentExtractor:
 
             blocks = []
 
-            for i in range(0, len(text_blocks) - 1):
+            for i in range(0, len(text_blocks)):
                 left = text_blocks[i]
-                right = text_blocks[i + 1]
+                idx_right = i + 1
+                if idx_right >= len(text_blocks):
+                    blocks.append(left)
+                    break
+                right = text_blocks[idx_right]
 
                 if left.text.endswith('>') and right.text.startswith('</a>'):
                     blocks.append(TextBlock(
@@ -141,12 +170,15 @@ class ContentExtractor:
                         text_pos_end=right.text_pos_end,
                         is_heading=left.is_heading,
                         text=left.text + "\nImage Link" + right.text))
+                    continue
+
+                blocks.append(left)
 
             return blocks
 
         texts = combine_text_blocks(texts)
 
-        content: list[Content] = [*videos, *images, *texts]
+        content: list[Content] = [*youtube, *videos, *images, *texts]
         content.sort(key=lambda file: file.text_pos_start)
 
         content[0].is_heading = True

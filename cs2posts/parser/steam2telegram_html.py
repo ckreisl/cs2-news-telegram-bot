@@ -31,7 +31,7 @@ class Steam2TelegramHTML(Parser):
 
     def __init__(self, text: str):
         super().__init__(text)
-        self.__parser: list[Parser] = []
+        self.__parser: list[tuple[Parser, int]] = []
 
     def add_parser(self, parser: Parser, priority: int = sys.maxsize) -> None:
         self.__parser.append((parser, priority))
