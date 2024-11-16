@@ -156,7 +156,8 @@ class ContentExtractor:
 
             blocks = []
 
-            for i in range(0, len(text_blocks)):
+            i = 0
+            while i < len(text_blocks):
                 left = text_blocks[i]
                 idx_right = i + 1
                 if idx_right >= len(text_blocks):
@@ -170,9 +171,11 @@ class ContentExtractor:
                         text_pos_end=right.text_pos_end,
                         is_heading=left.is_heading,
                         text=left.text + "\nImage Link" + right.text))
+                    i += 2
                     continue
 
                 blocks.append(left)
+                i += 1
 
             return blocks
 
