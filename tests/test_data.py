@@ -56,6 +56,8 @@ async def test_news_2024_10_02():
 
     actual_values = content_count(msg.content)
 
+    assert msg.content[0].text.endswith("</a>")
+    assert not msg.content[-1].text.startswith("</a>")
     assert actual_values[TextBlock.__name__] == expected_text_blocks
     assert actual_values[Image.__name__] == expected_image_blocks
 
