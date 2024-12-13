@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from cs2posts.bot.utils import Utils
+
 
 @dataclass
 class Content:
@@ -97,11 +99,12 @@ class ContentExtractor:
         matches = re.finditer(pattern, text)
         images = []
         for result in matches:
+            url = ContentExtractor.resolve_steam_clan_image_url(result.group(1))
             images.append(Image(
                 text_pos_start=result.start(),
                 text_pos_end=result.end(),
                 is_heading=False,
-                url=result.group(1)))
+                url=url))
 
         return images
 
@@ -194,6 +197,24 @@ class ContentExtractor:
             return text
         m = re.search(r'href="([^"]+)"', text)
         return m.group(1) if m else None
+
+    @staticmethod
+    def resolve_steam_clan_image_url(text: str) -> str:
+        STEAM_CLAN_IMAGE = "{STEAM_CLAN_IMAGE}"
+        if STEAM_CLAN_IMAGE not in text:
+            return text
+
+        urls = [
+            "https://clan.akamai.steamstatic.com/images",
+            "https://clan.fastly.steamstatic.com/images",
+        ]
+
+        for url in urls:
+            resolved_url = text.replace(STEAM_CLAN_IMAGE, url)
+            if Utils.is_valid_url(resolved_url):
+                return resolved_url
+
+        return text
 
     @staticmethod
     def is_url(text: str) -> bool:
