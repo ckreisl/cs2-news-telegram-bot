@@ -9,9 +9,9 @@ import pytest
 from telegram.constants import ParseMode
 
 from cs2posts.bot import settings
-from cs2posts.bot.chats import Chat
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.bot.spam import SpamProtectorMessages
+from cs2posts.dto.chats import Chat
 
 
 @pytest.fixture

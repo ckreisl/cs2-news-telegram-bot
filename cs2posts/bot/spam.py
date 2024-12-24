@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from telegram.constants import ParseMode
 
 from cs2posts.bot import settings
-from cs2posts.bot.chats import Chat
+from cs2posts.dto.chats import Chat
 
 
 logger = logging.getLogger(__name__)

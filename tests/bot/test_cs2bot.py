@@ -10,9 +10,9 @@ from telegram.constants import ChatType
 from telegram.error import BadRequest
 from telegram.error import Forbidden
 
-from cs2posts.bot.chats import Chat
 from cs2posts.bot.cs2 import CounterStrike2UpdateBot
-from cs2posts.post import Post
+from cs2posts.dto.chats import Chat
+from cs2posts.dto.post import Post
 
 
 def create_update_post():
@@ -328,7 +328,7 @@ async def test_cs2_bot_latest_command(bot):
     bot.chat_db.get.return_value = chat
     bot.latest_post = Mock()
 
-    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         bot.send_message = AsyncMock()
@@ -347,7 +347,7 @@ async def test_cs2_bot_news_command(bot):
     bot.chat_db.get.return_value = chat
     bot.latest_news_post = Mock()
 
-    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         bot.send_message = AsyncMock()
@@ -366,7 +366,7 @@ async def test_cs2_bot_update_command(bot):
     bot.chat_db.get.return_value = chat
     bot.latest_update_post = Mock()
 
-    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         bot.send_message = AsyncMock()
@@ -421,7 +421,7 @@ async def test_cs2_bot_send_news_post_to_chats(bot):
         Chat(13)]
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         await bot.send_post_to_chats(mocked_context, mocked_post)
@@ -442,7 +442,7 @@ async def test_cs2_bot_send_update_post_to_chats(bot):
         Chat(13)]
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         await bot.send_post_to_chats(mocked_context, mocked_post)
@@ -466,7 +466,7 @@ async def test_cs2_bot_send_external_post_to_chats(bot):
         Chat(42)]
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         await bot.send_post_to_chats(mocked_context, mocked_post)
@@ -485,7 +485,7 @@ async def test_cs2_bot_send_unknown_post_to_chats(bot):
     mocked_post.is_external.return_value = False
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.bot.message.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
         await bot.send_post_to_chats(mocked_context, mocked_post)
         bot.chat_db.get_running_and_interested_in_updates_chats.assert_not_called()
         bot.chat_db.get_running_and_interested_in_news_chats.assert_not_called()

@@ -13,8 +13,8 @@ from telegram.ext import CallbackQueryHandler
 from telegram.ext import CommandHandler
 from telegram.ext import ContextTypes
 
-from cs2posts.bot.chats import Chat
 from cs2posts.db import ChatDatabase
+from cs2posts.dto.chats import Chat
 
 
 logger = logging.getLogger(__name__)

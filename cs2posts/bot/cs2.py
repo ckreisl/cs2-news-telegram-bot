@@ -18,16 +18,16 @@ from telegram.ext import MessageHandler
 
 import cs2posts.bot.constants as const
 from cs2posts.bot import settings
-from cs2posts.bot.chats import Chat
-from cs2posts.bot.message import TelegramMessage
-from cs2posts.bot.message import TelegramMessageFactory
 from cs2posts.bot.options import Options
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.crawler import CounterStrike2Crawler
 from cs2posts.cs2 import CounterStrike2Posts
 from cs2posts.db import ChatDatabase
 from cs2posts.db import PostDatabase
-from cs2posts.post import Post
+from cs2posts.dto.chats import Chat
+from cs2posts.dto.post import Post
+from cs2posts.msg import TelegramMessage
+from cs2posts.msg import TelegramMessageFactory
 
 
 logger = logging.getLogger(__name__)

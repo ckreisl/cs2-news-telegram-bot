@@ -1,66 +1,23 @@
 from __future__ import annotations
 
-import abc
 import logging
 
-from bs4 import BeautifulSoup
 from telegram.constants import ParseMode
 
-from cs2posts.bot.constants import TELEGRAM_MAX_MESSAGE_LENGTH
-from cs2posts.bot.utils import Utils
+from .telegram import TelegramMessage
 from cs2posts.content import ContentExtractor
 from cs2posts.content import Image
 from cs2posts.content import TextBlock
 from cs2posts.content import Video
 from cs2posts.content import Youtube
 from cs2posts.content.utils import extract_url
+from cs2posts.dto.post import Post
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
-from cs2posts.parser.steam_update_heading import SteamUpdateHeadingParser
-from cs2posts.post import Post
+from cs2posts.utils import Utils
 
 
 logger = logging.getLogger(__name__)
-
-
-class TelegramMessage:
-
-    def __init__(self, message: str) -> None:
-        self.__message = message
-        self.__messages = self.split(message)
-
-    @property
-    def message(self) -> str:
-        return self.__message
-
-    @property
-    def messages(self) -> list[str]:
-        return self.__messages
-
-    def split(self, message: str) -> list[str]:
-
-        if len(message) < TELEGRAM_MAX_MESSAGE_LENGTH:
-            return [message]
-
-        lines = message.split('\n')
-        chunks = []
-        chunk = ''
-
-        for line in lines:
-            if (len(chunk) + len(line)) < TELEGRAM_MAX_MESSAGE_LENGTH:
-                chunk += line + "\n"
-                continue
-
-            chunks.append(chunk)
-            chunk = line + "\n"
-
-        chunks.append(chunk)
-
-        return chunks
-
-    @abc.abstractmethod
-    async def send(self, bot, chat_id: int) -> None:
-        raise NotImplementedError("Method not implemented")  # pragma: no cover
 
 
 class CounterStrikeNewsMessage(TelegramMessage):
@@ -169,100 +126,3 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 await self.send_video(bot, chat_id, content)
             elif isinstance(content, Youtube):
                 await self.send_youtube_video(bot, chat_id, content)
-
-
-class CounterStrikeUpdateMessage(TelegramMessage):
-
-    def __init__(self, post: Post) -> None:
-        post.url = Utils.get_redirected_url(post.url)
-
-        parser = Steam2TelegramHTML(post.contents)
-        parser.add_parser(parser=SteamListParser, priority=1)
-        parser.add_parser(parser=SteamUpdateHeadingParser, priority=2)
-
-        msg = f"<b>{post.title}</b>\n"
-        msg += f"({post.date_as_datetime})\n"
-        msg += "\n"
-        msg += parser.parse()
-        msg += "\n\n" if not msg.endswith("\n\n") else ""
-        msg += f"(Author: {post.author})"
-        msg += "\n\n"
-        msg += f"Source: <a href='{post.url}'>Link</a>"
-
-        super().__init__(msg)
-
-    async def send(self, bot, chat_id: int) -> None:
-        for msg in self.messages:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=msg,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)
-
-
-class CounterStrikeExternalMessage(TelegramMessage):
-
-    def __init__(self, post: Post) -> None:
-        post.url = Utils.get_redirected_url(post.url)
-        self.post = post
-
-        soup = BeautifulSoup(post.contents, "html.parser")
-
-        for img in soup.find_all("img"):
-            img.decompose()
-
-        for br in soup.find_all("br"):
-            br.decompose()
-
-        read_more_all = soup.find_all("a")
-
-        read_more = []
-        for a in read_more_all:
-            if "read more" in a.text.lower():
-                read_more.append(a)
-            if "read the rest of the story" in a.text.lower():
-                read_more.append(a)
-
-        if len(read_more) > 0:
-            for a in read_more:
-                a.extract()
-
-        content = str(soup)
-        content = content.replace("<p>", "").replace("</p>", "")
-        content = content.replace("<br/>", "")
-        content = content.lstrip().rstrip()
-
-        msg = "🔗 <b>External News</b>\n\n"
-        msg += f"<b>{post.title}</b>\n"
-        msg += f"({post.date_as_datetime})\n"
-        msg += "\n"
-        msg += content
-        msg += "\n\n"
-
-        if len(read_more) > 0:
-            post.url = read_more[0].get("href")
-
-        msg += f"Source: <a href='{post.url}'>Link</a>"
-
-        super().__init__(msg)
-
-    async def send(self, bot, chat_id: int) -> None:
-        for msg in self.messages:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=msg,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)
-
-
-class TelegramMessageFactory:
-
-    @staticmethod
-    async def create(post: Post) -> TelegramMessage:
-        if post.is_news():
-            return CounterStrikeNewsMessage(post)
-        if post.is_update():
-            return CounterStrikeUpdateMessage(post)
-        if post.is_external():
-            return CounterStrikeExternalMessage(post)
-        raise ValueError(f"Unknown post type {post.title=} {post.url=}")

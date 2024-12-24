@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from cs2posts.bot.utils import Utils
+from cs2posts.utils import Utils
 # TODO: Refactor this because it's not a good practice to import from bot
 
 

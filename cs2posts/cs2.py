@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from cs2posts.post import FeedType
-from cs2posts.post import Post
+from cs2posts.dto.post import FeedType
+from cs2posts.dto.post import Post
 
 
 logger = logging.getLogger(__name__)

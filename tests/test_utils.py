@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from cs2posts.bot.utils import Utils
+from cs2posts.utils import Utils
 
 
 def test_is_valid_url_valid():

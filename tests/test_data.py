@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 from telegram import Video
 
-from cs2posts.bot.message import TelegramMessageFactory
 from cs2posts.content.content import Content
 from cs2posts.content.content import Image
 from cs2posts.content.content import TextBlock
-from cs2posts.post import Post
+from cs2posts.dto.post import Post
+from cs2posts.msg import TelegramMessageFactory
 
 
 def load_data(type: str, date: str) -> Post:

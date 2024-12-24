@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from cs2posts.post import FeedType
-from cs2posts.post import Post
+from cs2posts.dto.post import FeedType
+from cs2posts.dto.post import Post
 
 
 @pytest.fixture

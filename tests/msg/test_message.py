@@ -5,13 +5,13 @@ from unittest.mock import patch
 
 import pytest
 
-from cs2posts.bot.constants import TELEGRAM_MAX_MESSAGE_LENGTH
-from cs2posts.bot.message import CounterStrikeExternalMessage
-from cs2posts.bot.message import CounterStrikeNewsMessage
-from cs2posts.bot.message import CounterStrikeUpdateMessage
-from cs2posts.bot.message import TelegramMessage
-from cs2posts.bot.message import TelegramMessageFactory
-from cs2posts.post import Post
+from cs2posts.dto.post import Post
+from cs2posts.msg import CounterStrikeExternalMessage
+from cs2posts.msg import CounterStrikeNewsMessage
+from cs2posts.msg import CounterStrikeUpdateMessage
+from cs2posts.msg import TelegramMessage
+from cs2posts.msg import TelegramMessageFactory
+from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 
 
 @pytest.fixture

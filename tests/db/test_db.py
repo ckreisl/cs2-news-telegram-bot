@@ -7,11 +7,11 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from cs2posts.bot.chats import Chat
 from cs2posts.db import ChatDatabase
 from cs2posts.db import PostDatabase
 from cs2posts.db import SQLite
-from cs2posts.post import Post
+from cs2posts.dto.chats import Chat
+from cs2posts.dto.post import Post
 
 
 @pytest.fixture
