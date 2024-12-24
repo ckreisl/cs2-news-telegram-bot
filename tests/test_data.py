@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from telegram import Video
 
-from cs2posts.bot.content import Content
-from cs2posts.bot.content import Image
-from cs2posts.bot.content import TextBlock
 from cs2posts.bot.message import TelegramMessageFactory
+from cs2posts.content.content import Content
+from cs2posts.content.content import Image
+from cs2posts.content.content import TextBlock
 from cs2posts.post import Post
 
 

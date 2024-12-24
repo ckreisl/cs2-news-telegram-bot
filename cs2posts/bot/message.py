@@ -7,12 +7,13 @@ from bs4 import BeautifulSoup
 from telegram.constants import ParseMode
 
 from cs2posts.bot.constants import TELEGRAM_MAX_MESSAGE_LENGTH
-from cs2posts.bot.content import ContentExtractor
-from cs2posts.bot.content import Image
-from cs2posts.bot.content import TextBlock
-from cs2posts.bot.content import Video
-from cs2posts.bot.content import Youtube
 from cs2posts.bot.utils import Utils
+from cs2posts.content import ContentExtractor
+from cs2posts.content import Image
+from cs2posts.content import TextBlock
+from cs2posts.content import Video
+from cs2posts.content import Youtube
+from cs2posts.content.utils import extract_url
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
 from cs2posts.parser.steam_update_heading import SteamUpdateHeadingParser
@@ -69,7 +70,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
 
-        self.content = ContentExtractor.extract_message_blocks(parser.parse())
+        self.content = ContentExtractor(parser.parse()).extract()
         self.__add_header()
         self.__add_footer()
 
@@ -114,7 +115,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 disable_web_page_preview=True)
 
     async def send_image(self, bot, chat_id: int, image: Image) -> None:
-        image_url = ContentExtractor.extract_url(image.url)
+        image_url = extract_url(image.url)
 
         if not Utils.is_valid_url(image_url):
             logger.error(
@@ -129,14 +130,14 @@ class CounterStrikeNewsMessage(TelegramMessage):
             parse_mode=ParseMode.HTML)
 
     async def send_video(self, bot, chat_id: int, video: Video) -> None:
-        video_url = ContentExtractor.extract_url(video.mp4)
+        video_url = extract_url(video.mp4)
 
         if not Utils.is_valid_url(video_url):
             logger.error(
                 f"Not sending video due to invalid video URL {video_url=}")
             return
 
-        thumbnail_url = ContentExtractor.extract_url(video.poster)
+        thumbnail_url = extract_url(video.poster)
         caption = self.get_header() if video.is_heading else None
         await bot.send_video(
             chat_id=chat_id,
