@@ -137,3 +137,11 @@ class PostDatabase(SQLite):
                 SELECT * FROM posts ORDER BY date DESC LIMIT 1
             """) as cursor:
                 return await self._convert_row_to_post(await cursor.fetchone())
+
+    async def get_post_by_gid(self, gid: str) -> Post | None:
+        async with aiosqlite.connect(self.filepath) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT * FROM posts WHERE gid = ?
+            """, (gid,)) as cursor:
+                return await self._convert_row_to_post(await cursor.fetchone())

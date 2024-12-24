@@ -30,6 +30,9 @@ class SteamListParser(Parser):
     def is_end_tag_list_item(self, i: int) -> bool:
         return self.is_tag(self.LIST_ITEM_END_TAG, i)
 
+    def is_empty_tag_list_item(self, i: int) -> bool:
+        return self.is_tag(self.LIST_ITEM_START_TAG + self.LIST_ITEM_END_TAG, i)
+
     def parse(self) -> str:
         i = 0
         nested_lvl = 0
@@ -43,6 +46,11 @@ class SteamListParser(Parser):
                 continue
 
             if self.is_start_tag_list_item(i):
+
+                if self.is_empty_tag_list_item(i):
+                    i += len(self.LIST_ITEM_START_TAG + self.LIST_ITEM_END_TAG)
+                    continue
+
                 space = " " * (nested_lvl - 1) * 4 if nested_lvl > 1 else ""
                 if nested_lvl > 1:
                     tag = self.LIST_ITEM_ICON_NESTED
