@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cs2posts.crawler import CounterStrike2Crawler
-from cs2posts.cs2 import CounterStrike2Posts
+from cs2posts.cs2posts import CounterStrike2Posts
 from cs2posts.dto.post import Post
 
 

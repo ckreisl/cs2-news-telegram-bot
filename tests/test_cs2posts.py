@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cs2posts.cs2 import CounterStrike2Posts
+from cs2posts.cs2posts import CounterStrike2Posts
 
 
 @pytest.fixture

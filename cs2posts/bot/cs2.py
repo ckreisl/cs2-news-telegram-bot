@@ -21,7 +21,7 @@ from cs2posts.bot import settings
 from cs2posts.bot.options import Options
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.crawler import CounterStrike2Crawler
-from cs2posts.cs2 import CounterStrike2Posts
+from cs2posts.cs2posts import CounterStrike2Posts
 from cs2posts.db import ChatDatabase
 from cs2posts.db import PostDatabase
 from cs2posts.dto.chats import Chat
