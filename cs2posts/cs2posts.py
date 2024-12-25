@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from cs2posts.post import FeedType
-from cs2posts.post import Post
+from cs2posts.dto.post import FeedType
+from cs2posts.dto.post import Post
+from cs2posts.utils import Utils
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ class CounterStrike2Posts:
 
     def __init__(self, posts: dict[str, Any]) -> None:
 
-        self.__posts = []
+        self.__posts: list[Post] = []
 
         if posts is None or posts == {}:
             return
@@ -103,6 +104,10 @@ class CounterStrike2Posts:
     @property
     def oldest_external_post(self) -> Post | None:
         return self.external_posts[-1] if self.external_posts else None
+
+    def validate(self) -> None:
+        for post in self.news_posts:
+            post.contents = Utils.resolve_steam_clan_image_url(post.contents)
 
     def is_latest_post_news(self) -> bool:
         if self.latest is None:

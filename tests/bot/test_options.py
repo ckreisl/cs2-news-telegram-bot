@@ -6,9 +6,9 @@ from unittest.mock import patch
 
 import pytest
 
-from cs2posts.bot.chats import Chat
 from cs2posts.bot.options import ButtonData
 from cs2posts.bot.options import Options
+from cs2posts.dto.chats import Chat
 
 
 @pytest.fixture
