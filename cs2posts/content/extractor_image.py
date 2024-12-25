@@ -4,7 +4,7 @@ import re
 
 from .content import Image
 from .extractor import Extractor
-from .utils import resolve_steam_clan_image_url
+from cs2posts.utils import Utils
 
 
 class ImageExtractor(Extractor):
@@ -14,7 +14,7 @@ class ImageExtractor(Extractor):
         matches = re.finditer(pattern, self.text)
         images = []
         for result in matches:
-            url = resolve_steam_clan_image_url(result.group(1))
+            url = Utils.resolve_steam_clan_image_url(result.group(1))
             images.append(Image(
                 text_pos_start=result.start(),
                 text_pos_end=result.end(),

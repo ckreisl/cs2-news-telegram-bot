@@ -382,15 +382,16 @@ class CounterStrike2UpdateBot:
             logger.error(f'Could not fetch latest posts: {e}')
             return
 
-        posts = CounterStrike2Posts.create(data)
+        cs2posts = CounterStrike2Posts.create(data)
+        cs2posts.validate()
 
-        if posts.is_empty():
-            logger.info(f'No post(s) found in latest crawl: {posts}')
+        if cs2posts.is_empty():
+            logger.info('No post(s) found in latest crawl.')
             return
 
-        await self._post_checker_news(context, posts.latest_news_post)
-        await self._post_checker_update(context, posts.latest_update_post)
-        await self._post_checker_external(context, posts.latest_external_post)
+        await self._post_checker_news(context, cs2posts.latest_news_post)
+        await self._post_checker_update(context, cs2posts.latest_update_post)
+        await self._post_checker_external(context, cs2posts.latest_external_post)
 
         self.latest_post = await self.post_db.get_latest_post()
 

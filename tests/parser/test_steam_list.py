@@ -26,3 +26,9 @@ def test_steam_list_parser_nested_list(steam_list_parser):
     steam_list_parser.text = """<ul><li>Foo</li><ul><li>Bar</li></ul><li>Hello World</li></ul>"""
     expected = '\n• Foo\n    ◦ Bar\n• Hello World\n\n'
     assert steam_list_parser.parse() == expected
+
+
+def test_steam_list_parser_empty_list_item(steam_list_parser):
+    steam_list_parser.text = """<li></li>Inferno"""
+    expected = "• Inferno"
+    assert steam_list_parser.parse() == expected

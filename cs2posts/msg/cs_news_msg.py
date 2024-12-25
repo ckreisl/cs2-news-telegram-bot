@@ -10,7 +10,6 @@ from cs2posts.content import Image
 from cs2posts.content import TextBlock
 from cs2posts.content import Video
 from cs2posts.content import Youtube
-from cs2posts.content.utils import extract_url
 from cs2posts.dto.post import Post
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
@@ -72,7 +71,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 disable_web_page_preview=True)
 
     async def send_image(self, bot, chat_id: int, image: Image) -> None:
-        image_url = extract_url(image.url)
+        image_url = Utils.extract_url(image.url)
 
         if not Utils.is_valid_url(image_url):
             logger.error(
@@ -87,14 +86,14 @@ class CounterStrikeNewsMessage(TelegramMessage):
             parse_mode=ParseMode.HTML)
 
     async def send_video(self, bot, chat_id: int, video: Video) -> None:
-        video_url = extract_url(video.mp4)
+        video_url = Utils.extract_url(video.mp4)
 
         if not Utils.is_valid_url(video_url):
             logger.error(
                 f"Not sending video due to invalid video URL {video_url=}")
             return
 
-        thumbnail_url = extract_url(video.poster)
+        thumbnail_url = Utils.extract_url(video.poster)
         caption = self.get_header() if video.is_heading else None
         await bot.send_video(
             chat_id=chat_id,

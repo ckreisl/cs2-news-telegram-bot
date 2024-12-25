@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from cs2posts.cs2 import CounterStrike2Posts
@@ -46,8 +48,44 @@ def crawler_data():
 
 
 @pytest.fixture
+def crawler_data_steam_clan_image():
+    return {
+        "appnews": {
+            "appid": 730,
+            "newsitems": [
+                {
+                    "gid": "5141476355659151610",
+                    "title": "Your Time is Now",
+                    "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5141476355659151610",
+                    "is_external_url": True,
+                    "author": "Piggles ULTRAPRO",
+                    "contents": "{STEAM_CLAN_IMAGE}",
+                    "feedlabel": "Community Announcements",
+                    "date": 1693524157,
+                    "feedname": "steam_community_announcements",
+                    "feed_type": 1,
+                    "appid": 730
+                }
+            ]
+        }
+    }
+
+
+@pytest.fixture
 def cs2_posts(crawler_data):
     return CounterStrike2Posts(crawler_data)
+
+
+@pytest.fixture
+def cs2_posts_steam_clan_image(crawler_data_steam_clan_image):
+    return CounterStrike2Posts(crawler_data_steam_clan_image)
+
+
+def test_cs2_validate_replace_steam_clan_image_url(cs2_posts_steam_clan_image):
+    with patch("cs2posts.utils.Utils.is_valid_url", return_value=True):
+        cs2_posts_steam_clan_image.validate()
+    expected = "https://clan.akamai.steamstatic.com/images"
+    assert cs2_posts_steam_clan_image.posts[0].contents == expected
 
 
 def test_cs2_net_post_empty():
