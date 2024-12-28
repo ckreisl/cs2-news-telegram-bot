@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,6 @@ class Chat:
     last_activity: datetime = datetime(1970, 1, 1)
 
     @classmethod
-    def from_json(cls, data: dict[str, str]) -> Chat:
+    def from_dict(cls, data: dict[str, Any]) -> Chat:
         last_activity = datetime.fromisoformat(data.pop('last_activity'))
         return cls(**data, last_activity=last_activity)

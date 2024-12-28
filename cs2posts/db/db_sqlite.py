@@ -21,6 +21,8 @@ class SQLite(Database):
         async with aiosqlite.connect(self.filepath) as conn:
             async with conn.execute(f"""SELECT COUNT(*) FROM {table_name}""") as cursor:
                 result = await cursor.fetchone()
+                if result is None:
+                    return True
                 return result[0] == 0
 
     async def create(self, *, overwrite=False) -> None:

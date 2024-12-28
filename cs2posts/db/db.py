@@ -15,7 +15,7 @@ class Database:
         self.__filepath = filepath
 
     @property
-    def filepath(self) -> Path:
+    def filepath(self) -> Path | None:
         return self.__filepath
 
     @abc.abstractmethod
@@ -35,5 +35,5 @@ class Database:
         pass  # pragma: no cover
 
     @abc.abstractmethod
-    async def backup(self, filepath: Path) -> bool:
+    async def backup(self, filepath: Path) -> None:
         pass  # pragma: no cover

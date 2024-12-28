@@ -51,3 +51,27 @@ def test_get_redirected_url_exception():
         mock_get.side_effect = Exception
         redirected_url = Utils.get_redirected_url(url)
     assert redirected_url == url
+
+
+def test_resolve_steam_clan_image_url_valid_url():
+    text = "{STEAM_CLAN_IMAGE}"
+    expected = "https://clan.akamai.steamstatic.com/images"
+    with patch("cs2posts.utils.Utils.is_valid_url") as mock_is_valid_url:
+        mock_is_valid_url.return_value = True
+        resolved_url = Utils.resolve_steam_clan_image_url(text)
+    assert resolved_url == expected
+
+
+def test_resolve_steam_clan_image_url_invalid_url():
+    text = "{STEAM_CLAN_IMAGE}"
+    with patch("cs2posts.utils.Utils.is_valid_url") as mock_is_valid_url:
+        mock_is_valid_url.return_value = False
+        resolved_url = Utils.resolve_steam_clan_image_url(text)
+    assert resolved_url == text
+
+
+def test_extract_url_valid_url():
+    text = "https://example.com"
+    expected = "https://example.com"
+    extracted_url = Utils.extract_url(text)
+    assert extracted_url == expected

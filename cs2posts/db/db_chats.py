@@ -70,7 +70,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def is_empty(self) -> bool:
         return await super().is_empty("chats")
@@ -84,7 +84,10 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE chat_id = ?
             """, (chat_id,)) as cursor:
-                return Chat.from_json(dict(await cursor.fetchone()))
+                result = await cursor.fetchone()
+                if result is None:
+                    return None
+                return Chat.from_dict(dict(result))
 
     async def add(self, chat: Chat) -> Chat:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -162,14 +165,16 @@ class ChatDatabase(SQLite):
             chats = chats['chats']
 
         for chat in chats:
-            await self.add(Chat.from_json(chat))
+            await self.add(Chat.from_dict(chat))
 
-    async def exists(self, chat_id: Chat) -> bool:
+    async def exists(self, chat_id: int) -> bool:
         async with aiosqlite.connect(self.filepath) as conn:
             async with conn.execute("""
                 SELECT COUNT(*) FROM chats WHERE chat_id = ?
             """, (chat_id,)) as cursor:
                 result = await cursor.fetchone()
+                if result is None:
+                    return False
                 return result[0] == 1
 
     async def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
@@ -184,7 +189,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def get_interested_in_news_chats(self) -> list[Chat]:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -192,7 +197,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE is_news_interested = 1
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def get_interested_in_updates_chats(self) -> list[Chat]:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -200,7 +205,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE is_update_interested = 1
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def get_interested_in_external_news_chats(self) -> list[Chat]:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -208,7 +213,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE is_external_news_interested = 1
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def get_running_and_interested_in_news_chats(self) -> list[Chat]:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -216,7 +221,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1 AND is_news_interested = 1
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def get_running_and_interested_in_updates_chats(self) -> list[Chat]:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -224,7 +229,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1 AND is_update_interested = 1
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def get_running_and_interested_in_external_news_chats(self) -> list[Chat]:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -232,7 +237,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM chats WHERE is_running = 1 AND is_external_news_interested = 1
             """) as cursor:
-                return [Chat.from_json(dict(row)) for row in await cursor.fetchall()]
+                return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
     async def contains(self, chat: Chat) -> bool:
         async with aiosqlite.connect(self.filepath) as conn:
@@ -240,6 +245,8 @@ class ChatDatabase(SQLite):
                 SELECT COUNT(*) FROM chats WHERE chat_id = ?
             """, (chat.chat_id,)) as cursor:
                 result = await cursor.fetchone()
+                if result is None:
+                    return False
                 return result[0] == 1
 
     async def size(self) -> int:
@@ -247,4 +254,7 @@ class ChatDatabase(SQLite):
             async with conn.execute("""
                 SELECT COUNT(*) FROM chats
             """) as cursor:
-                return (await cursor.fetchone())[0]
+                result = await cursor.fetchone()
+                if result is None:
+                    return 0
+                return result[0]
