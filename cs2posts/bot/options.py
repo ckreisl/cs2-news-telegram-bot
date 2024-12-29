@@ -43,7 +43,7 @@ class OptionsMessageFactory:
         return text, reply_markup
 
     @staticmethod
-    def create_keyboard(chat: Chat) -> list[InlineKeyboardButton]:
+    def create_keyboard(chat: Chat) -> list[list[InlineKeyboardButton]]:
 
         btn_updates_text = "Disable" if chat.is_update_interested else "Enable"
         btn_news_text = "Disable" if chat.is_news_interested else "Enable"

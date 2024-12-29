@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 
 class Database:
 
-    def __init__(self, filepath: Path | None) -> None:
+    def __init__(self, filepath: Path) -> None:
         self.__filepath = filepath
 
     @property
-    def filepath(self) -> Path | None:
+    def filepath(self) -> Path:
         return self.__filepath
 
     @abc.abstractmethod

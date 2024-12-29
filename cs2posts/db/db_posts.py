@@ -11,9 +11,6 @@ from cs2posts.dto import Post
 
 class PostDatabase(SQLite):
 
-    def __init__(self, filepath: Path | None) -> None:
-        super().__init__(filepath)
-
     async def create_table(self) -> None:
         async with aiosqlite.connect(self.filepath) as conn:
             await conn.execute("""

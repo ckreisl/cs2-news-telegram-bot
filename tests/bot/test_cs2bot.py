@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
+from unittest.mock import call
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -74,6 +75,20 @@ async def test_cs2_bot_post_init(bot):
     mocked_app.bot.username = "test_bot"
     await bot.post_init(mocked_app)
     assert bot.username == "test_bot"
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_post_shutdown(bot):
+    bot.latest_news_post = create_news_post()
+    bot.latest_update_post = create_update_post()
+    bot.latest_external_post = create_update_post()
+
+    await bot.post_shutdown(Mock())
+
+    assert not bot.is_running
+    assert call(bot.latest_news_post) in bot.post_db.save.call_args_list
+    assert call(bot.latest_update_post) in bot.post_db.save.call_args_list
+    assert call(bot.latest_external_post) in bot.post_db.save.call_args_list
 
 
 @pytest.mark.asyncio
@@ -574,6 +589,13 @@ async def test_cs2_bot_send_message_raises_exception(bot):
     mocked_msg.send.assert_called_once_with(
         mocked_context.bot, chat_id=chat.chat_id)
     bot.chat_db.remove.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_backup_chats_db_from_settings(tmp_path, bot):
+    bot.chat_db.backup = AsyncMock()
+    await bot.backup_chats_db(Mock())
+    bot.chat_db.backup.assert_called_once()
 
 
 def test_cs2_bot_run(bot):
