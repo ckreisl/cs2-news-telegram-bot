@@ -11,9 +11,6 @@ from cs2posts.dto import Post
 
 class PostDatabase(SQLite):
 
-    def __init__(self, filepath: Path | None) -> None:
-        super().__init__(filepath)
-
     async def create_table(self) -> None:
         async with aiosqlite.connect(self.filepath) as conn:
             await conn.execute("""
@@ -92,11 +89,11 @@ class PostDatabase(SQLite):
 
         # Backwards compatibility from old .json format
         if posts.get('news') is not None:
-            await self.save(Post.from_json(posts['news']))
+            await self.save(Post.from_dict(posts['news']))
         if posts.get('update') is not None:
-            await self.save(Post.from_json(posts['update']))
+            await self.save(Post.from_dict(posts['update']))
         if posts.get('external') is not None:
-            await self.save(Post.from_json(posts['external']))
+            await self.save(Post.from_dict(posts['external']))
 
     async def _convert_row_to_post(self, row: aiosqlite.Row) -> Post:
         if row is None:

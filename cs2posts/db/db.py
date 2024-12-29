@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Database:
 
-    def __init__(self, filepath: Path | None) -> None:
+    def __init__(self, filepath: Path) -> None:
         self.__filepath = filepath
 
     @property
@@ -35,5 +35,5 @@ class Database:
         pass  # pragma: no cover
 
     @abc.abstractmethod
-    async def backup(self, filepath: Path) -> bool:
+    async def backup(self, filepath: Path) -> None:
         pass  # pragma: no cover

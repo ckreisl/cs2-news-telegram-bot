@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from cs2posts.bot.options import ButtonData
+from cs2posts.bot.options import IconGenerator
 from cs2posts.bot.options import Options
 from cs2posts.dto.chats import Chat
 
@@ -198,6 +199,38 @@ async def test_options_update(mocked_msg_factory, options):
 
 
 @pytest.mark.asyncio
+@patch('cs2posts.bot.options.OptionsMessageFactory')
+async def test_options_external_news(mocked_msg_factory, options):
+    mocked_msg_factory.create.return_value = ('text', 'reply_markup')
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+    mocked_update.callback_query.from_user.id = 42
+    mocked_update.callback_query.data = ButtonData.EXTERNAL_NEWS
+
+    options.update = AsyncMock()
+
+    chat = Chat(chat_id=42, chat_id_admin=42, is_external_news_interested=True)
+    options.chats_db.get.return_value = chat
+
+    await options.button(mocked_update, mocked_context)
+
+    mocked_update.callback_query.answer.assert_called_once()
+    options.chats_db.update.assert_called_once_with(chat)
+    assert chat.is_external_news_interested is False
+    options.update.assert_called_with(
+        mocked_context, mocked_update.callback_query, chat)
+
+    mocked_update.callback_query.answer.reset_mock()
+    await options.button(mocked_update, mocked_context)
+
+    mocked_update.callback_query.answer.assert_called_once()
+    options.chats_db.update.assert_called_with(chat)
+    assert chat.is_external_news_interested
+    options.update.assert_called_with(
+        mocked_context, mocked_update.callback_query, chat)
+
+
+@pytest.mark.asyncio
 async def test_options_close(options):
     mocked_context = AsyncMock()
     mocked_update = AsyncMock()
@@ -210,3 +243,8 @@ async def test_options_close(options):
     mocked_context.bot.delete_message.assert_awaited_once()
     mocked_context.bot.delete_message.assert_called_once_with(
         chat_id=42, message_id=1337)
+
+
+def test_icon_generator_get_enable_icon():
+    assert IconGenerator.get_enabled_icon(True) == '✅'
+    assert IconGenerator.get_enabled_icon(False) == '⛔️'

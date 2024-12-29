@@ -16,7 +16,7 @@ from cs2posts.msg import TelegramMessageFactory
 def load_data(type: str, date: str) -> Post:
     with open(f"{Path(__file__).parent}/data/{type}_{date}.json") as fs:
         data = json.load(fs)
-    return Post.from_json(data)
+    return Post.from_dict(data)
 
 
 def content_count(content: list[Content]) -> dict[str, int]:

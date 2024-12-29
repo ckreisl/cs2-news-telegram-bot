@@ -13,6 +13,7 @@ class PostType(Enum):
     NEWS = "news"
     UPDATE = "update"
     EXTERNAL = "external"
+    UNKOWN = "unknown"
 
     def __str__(self) -> str:
         return str(self.value)
@@ -28,6 +29,7 @@ class PostType(Enum):
             return cls.UPDATE
         if post.is_external():
             return cls.EXTERNAL
+        return cls.UNKOWN
 
 
 class FeedType(Enum):
@@ -57,7 +59,7 @@ class Post:
     tags: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_json(cls, json: dict[str, str]) -> Post:
+    def from_dict(cls, json: dict[str, Any]) -> Post:
         return cls(**json)
 
     @property

@@ -324,53 +324,19 @@ class CounterStrike2UpdateBot:
         msg = await TelegramMessageFactory.create(self.latest_external_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
-    async def _post_checker_news(self, context: CallbackContext, post: Post) -> None:
+    async def _post_checker(self, context: CallbackContext, post: Post) -> None:
         if post is None:
             return
 
-        if not post.is_newer_than(self.latest_news_post):
-            logger.info(
-                f'No new news post found latest_news_post=[{post.title}]')
+        post_type = str(post.get_type())
+        latest_post = getattr(self, f'latest_{post_type}_post')
+        if not post.is_newer_than(latest_post):
+            logger.info(f'No new {post_type} post found latest_{post_type}_post=[{post.title}]')
             return
 
-        logger.info(
-            f'New news post found latest_news_post=[{post.title}]')
+        logger.info(f'New {post_type} post found latest_{post_type}_post=[{post.title}]')
 
-        self.latest_news_post = post
-        await self.send_post_to_chats(context, post=post)
-        await self.post_db.save(post)
-
-    async def _post_checker_update(self, context: CallbackContext, post: Post) -> None:
-        if post is None:
-            return
-
-        if not post.is_newer_than(self.latest_update_post):
-            logger.info(
-                f'No new update post found latest_update_post=[{post.title}]')
-            return
-
-        logger.info(
-            f'New update post found latest_update_post=[{post.title}]')
-
-        self.latest_update_post = post
-        await self.send_post_to_chats(context, post=post)
-        await self.post_db.save(post)
-
-    async def _post_checker_external(self, context: CallbackContext, post: Post) -> None:
-        if post is None:
-            logger.info(
-                f'No external {post=} found latest_external_post=[{self.latest_external_post.title}]')
-            return
-
-        if not post.is_newer_than(self.latest_external_post):
-            logger.info(
-                f'No new external post found latest_external_post=[{post.title}]')
-            return
-
-        logger.info(
-            f'New external post found latest_external_post=[{post.title}]')
-
-        self.latest_external_post = post
+        setattr(self, f'latest_{post_type}_post', post)
         await self.send_post_to_chats(context, post=post)
         await self.post_db.save(post)
 
@@ -389,9 +355,9 @@ class CounterStrike2UpdateBot:
             logger.info('No post(s) found in latest crawl.')
             return
 
-        await self._post_checker_news(context, cs2posts.latest_news_post)
-        await self._post_checker_update(context, cs2posts.latest_update_post)
-        await self._post_checker_external(context, cs2posts.latest_external_post)
+        await self._post_checker(context, cs2posts.latest_news_post)
+        await self._post_checker(context, cs2posts.latest_update_post)
+        await self._post_checker(context, cs2posts.latest_external_post)
 
         self.latest_post = await self.post_db.get_latest_post()
 
