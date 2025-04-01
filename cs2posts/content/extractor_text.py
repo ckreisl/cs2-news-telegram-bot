@@ -71,11 +71,20 @@ class TextBlockExtractor(Extractor):
                 text_pos = c.text_pos_end
                 continue
 
+            if text_pos == c.text_pos_start:
+                text_pos = c.text_pos_end
+                continue
+
+            text = self.text[text_pos:c.text_pos_start].strip()
+            if len(text) == 0:
+                text_pos = c.text_pos_end
+                continue
+
             blocks.append(TextBlock(
                 text_pos_start=text_pos,
                 text_pos_end=c.text_pos_start,
                 is_heading=False,
-                text=self.text[text_pos:c.text_pos_start].strip()))
+                text=text))
 
             text_pos = c.text_pos_end
 
