@@ -3,6 +3,7 @@ from __future__ import annotations
 from .content import Content
 from .content import TextBlock
 from .extractor import Extractor
+from .extractor_carousel import CarouselExtractor
 from .extractor_image import ImageExtractor
 from .extractor_video import VideoExtractor
 from .extractor_youtube import YoutubeExtractor
@@ -12,18 +13,21 @@ class TextBlockExtractor(Extractor):
 
     def __init__(self, text: str,
                  videos: list[Content] | None = None,
+                 carousel: list[Content] | None = None,
                  images: list[Content] | None = None,
                  youtube: list[Content] | None = None) -> None:
         super().__init__(text)
 
         videos = videos or VideoExtractor(self.text).extract()
+        carousel = carousel or CarouselExtractor(self.text).extract()
         images = images or ImageExtractor(self.text).extract()
         youtube = youtube or YoutubeExtractor(self.text).extract()
 
         self.__content = sorted([
             *videos,
             *youtube,
-            *images
+            *carousel,
+            *images,
         ], key=lambda content: content.text_pos_start)
 
     def _combine(self, text_blocks: list[TextBlock]) -> list[TextBlock]:

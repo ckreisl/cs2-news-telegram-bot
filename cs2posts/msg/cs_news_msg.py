@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import logging
 
+from telegram import InputMediaPhoto
 from telegram.constants import ParseMode
 
 from .telegram import TelegramMessage
+from cs2posts.content import Carousel
 from cs2posts.content import ContentExtractor
 from cs2posts.content import Image
 from cs2posts.content import TextBlock
 from cs2posts.content import Video
 from cs2posts.content import Youtube
 from cs2posts.dto.post import Post
+from cs2posts.msg.constants import MAX_MEDIA_GROUP_SIZE
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
 from cs2posts.utils import Utils
@@ -33,7 +36,8 @@ class CounterStrikeNewsMessage(TelegramMessage):
     def __add_header(self) -> None:
         if (isinstance(self.content[0], Image) or  # noqa
             isinstance(self.content[0], Video) or  # noqa
-            isinstance(self.content[0], Youtube)):  # noqa
+            isinstance(self.content[0], Youtube) or  # noqa
+            isinstance(self.content[0], Carousel)):  # noqa
             # Ignore header we set it as caption
             return
 
@@ -85,6 +89,25 @@ class CounterStrikeNewsMessage(TelegramMessage):
             caption=caption,
             parse_mode=ParseMode.HTML)
 
+    async def send_carousel(self, bot, chat_id: int, carousel: Carousel) -> None:
+        media = []
+        for image in carousel.images:
+            image_url = Utils.extract_url(image.url)
+
+            if not Utils.is_valid_url(image_url):
+                logger.error(
+                    f"Not sending image due to invalid image URL {image_url=}")
+                return
+
+            media.append(InputMediaPhoto(media=image_url))
+
+        chunks = [media[i:i + MAX_MEDIA_GROUP_SIZE] for i in range(0, len(media), MAX_MEDIA_GROUP_SIZE)]
+
+        for chunk in chunks:
+            await bot.send_media_group(
+                chat_id=chat_id,
+                media=chunk)
+
     async def send_video(self, bot, chat_id: int, video: Video) -> None:
         video_url = Utils.extract_url(video.mp4)
 
@@ -121,6 +144,8 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 await self.send_message(bot, chat_id, content)
             elif isinstance(content, Image):
                 await self.send_image(bot, chat_id, content)
+            elif isinstance(content, Carousel):
+                await self.send_carousel(bot, chat_id, content)
             elif isinstance(content, Video):
                 await self.send_video(bot, chat_id, content)
             elif isinstance(content, Youtube):

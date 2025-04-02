@@ -25,6 +25,11 @@ class Image(Content):
 
 
 @dataclass
+class Carousel(Content):
+    images: list[Image]
+
+
+@dataclass
 class TextBlock(Content):
     text: str
 
