@@ -97,7 +97,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             if not Utils.is_valid_url(image_url):
                 logger.error(
                     f"Not sending image due to invalid image URL {image_url=}")
-                return
+                continue
 
             media.append(InputMediaPhoto(media=image_url))
 

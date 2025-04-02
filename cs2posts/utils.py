@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 import re
 
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 class Utils:
 
     @staticmethod
+    @functools.lru_cache(maxsize=128)
     def is_valid_url(url: str | None, timeout: int = REQUESTS_TIMEOUT) -> bool:
         if not url:
             return False
