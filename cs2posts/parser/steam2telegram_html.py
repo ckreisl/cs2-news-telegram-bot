@@ -4,6 +4,7 @@ import re
 import sys
 
 import bbcode
+from bs4 import BeautifulSoup
 
 from cs2posts.parser.parser import Parser
 
@@ -24,7 +25,15 @@ STEAM_FORMAT = {
         'pattern': r'&ndash;',
         'replace': r'—',
     },
+    "p": {
+        'pattern': r'\[p\](.*?)\[/p\]',
+        'replace': r'\1',
+    },
 }
+
+CLEANUP_FORMAT = [
+    'b'
+]
 
 
 class Steam2TelegramHTML(Parser):
@@ -51,7 +60,15 @@ class Steam2TelegramHTML(Parser):
         for value in STEAM_FORMAT.values():
             pattern = value['pattern']
             replace = value['replace']
-            self.text = re.sub(pattern, replace, self.text,
-                               flags=re.IGNORECASE)
+            self.text = re.sub(
+                pattern, replace, self.text,
+                flags=re.IGNORECASE | re.DOTALL)
 
-        return self.text
+        soup = BeautifulSoup(self.text, 'html.parser')
+        for cleanup_tag in CLEANUP_FORMAT:
+            for tag in soup.find_all(cleanup_tag):
+                text = tag.get_text()
+                if not text or not text.replace("\xa0", " ").strip():
+                    tag.decompose()
+
+        return str(soup)
