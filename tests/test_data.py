@@ -28,6 +28,10 @@ def content_count(content: list[Content]) -> dict[str, int]:
     return counts
 
 
+def get_video_blocks(content: list[Content]) -> list[Video]:
+    return [c for c in content if isinstance(c, Video)]
+
+
 @pytest.mark.asyncio
 async def test_news_2024_05_23():
     post = load_data("news", "2024-05-23")
@@ -37,6 +41,9 @@ async def test_news_2024_05_23():
     expected_text_blocks = 3
     expected_image_blocks = 1
     expected_video_blocks = 1
+
+    for video in get_video_blocks(msg.content):
+        assert not video.is_empty()
 
     actual_values = content_count(msg.content)
 
@@ -71,6 +78,9 @@ async def test_news_2024_11_13():
     expected_text_blocks = 3
     expected_image_blocks = 1
     expected_video_blocks = 1
+
+    for video in get_video_blocks(msg.content):
+        assert not video.is_empty()
 
     actual_values = content_count(msg.content)
 

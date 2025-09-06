@@ -109,6 +109,9 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 media=chunk)
 
     async def send_video(self, bot, chat_id: int, video: Video) -> None:
+        if video.is_empty():
+            return
+
         video_url = Utils.extract_url(video.mp4)
 
         if not Utils.is_valid_url(video_url):

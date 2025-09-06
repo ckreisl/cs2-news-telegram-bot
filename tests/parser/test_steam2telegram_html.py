@@ -37,4 +37,16 @@ def test_steam2telegram_html_sanitize_multiple(steam2telegram_html):
 def test_steam2telegram_html_dash(steam2telegram_html):
     steam2telegram_html.text = '--'
     expected = '—'
-    steam2telegram_html.parse() == expected
+    assert steam2telegram_html.parse() == expected
+
+
+def test_steam2telegram_html_sanitize_p_tag_empty(steam2telegram_html):
+    steam2telegram_html.text = '[p][/p]'
+    expected = ''
+    assert steam2telegram_html.parse() == expected
+
+
+def test_steam2telegram_html_sanitize_p_tag(steam2telegram_html):
+    steam2telegram_html.text = '[p]foobar[/p]'
+    expected = 'foobar'
+    assert steam2telegram_html.parse() == expected

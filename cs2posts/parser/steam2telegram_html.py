@@ -12,7 +12,11 @@ NEWLINE_FORMAT = {
     'br': {
         'pattern': '<br />',
         'replace': '\n',
-    }
+    },
+    'hr': {
+        'pattern': '<hr />',
+        'replace': '\n',
+    },
 }
 
 STEAM_FORMAT = {
@@ -23,6 +27,11 @@ STEAM_FORMAT = {
     "dash": {
         'pattern': r'&ndash;',
         'replace': r'—',
+    },
+    "p": {
+        'pattern': r'\[p\](.*?)\[/p\]',
+        # For now remove, later on it should rather be r'\1\n'
+        'replace': r'\1',
     },
 }
 
@@ -40,9 +49,10 @@ class Steam2TelegramHTML(Parser):
         self.text = bbcode.render_html(self.text)
 
         # TODO: Must be placed here now before parsers due to HeadingParser
-        pattern = NEWLINE_FORMAT['br']['pattern']
-        replace = NEWLINE_FORMAT['br']['replace']
-        self.text = self.text.replace(pattern, replace)
+        for value in NEWLINE_FORMAT.values():
+            pattern = value['pattern']
+            replace = value['replace']
+            self.text = self.text.replace(pattern, replace)
 
         parser_by_priority = sorted(self.__parser, key=lambda x: x[1])
         for parser, _ in parser_by_priority:
@@ -51,7 +61,8 @@ class Steam2TelegramHTML(Parser):
         for value in STEAM_FORMAT.values():
             pattern = value['pattern']
             replace = value['replace']
-            self.text = re.sub(pattern, replace, self.text,
-                               flags=re.IGNORECASE)
+            self.text = re.sub(
+                pattern, replace, self.text,
+                flags=re.IGNORECASE | re.DOTALL)
 
         return self.text
