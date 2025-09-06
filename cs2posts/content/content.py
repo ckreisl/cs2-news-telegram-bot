@@ -18,6 +18,9 @@ class Video(Content):
     autoplay: bool
     controls: bool
 
+    def is_empty(self) -> bool:
+        return not (self.webm or self.mp4)
+
 
 @dataclass
 class Image(Content):
