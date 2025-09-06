@@ -49,3 +49,13 @@ def test_steam_update_heading_parser_vacnet(steam_parser):
 def test_steam_update_heading_parser_identifier(steam_parser):
     steam_parser.text = "start[MAPS]Some text"
     assert steam_parser.parse() == "start<b>[MAPS]</b>\nSome text"
+
+
+def test_steam_update_heading_parser_leading_backslash(steam_parser):
+    steam_parser.text = "\n\\[MAPS]\n"
+    assert steam_parser.parse() == "\n<b>[MAPS]</b>\n"
+
+
+def test_steam_update_heading_parser_leading_backslash_by_heading_item(steam_parser):
+    steam_parser.text = "start\\[ITEMS]Some text"
+    assert steam_parser.parse() == "start<b>[ITEMS]</b>\nSome text"

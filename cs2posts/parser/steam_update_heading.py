@@ -20,9 +20,6 @@ class SteamUpdateHeadingParser(Parser):
     def is_heading_by_newlines(self, word: str) -> bool:
         pos = self.text.find(word)
 
-        if len(word.strip('[]')) == 1:
-            return False
-
         if pos == 0:
             return True
 
@@ -36,11 +33,26 @@ class SteamUpdateHeadingParser(Parser):
     def is_heading(self, word: str) -> bool:
         return self.is_heading_by_newlines(word) or self.is_heading_by_identifier(word)
 
+    def is_single_element_heading(self, word: str) -> bool:
+        stripped = word.strip('[]').strip()
+        return len(stripped) == 1
+
+    def remove_leading_backslash(self, word: str) -> str:
+        pos = self.text.find(word)
+        if pos != -1 and self.text[pos - 1] == '\\':
+            return self.text[:pos - 1] + self.text[pos:]
+        return self.text
+
     def parse(self) -> str:
         headings = re.findall(re.compile(self.HEADING_REGEX), self.text)
         headings = [f"[{heading}]" for heading in headings]
 
         for heading in headings:
+            if self.is_single_element_heading(heading):
+                continue
+
+            self.text = self.remove_leading_backslash(heading)
+
             if self.is_heading_by_newlines(heading):
                 self.text = self.text.replace(heading, f"<b>{heading}</b>")
             elif self.is_heading_by_identifier(heading):
