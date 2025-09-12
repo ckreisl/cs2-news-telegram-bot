@@ -27,9 +27,9 @@ def main() -> int:
         chat_db=ChatDatabase(settings.CHAT_DB_FILEPATH),
         token=settings.TELEGRAM_TOKEN)
 
-    asyncio.get_event_loop().run_until_complete(
-        cs2_update_bot.async_init())
-
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(cs2_update_bot.async_init())
     cs2_update_bot.run()
 
     return 0
