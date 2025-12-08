@@ -20,6 +20,10 @@ NEWLINE_FORMAT = {
 }
 
 STEAM_FORMAT = {
+    "h2": {
+        'pattern': r'\[h2\](.*?)\[/h2\]',
+        'replace': r'\n\n<b>\1</b>\n\n',
+    },
     "h3": {
         'pattern': r'\[h3\](.*?)\[/h3\]',
         'replace': r'\n\n<b>\1</b>\n\n',
