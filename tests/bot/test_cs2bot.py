@@ -603,3 +603,207 @@ def test_cs2_bot_run(bot):
     bot.run()
     bot.app.run_polling.assert_called_once_with(
         allowed_updates=Update.ALL_TYPES)
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_post_checker_none_post(bot):
+    mocked_context = AsyncMock()
+
+    # Test _post_checker with None post
+    bot.send_post_to_chats = AsyncMock()
+    await bot._post_checker(mocked_context, None)
+    bot.send_post_to_chats.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_post_checker_not_newer_post(bot):
+    mocked_context = AsyncMock()
+
+    # Setup latest news post
+    bot.latest_news_post = create_news_post()
+    bot.latest_news_post.date = 1234567890
+
+    # Create a post that is not newer
+    old_post = create_news_post()
+    old_post.date = 1234567800  # Earlier timestamp
+
+    bot.send_post_to_chats = AsyncMock()
+    await bot._post_checker(mocked_context, old_post)
+    bot.send_post_to_chats.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_post_checker_newer_news_post(bot):
+    mocked_context = AsyncMock()
+
+    # Setup latest news post
+    bot.latest_news_post = create_news_post()
+    bot.latest_news_post.date = 1234567890
+
+    # Create a post that is newer
+    new_post = create_news_post()
+    new_post.date = 1234567999  # Later timestamp
+
+    bot.send_post_to_chats = AsyncMock()
+    bot.post_db.save = AsyncMock()
+
+    await bot._post_checker(mocked_context, new_post)
+    bot.send_post_to_chats.assert_called_once_with(mocked_context, post=new_post)
+    bot.post_db.save.assert_called_once_with(new_post)
+    assert bot.latest_news_post == new_post
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_post_checker_newer_update_post(bot):
+    mocked_context = AsyncMock()
+
+    # Setup latest update post
+    bot.latest_update_post = create_update_post()
+    bot.latest_update_post.date = 1234567890
+
+    # Create a post that is newer
+    new_post = create_update_post()
+    new_post.date = 1234567999  # Later timestamp
+
+    bot.send_post_to_chats = AsyncMock()
+    bot.post_db.save = AsyncMock()
+
+    await bot._post_checker(mocked_context, new_post)
+    bot.send_post_to_chats.assert_called_once_with(mocked_context, post=new_post)
+    bot.post_db.save.assert_called_once_with(new_post)
+    assert bot.latest_update_post == new_post
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_post_checker_valid_posts(bot):
+    mocked_context = AsyncMock()
+
+    # Setup
+    bot.latest_news_post = create_news_post()
+    bot.latest_update_post = create_update_post()
+    bot.latest_external_post = create_update_post()
+    bot._post_checker = AsyncMock()
+
+    # Mock crawler response
+    bot.crawler.crawl = AsyncMock(return_value={
+        'appnews': {
+            'appid': 730,
+            'newsitems': []
+        }
+    })
+
+    with patch('cs2posts.cs2posts.CounterStrike2Posts') as mocked_posts:
+        mocked_cs2posts = Mock()
+        mocked_cs2posts.is_empty.return_value = True
+        mocked_cs2posts.validate.return_value = None
+        mocked_posts.create.return_value = mocked_cs2posts
+
+        await bot.post_checker(mocked_context)
+        bot._post_checker.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_new_chat_member_update_none(bot):
+    mocked_context = AsyncMock()
+    await bot.new_chat_member(None, mocked_context)
+    bot.chat_db.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_new_chat_member_message_none(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+    mocked_update.message = None
+    await bot.new_chat_member(mocked_update, mocked_context)
+    bot.chat_db.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_left_chat_member_update_none(bot):
+    mocked_context = AsyncMock()
+    await bot.left_chat_member(None, mocked_context)
+    bot.chat_db.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_left_chat_member_message_none(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+    mocked_update.message = None
+    await bot.left_chat_member(mocked_update, mocked_context)
+    bot.chat_db.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_external_command(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+
+    chat = Chat(42)
+    bot.chat_db.get.return_value = chat
+    bot.latest_external_post = Mock()
+
+    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+        mocked_msg = Mock()
+        mocked_factory.return_value = mocked_msg
+        bot.send_message = AsyncMock()
+        await bot.external(mocked_update, mocked_context)
+        mocked_factory.assert_called_once_with(bot.latest_external_post)
+        bot.send_message.assert_called_once_with(
+            context=mocked_context, msg=mocked_msg, chat=chat)
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_start_not_running_chat(bot):
+    mocked_context = AsyncMock()
+    mocked_context.bot = AsyncMock()
+    mocked_context.job_queue = Mock()
+    mocked_update = AsyncMock()
+    mocked_update.message.chat_id = 42
+    mocked_update.message.from_user.id = 42
+
+    chat = Chat(42)
+    chat.is_running = False
+    bot.is_running = True
+    bot.chat_db.get.return_value = chat
+
+    bot.chat_db.reset_mock()
+    await bot.start(mocked_update, mocked_context)
+
+    assert chat.is_running is True
+    mocked_update.message.reply_text.assert_called_once()
+    bot.chat_db.update.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_stop_command_chat_is_supergroup(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+    mocked_update.message.chat.type = ChatType.SUPERGROUP
+
+    chat = Chat(42)
+    bot.chat_db.get.return_value = chat
+
+    bot.chat_db.reset_mock()
+    await bot.stop(mocked_update, mocked_context)
+
+    assert chat.is_running is False
+    mocked_update.message.reply_text.assert_called_once()
+    bot.chat_db.remove.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_stop_command_chat_is_channel(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+    mocked_update.message.chat.type = ChatType.CHANNEL
+
+    chat = Chat(42)
+    bot.chat_db.get.return_value = chat
+
+    bot.chat_db.reset_mock()
+    await bot.stop(mocked_update, mocked_context)
+
+    assert chat.is_running is False
+    mocked_update.message.reply_text.assert_called_once()
+    bot.chat_db.remove.assert_not_called()
