@@ -22,7 +22,7 @@ NEWLINE_FORMAT = {
 STEAM_FORMAT = {
     "h3": {
         'pattern': r'\[h3\](.*?)\[/h3\]',
-        'replace': r'<b>\1</b>',
+        'replace': r'\n\n<b>\1</b>\n\n',
     },
     "dash": {
         'pattern': r'&ndash;',
