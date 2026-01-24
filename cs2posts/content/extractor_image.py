@@ -21,7 +21,7 @@ def extract_images(text: str) -> Iterator:
     # Handle both standard quotes and html-encoded quotes (&quot;)
     # Group 1: Content inside &quot;...&quot; (can contain quotes)
     # Group 2: Content inside "..." (standard)
-    pattern = r'\[img src=(?:&quot;(.*?)&quot;|"([^"]+)")(?:[^\]]*)\]\[\/img\]'
+    pattern = r'\[img src=(?:&quot;(.*?)&quot;|"([^"]*)")(?:[^\]]*)\]\[\/img\]'
     matches = re.finditer(pattern, text, re.I | re.S)
     return matches
 

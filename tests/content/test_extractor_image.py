@@ -43,13 +43,15 @@ def test_extract_images_single_image():
     text = '[img src="https://example.com/image.png"][/img]'
     matches = list(extract_images(text))
     assert len(matches) == 1
-    assert matches[0].group(1) == "https://example.com/image.png"
+    # Group 2 is for standard double quotes
+    assert matches[0].group(2) == "https://example.com/image.png"
 
 
-def test_extract_images_without_quotes():
-    text = '[img src=https://example.com/image.png][/img]'
+def test_extract_images_html_encoded_quotes():
+    text = '[img src=&quot;https://example.com/image.png&quot;][/img]'
     matches = list(extract_images(text))
     assert len(matches) == 1
+    # Group 1 is for html encoded quotes
     assert matches[0].group(1) == "https://example.com/image.png"
 
 
@@ -57,8 +59,8 @@ def test_extract_images_multiple_images():
     text = '[img src="https://example.com/image1.png"][/img] text [img src="https://example.com/image2.png"][/img]'
     matches = list(extract_images(text))
     assert len(matches) == 2
-    assert matches[0].group(1) == "https://example.com/image1.png"
-    assert matches[1].group(1) == "https://example.com/image2.png"
+    assert matches[0].group(2) == "https://example.com/image1.png"
+    assert matches[1].group(2) == "https://example.com/image2.png"
 
 
 def test_extract_images_no_images():
@@ -77,7 +79,37 @@ def test_extract_images_with_additional_attributes():
     text = '[img src="https://example.com/image.png" width="100" height="200"][/img]'
     matches = list(extract_images(text))
     assert len(matches) == 1
-    assert matches[0].group(1) == "https://example.com/image.png"
+    assert matches[0].group(2) == "https://example.com/image.png"
+
+
+def test_extract_images_mixed_quote_types():
+    text = '[img src="https://example.com/1.png"][/img] [img src=&quot;https://example.com/2.png&quot;][/img]'
+    matches = list(extract_images(text))
+    assert len(matches) == 2
+    assert matches[0].group(2) == "https://example.com/1.png"
+    assert matches[1].group(1) == "https://example.com/2.png"
+
+
+def test_extract_images_html_encoded_quotes_containing_quotes():
+    url = 'https://example.com/image_with_"quote".png'
+    text = f'[img src=&quot;{url}&quot;][/img]'
+    matches = list(extract_images(text))
+    assert len(matches) == 1
+    assert matches[0].group(1) == url
+
+
+def test_extract_images_empty_src_quoted():
+    text = '[img src=""][/img]'
+    matches = list(extract_images(text))
+    assert len(matches) == 1
+    assert matches[0].group(2) == ""
+
+
+def test_extract_images_empty_src_html_encoded():
+    text = '[img src=&quot;&quot;][/img]'
+    matches = list(extract_images(text))
+    assert len(matches) == 1
+    assert matches[0].group(1) == ""
 
 
 # Tests for ImageExtractor class
