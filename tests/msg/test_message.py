@@ -105,7 +105,8 @@ async def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_
 
 @pytest.mark.asyncio
 async def test_telegram_message_send_news(mocked_cs2_news_post):
-    with patch('requests.get') as mocked_get:
+    with patch('requests.get') as mocked_get, \
+            patch('cs2posts.utils.Utils.is_valid_url', return_value=True):
         mocked_get.return_value.ok = True
         msg = await TelegramMessageFactory.create(mocked_cs2_news_post)
 
