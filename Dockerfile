@@ -5,15 +5,17 @@ RUN apt-get update && apt-get install -y sqlite3
 RUN groupadd -g 1000 dev && \
     useradd -u 1000 -g dev -m dev
 
+WORKDIR /app
+RUN chown dev:dev /app
+
 USER dev
 
-WORKDIR /app
+COPY --chown=dev:dev requirements.txt .
 
-COPY requirements.txt .
+ENV PATH="/home/dev/.local/bin:${PATH}"
+RUN pip install --user --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY cs2posts/ cs2posts/
-COPY main.py .
+COPY --chown=dev:dev cs2posts/ cs2posts/
+COPY --chown=dev:dev main.py .
 
 CMD [ "python", "main.py" ]

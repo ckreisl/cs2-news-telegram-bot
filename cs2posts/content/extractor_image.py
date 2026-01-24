@@ -18,8 +18,11 @@ def extract_images_deprecated(text: str) -> Iterator:
 
 
 def extract_images(text: str) -> Iterator:
-    pattern = r'\[img src="?([^"\]]+)"?[^\]]*\]\[\/img\]'
-    matches = re.finditer(pattern, text)
+    # Handle both standard quotes and html-encoded quotes (&quot;)
+    # Group 1: Content inside &quot;...&quot; (can contain quotes)
+    # Group 2: Content inside "..." (standard)
+    pattern = r'\[img src=(?:&quot;(.*?)&quot;|"([^"]*)")(?:[^\]]*)\]\[\/img\]'
+    matches = re.finditer(pattern, text, re.I | re.S)
     return matches
 
 
@@ -35,7 +38,10 @@ class ImageExtractor(Extractor):
         images = []
         for result in all_matches:
 
-            src_url = result.group(1)
+            # Get the URL from the correct capture group
+            src_url = result.group(1) or result.group(2)
+            if not src_url:
+                continue
 
             html_encoded_quot = "&quot;"
             if html_encoded_quot in src_url:
