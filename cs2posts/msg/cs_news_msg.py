@@ -112,22 +112,34 @@ class CounterStrikeNewsMessage(TelegramMessage):
         if video.is_empty():
             return
 
-        video_url = Utils.extract_url(video.mp4)
+        args = {
+            "chat_id": chat_id,
+            "supports_streaming": True,
+            "parse_mode": ParseMode.HTML
+        }
+
+        video_url = None
+        if video.mp4:
+            video_url = Utils.extract_url(video.mp4)
+            args['video'] = video_url
+
+        if video.mp4 is None and video.webm:
+            video_url = Utils.extract_url(video.webm)
+            args['video'] = video_url
 
         if not Utils.is_valid_url(video_url):
             logger.error(
                 f"Not sending video due to invalid video URL {video_url=}")
             return
 
-        thumbnail_url = Utils.extract_url(video.poster)
+        if video.poster:
+            thumbnail_url = Utils.extract_url(video.poster)
+            args['thumbnail'] = thumbnail_url
+
         caption = self.get_header() if video.is_heading else None
-        await bot.send_video(
-            chat_id=chat_id,
-            video=video_url,
-            thumbnail=thumbnail_url,
-            caption=caption,
-            supports_streaming=True,
-            parse_mode=ParseMode.HTML)
+        args['caption'] = caption
+
+        await bot.send_video(**args)
 
     async def send_youtube_video(self, bot, chat_id: int, youtube: Youtube) -> None:
         text: str = ""

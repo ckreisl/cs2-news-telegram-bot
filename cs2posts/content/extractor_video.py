@@ -5,6 +5,7 @@ import re
 
 from .content import Video
 from .extractor import Extractor
+from cs2posts.utils import Utils
 
 
 class VideoExtractor(Extractor):
@@ -39,7 +40,13 @@ class VideoExtractor(Extractor):
         if href:
             return href.group(1).strip()
         m = self._URL_IN_TEXT_RE.search(val)
-        return m.group(1).strip() if m else None
+        if m:
+            return m.group(1).strip()
+        # Return raw value if it's a non-empty path (e.g., {STEAM_CLAN_IMAGE}/...)
+        stripped = val.strip()
+        if not stripped or " " in stripped:
+            return None
+        return stripped
 
     def _parse_attrs(self, attrs_raw: str) -> dict[str, str]:
         out: dict[str, str] = {}
@@ -61,6 +68,13 @@ class VideoExtractor(Extractor):
             webm_url = self._extract_url(attrs.get("webm", "")) if "webm" in attrs else ""
             mp4_url = self._extract_url(attrs.get("mp4", "")) if "mp4" in attrs else ""
             poster_url = self._extract_url(attrs.get("poster", "")) if "poster" in attrs else ""
+
+            if webm_url:
+                webm_url = Utils.resolve_steam_clan_image_url(webm_url)
+            if mp4_url:
+                mp4_url = Utils.resolve_steam_clan_image_url(mp4_url)
+            if poster_url:
+                poster_url = Utils.resolve_steam_clan_image_url(poster_url)
 
             videos.append(Video(
                 text_pos_start=m.start(),

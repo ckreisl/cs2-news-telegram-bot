@@ -14,7 +14,7 @@ class Content:
 class Video(Content):
     webm: str
     mp4: str
-    poster: str
+    poster: str | None
     autoplay: bool
     controls: bool
 
