@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import abc
+import asyncio
 import json
 import logging
 from typing import Any
@@ -12,44 +14,65 @@ logger = logging.getLogger(__name__)
 CRAWLER_REQUEST_TIMEOUT = 3
 
 
-class WebCrawler:
-    pass
+class WebCrawler(abc.ABC):
+    """Base class for crawlers.
+
+    This abstraction exists mostly for typing and future extensibility.
+    """
+
+    @abc.abstractmethod
+    async def crawl(self, *args: Any, **kwargs: Any) -> Any:
+        """Fetch data from the remote source."""
 
 
 class SteamAPICrawler(WebCrawler):
-    pass
+    """Base Steam Web API crawler."""
 
 
 class CounterStrike2Crawler(SteamAPICrawler):
+    """Fetches latest CS2 news updates from the Steam API."""
+
+    BASE_URL = (
+        "https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/"
+        "?appid=730"
+        "&count=%s"
+        "&maxlength=0"
+    )
 
     def __init__(self) -> None:
         super().__init__()
-        # https://developer.valvesoftware.com/wiki/Steam_Web_API
-        # maxlength=0 to get whole content
-        self.url = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/" \
-            "?appid=730" \
-            "&count=%s" \
-            "&maxlength=0"
+        self.url = self.BASE_URL
 
-    def _validate_args(self, **kwargs: dict[str, Any]) -> None:
-        if "count" in kwargs and kwargs["count"] < 0:
-            raise ValueError('Count must be greater than 0!')
+    def _validate_args(self, *, count: int) -> None:
+        if count < 0:
+            raise ValueError('count must be greater than or equal to 0')
 
     async def crawl(self, *, count: int | None = None) -> dict[str, Any]:
+        """Fetch the latest CS2 news posts.
+
+        This method is asynchronous for integration with the rest of the bot, but
+        it uses a threadpool to keep the HTTP call non-blocking.
+        """
+
         if count is None:
             count = 100
 
         self._validate_args(count=count)
 
+        url = self.url % count
         try:
-            response = requests.get(
-                self.url % count, timeout=CRAWLER_REQUEST_TIMEOUT)
-        except Exception as e:
-            logger.error(f'Could not fetch data due to {e}')
+            response = await asyncio.to_thread(
+                requests.get, url, timeout=CRAWLER_REQUEST_TIMEOUT)
+        except Exception:
+            logger.exception('Could not fetch data from Steam API')
             raise
 
         if not response.ok:
-            raise Exception(
-                f'Could not fetch data received response code={response.status_code}')
+            raise RuntimeError(
+                f'Could not fetch data, received response code={response.status_code}')
 
-        return json.loads(response.text)
+        try:
+            return json.loads(response.text)
+        except json.JSONDecodeError as exc:
+            logger.exception('Received invalid JSON from Steam API: %s', exc)
+            raise
