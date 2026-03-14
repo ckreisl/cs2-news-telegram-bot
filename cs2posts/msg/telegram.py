@@ -1,12 +1,30 @@
 from __future__ import annotations
 
-import abc
+import functools
 import logging
+
+from telegram.constants import ParseMode
 
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 
 
 logger = logging.getLogger(__name__)
+
+
+def resilient_send(func):
+    """Decorator for async send-helper methods.
+
+    Catches any exception, logs it with full traceback, and returns normally
+    so that the caller's iteration loop continues with the next block.
+    """
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception:
+            logging.getLogger(func.__module__).exception(
+                f"Failed to execute {func.__name__}, skipping block")
+    return wrapper
 
 
 class TelegramMessage:
@@ -44,6 +62,19 @@ class TelegramMessage:
 
         return chunks
 
-    @abc.abstractmethod
+    @resilient_send
+    async def _send_text_chunk(self, bot, chat_id: int, text: str) -> None:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True)
+
     async def send(self, bot, chat_id: int) -> None:
-        raise NotImplementedError("Method not implemented")  # pragma: no cover
+        """Default implementation: sends each text chunk in ``self.messages``.
+
+        Subclasses that handle richer content (images, carousels, etc.) should
+        override this method.
+        """
+        for msg in self.messages:
+            await self._send_text_chunk(bot, chat_id, msg)

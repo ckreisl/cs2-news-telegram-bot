@@ -604,3 +604,84 @@ def test_counter_strike_news_message_add_footer_to_non_textblock():
             # Should append a TextBlock with footer
             assert isinstance(msg.content[-1], TextBlock)
             assert "(Author: Valve)" in msg.content[-1].text
+
+
+@pytest.mark.asyncio
+async def test_counter_strike_news_message_send_continues_after_block_failure():
+    """send() must not abort when one content block raises; remaining blocks must still be sent."""
+    post = Post(
+        gid="1338",
+        title="Some News",
+        is_external_url=True,
+        url="https://www.counter-strike.net/newsentry/1338",
+        author="Valve",
+        contents="Test",
+        date=1234567890,
+        feedlabel="feedlabel",
+        feedname="feedname",
+        feed_type=1,
+        appid=730)
+
+    with patch('requests.get') as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
+        msg = CounterStrikeNewsMessage(post)
+
+    msg.content = [
+        TextBlock(0, 10, False, "First block"),
+        Image(10, 20, False, "https://example.com/image.jpg"),
+        TextBlock(20, 30, False, "Third block"),
+    ]
+
+    mocked_bot = AsyncMock()
+    # Image block will fail at the Telegram API level; text blocks must still send
+    mocked_bot.send_photo.side_effect = RuntimeError("Telegram error")
+
+    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url', return_value="https://example.com/image.jpg"), \
+            patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url', return_value=True):
+        await msg.send(mocked_bot, 42)
+
+    # Both TextBlock sends must have been attempted despite the image failure
+    assert mocked_bot.send_message.call_count == 2
+    mocked_bot.send_photo.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_counter_strike_news_message_send_all_blocks_attempted_on_multiple_failures():
+    """All content blocks must be attempted even when multiple blocks fail."""
+    post = Post(
+        gid="1338",
+        title="Some News",
+        is_external_url=True,
+        url="https://www.counter-strike.net/newsentry/1338",
+        author="Valve",
+        contents="Test",
+        date=1234567890,
+        feedlabel="feedlabel",
+        feedname="feedname",
+        feed_type=1,
+        appid=730)
+
+    with patch('requests.get') as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
+        msg = CounterStrikeNewsMessage(post)
+
+    msg.content = [
+        TextBlock(0, 10, False, "Block 1"),
+        Image(10, 20, False, "https://example.com/img1.jpg"),
+        Youtube(20, 30, False, "dQw4w9WgXcQ"),
+        TextBlock(30, 40, False, "Block 4"),
+    ]
+
+    mocked_bot = AsyncMock()
+    # Image block fails; text and youtube blocks should still be attempted
+    mocked_bot.send_photo.side_effect = RuntimeError("Telegram error")
+
+    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url', return_value="https://example.com/img1.jpg"), \
+            patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url', return_value=True):
+        await msg.send(mocked_bot, 42)
+
+    # 2 TextBlocks + 1 Youtube each call bot.send_message → 3 total
+    assert mocked_bot.send_message.call_count == 3
+    mocked_bot.send_photo.assert_called_once()
