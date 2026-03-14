@@ -18,10 +18,10 @@ class TextBlockExtractor(Extractor):
                  youtube: list[Content] | None = None) -> None:
         super().__init__(text)
 
-        videos = videos or VideoExtractor(self.text).extract()
-        carousel = carousel or CarouselExtractor(self.text).extract()
-        images = images or ImageExtractor(self.text).extract()
-        youtube = youtube or YoutubeExtractor(self.text).extract()
+        videos = VideoExtractor(self.text).extract() if videos is None else videos
+        carousel = CarouselExtractor(self.text).extract() if carousel is None else carousel
+        images = ImageExtractor(self.text).extract() if images is None else images
+        youtube = YoutubeExtractor(self.text).extract() if youtube is None else youtube
 
         self.__content = sorted([
             *videos,
