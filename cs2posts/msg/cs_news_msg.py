@@ -5,6 +5,7 @@ import logging
 from telegram import InputMediaPhoto
 from telegram.constants import ParseMode
 
+from .telegram import resilient_send
 from .telegram import TelegramMessage
 from cs2posts.content import Carousel
 from cs2posts.content import ContentExtractor
@@ -66,6 +67,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
     def get_header(self) -> str:
         return f"<b>{self.post.title}</b>\n({self.post.date_as_datetime})"
 
+    @resilient_send
     async def send_message(self, bot, chat_id: int, message: TextBlock) -> None:
         for text in self.split(message.text):
             await bot.send_message(
@@ -74,6 +76,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True)
 
+    @resilient_send
     async def send_image(self, bot, chat_id: int, image: Image) -> None:
         image_url = Utils.extract_url(image.url)
 
@@ -89,6 +92,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             caption=caption,
             parse_mode=ParseMode.HTML)
 
+    @resilient_send
     async def send_carousel(self, bot, chat_id: int, carousel: Carousel) -> None:
         media = []
         for image in carousel.images:
@@ -108,6 +112,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 chat_id=chat_id,
                 media=chunk)
 
+    @resilient_send
     async def send_video(self, bot, chat_id: int, video: Video) -> None:
         if video.is_empty():
             return
@@ -141,6 +146,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
         await bot.send_video(**args)
 
+    @resilient_send
     async def send_youtube_video(self, bot, chat_id: int, youtube: Youtube) -> None:
         text: str = ""
         if youtube.is_heading:

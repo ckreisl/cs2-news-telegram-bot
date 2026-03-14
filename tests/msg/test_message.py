@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +13,7 @@ from cs2posts.msg import CounterStrikeUpdateMessage
 from cs2posts.msg import TelegramMessage
 from cs2posts.msg import TelegramMessageFactory
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
+from cs2posts.msg.telegram import resilient_send
 
 
 @pytest.fixture
@@ -129,3 +131,96 @@ async def test_telegram_message_send_update(mocked_cs2_update_post):
 
     mocked_bot.send_photo.assert_not_called()
     mocked_bot.send_message.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_resilient_send_swallows_exception():
+    """resilient_send must not propagate exceptions out of the decorated function."""
+    @resilient_send
+    async def failing_func(obj):
+        raise RuntimeError("boom")
+
+    # Should not raise
+    await failing_func(MagicMock())
+
+
+@pytest.mark.asyncio
+async def test_resilient_send_continues_after_exception():
+    """Subsequent calls must still execute after one decorated call raises."""
+    call_log = []
+
+    @resilient_send
+    async def may_raise(value):
+        call_log.append(value)
+        if value == "fail":
+            raise RuntimeError("boom")
+
+    await may_raise("first")
+    await may_raise("fail")
+    await may_raise("third")
+
+    assert call_log == ["first", "fail", "third"]
+
+
+@pytest.mark.asyncio
+async def test_resilient_send_returns_none_on_exception():
+    """resilient_send must return None when the wrapped function raises."""
+    @resilient_send
+    async def failing_func():
+        raise ValueError("oops")
+
+    result = await failing_func()
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_send_continues_after_chunk_failure():
+    """TelegramMessage.send() must deliver all chunks even if one raises."""
+    msg = TelegramMessage("hello")
+    # Manually set three chunks
+    msg._TelegramMessage__messages = ["chunk1", "chunk2", "chunk3"]
+
+    bot = AsyncMock()
+    # Make the second call to send_message raise
+    bot.send_message.side_effect = [None, RuntimeError("network error"), None]
+
+    await msg.send(bot=bot, chat_id=42)
+
+    assert bot.send_message.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_send_update_continues_after_chunk_failure(mocked_cs2_update_post):
+    """CounterStrikeUpdateMessage.send() (inherited) must not abort on a failed chunk."""
+    with patch('requests.get') as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://test.com"
+        msg = await TelegramMessageFactory.create(mocked_cs2_update_post)
+
+    # Force two chunks
+    msg._TelegramMessage__messages = ["chunk1", "chunk2"]
+
+    bot = AsyncMock()
+    bot.send_message.side_effect = [RuntimeError("fail"), None]
+
+    await msg.send(bot=bot, chat_id=42)
+
+    assert bot.send_message.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_send_external_continues_after_chunk_failure(mocked_cs2_external_news):
+    """CounterStrikeExternalMessage.send() (inherited) must not abort on a failed chunk."""
+    with patch('requests.get') as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://test.com"
+        msg = await TelegramMessageFactory.create(mocked_cs2_external_news)
+
+    msg._TelegramMessage__messages = ["chunk1", "chunk2"]
+
+    bot = AsyncMock()
+    bot.send_message.side_effect = [RuntimeError("fail"), None]
+
+    await msg.send(bot=bot, chat_id=42)
+
+    assert bot.send_message.call_count == 2

@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import httpcore
+import httpx
 from telegram import Update
 from telegram.constants import ChatType
 from telegram.constants import ParseMode
@@ -407,6 +409,9 @@ class CounterStrike2UpdateBot:
             logger.error(f"Reason: {e}")
             chat = await self.chat_db.migrate(chat, e.new_chat_id)
             await self.send_message(context, msg, chat)
+        except (httpx.ReadTimeout, httpcore.ReadTimeout) as e:
+            logger.error(f'Read timeout for chat {chat.chat_id=}')
+            logger.error(f"Reason: {e}")
         except Exception as e:
             logger.exception(f'Could not send message to chat {chat.chat_id=}')
             logger.exception(f"Reason: {e}")

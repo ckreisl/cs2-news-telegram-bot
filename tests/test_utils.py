@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from cs2posts.utils import Utils
+
+
+@pytest.fixture(autouse=True)
+def clear_is_valid_url_cache():
+    Utils.is_valid_url.cache_clear()
 
 
 def test_is_valid_url_valid():
     url = "https://example.com"
-    with patch("requests.get") as mock_get:
-        mock_get.return_value.ok = True
+    with patch("requests.head") as mock_head:
+        mock_head.return_value.ok = True
         is_valid = Utils.is_valid_url(url)
     assert is_valid
 

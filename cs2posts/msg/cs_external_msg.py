@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 from bs4 import BeautifulSoup
-from telegram.constants import ParseMode
 
 from .telegram import TelegramMessage
 from cs2posts.dto.post import Post
@@ -58,11 +57,3 @@ class CounterStrikeExternalMessage(TelegramMessage):
         msg += f"Source: <a href='{post.url}'>Link</a>"
 
         super().__init__(msg)
-
-    async def send(self, bot, chat_id: int) -> None:
-        for msg in self.messages:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=msg,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)

@@ -184,3 +184,51 @@ def test_textblock_extractor_consecutive_content():
     extractor = TextBlockExtractor(text, videos=[], carousel=[], images=images, youtube=[])
     blocks = extractor.extract()
     assert any(b.text == "after" for b in blocks)
+
+
+def test_textblock_extractor_empty_list_not_treated_as_none():
+    # An explicitly passed empty list [] must be respected as "no items",
+    # not silently replaced by a fresh extractor run (the `x or Extractor()`
+    # pattern would treat [] as falsy and re-extract, causing position bugs).
+    text = "[img]https://example.com/image.png[/img] after"
+    # Pass images=[] explicitly — no images should be registered as content,
+    # so the whole text (including the raw [img] tag) becomes one TextBlock.
+    extractor = TextBlockExtractor(text, videos=[], carousel=[], images=[], youtube=[])
+    blocks = extractor.extract()
+    # With images=[] respected, __content is empty → single block covering full text.
+    assert len(blocks) == 1
+    assert blocks[0].text == text.strip()
+
+
+def test_textblock_extractor_empty_images_with_carousel_no_stray_closing_tag():
+    # Regression test: when ContentExtractor deduplicates images inside a
+    # carousel to an empty list and passes images=[] to TextBlockExtractor,
+    # the text between two carousels must NOT start with [/carousel].
+    #
+    # The buggy `images = images or ImageExtractor(...)` call would discard
+    # the empty list, re-extract all images (including those inside the
+    # carousel), and corrupt text_pos so a TextBlock was created starting at
+    # the end of the last [img] inside carousel — right before [/carousel].
+    inner = "[img]https://example.com/1.png[/img][img]https://example.com/2.png[/img]"
+    text = f"intro [carousel]{inner}[/carousel] middle [carousel]{inner}[/carousel] end"
+
+    c1_start = text.index("[carousel]")
+    c1_end = text.index("[/carousel]") + len("[/carousel]")
+    c2_start = text.rindex("[carousel]")
+    c2_end = text.rindex("[/carousel]") + len("[/carousel]")
+
+    carousel = [
+        Carousel(text_pos_start=c1_start, text_pos_end=c1_end, is_heading=False, images=[]),
+        Carousel(text_pos_start=c2_start, text_pos_end=c2_end, is_heading=False, images=[]),
+    ]
+
+    extractor = TextBlockExtractor(text, videos=[], carousel=carousel, images=[], youtube=[])
+    blocks = extractor.extract()
+
+    for block in blocks:
+        assert "[/carousel]" not in block.text, (
+            f"Stray [/carousel] found in TextBlock: {block.text!r}"
+        )
+        assert "[carousel]" not in block.text, (
+            f"Stray [carousel] found in TextBlock: {block.text!r}"
+        )
