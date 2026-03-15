@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 import logging
 
 from telegram.constants import ParseMode
 
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
+from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 
 
 logger = logging.getLogger(__name__)
@@ -76,5 +78,7 @@ class TelegramMessage:
         Subclasses that handle richer content (images, carousels, etc.) should
         override this method.
         """
-        for msg in self.messages:
+        for i, msg in enumerate(self.messages):
             await self._send_text_chunk(bot, chat_id, msg)
+            if i < len(self.messages) - 1:
+                await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)

@@ -17,6 +17,7 @@ from telegram.ext import CommandHandler
 from telegram.ext import ContextTypes
 from telegram.ext import filters
 from telegram.ext import MessageHandler
+from telegram.request import HTTPXRequest
 
 import cs2posts.bot.constants as const
 from cs2posts.bot import settings
@@ -63,10 +64,17 @@ def spam_protected(func):
 class CounterStrike2UpdateBot:
 
     def __init__(self, *args, **kwargs) -> None:
+        request = HTTPXRequest(
+            read_timeout=30,
+            write_timeout=30,
+            connect_timeout=15,
+            pool_timeout=15,
+        )
         self.app = (Application.builder()
                     .post_init(self.post_init)
                     .post_shutdown(self.post_shutdown)
                     .token(kwargs['token'])
+                    .request(request)
                     .build())
 
         self.crawler: CounterStrike2Crawler = kwargs['crawler']
