@@ -69,6 +69,40 @@ def test_cs2_bot_init_no_files(bot):
     pass
 
 
+@patch('cs2posts.bot.cs2.Application.builder')
+@patch('cs2posts.bot.cs2.HTTPXRequest')
+def test_cs2_bot_init_sets_custom_timeouts(mocked_httpx_request, mocked_builder):
+    app = Mock()
+    app.add_handlers = Mock()
+
+    builder = Mock()
+    builder.post_init.return_value = builder
+    builder.post_shutdown.return_value = builder
+    builder.token.return_value = builder
+    builder.request.return_value = builder
+    builder.build.return_value = app
+    mocked_builder.return_value = builder
+
+    request_instance = Mock()
+    mocked_httpx_request.return_value = request_instance
+
+    CounterStrike2UpdateBot(
+        token='test_token',
+        chat_db=AsyncMock(),
+        post_db=AsyncMock(),
+        crawler=AsyncMock(),
+        spam_protector=AsyncMock(),
+    )
+
+    mocked_httpx_request.assert_called_once_with(
+        read_timeout=30,
+        write_timeout=30,
+        connect_timeout=15,
+        pool_timeout=15,
+    )
+    builder.request.assert_called_once_with(request_instance)
+
+
 @pytest.mark.asyncio
 async def test_cs2_bot_post_init(bot):
     mocked_app = AsyncMock()

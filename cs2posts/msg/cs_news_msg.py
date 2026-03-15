@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from telegram import InputMediaPhoto
@@ -15,6 +16,7 @@ from cs2posts.content import Video
 from cs2posts.content import Youtube
 from cs2posts.dto.post import Post
 from cs2posts.msg.constants import MAX_MEDIA_GROUP_SIZE
+from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
 from cs2posts.utils import Utils
@@ -69,12 +71,15 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
     @resilient_send
     async def send_message(self, bot, chat_id: int, message: TextBlock) -> None:
-        for text in self.split(message.text):
+        chunks = self.split(message.text)
+        for i, text in enumerate(chunks):
             await bot.send_message(
                 chat_id=chat_id,
                 text=text,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True)
+            if i < len(chunks) - 1:
+                await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
     @resilient_send
     async def send_image(self, bot, chat_id: int, image: Image) -> None:
@@ -107,10 +112,12 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
         chunks = [media[i:i + MAX_MEDIA_GROUP_SIZE] for i in range(0, len(media), MAX_MEDIA_GROUP_SIZE)]
 
-        for chunk in chunks:
+        for i, chunk in enumerate(chunks):
             await bot.send_media_group(
                 chat_id=chat_id,
                 media=chunk)
+            if i < len(chunks) - 1:
+                await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
     @resilient_send
     async def send_video(self, bot, chat_id: int, video: Video) -> None:
@@ -160,7 +167,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             disable_web_page_preview=False)
 
     async def send(self, bot, chat_id: int) -> None:
-        for content in self.content:
+        for i, content in enumerate(self.content):
             if isinstance(content, TextBlock):
                 await self.send_message(bot, chat_id, content)
             elif isinstance(content, Image):
@@ -171,3 +178,5 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 await self.send_video(bot, chat_id, content)
             elif isinstance(content, Youtube):
                 await self.send_youtube_video(bot, chat_id, content)
+            if i < len(self.content) - 1:
+                await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)

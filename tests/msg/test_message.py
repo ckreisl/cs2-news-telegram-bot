@@ -13,6 +13,7 @@ from cs2posts.msg import CounterStrikeUpdateMessage
 from cs2posts.msg import TelegramMessage
 from cs2posts.msg import TelegramMessageFactory
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
+from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 from cs2posts.msg.telegram import resilient_send
 
 
@@ -224,3 +225,17 @@ async def test_telegram_message_send_external_continues_after_chunk_failure(mock
     await msg.send(bot=bot, chat_id=42)
 
     assert bot.send_message.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_send_uses_configured_delay_between_chunks():
+    msg = TelegramMessage("hello")
+    msg._TelegramMessage__messages = ["chunk1", "chunk2", "chunk3"]
+
+    bot = AsyncMock()
+
+    with patch('cs2posts.msg.telegram.asyncio.sleep', new=AsyncMock()) as mocked_sleep:
+        await msg.send(bot=bot, chat_id=42)
+
+    assert mocked_sleep.await_count == 2
+    mocked_sleep.assert_any_await(TELEGRAM_SEND_DELAY_SECONDS)
