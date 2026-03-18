@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -55,4 +56,13 @@ async def test_crawler_raises_exception_on_bad_response(crawler, mock_get):
     mock_get.return_value.ok = False
     mock_get.return_value.status_code = 404
     with pytest.raises(Exception):
+        await crawler.crawl()
+
+
+@pytest.mark.asyncio
+async def test_crawler_raises_exception_on_invalid_json(crawler, mock_get):
+    mock_get.return_value.ok = True
+    mock_get.return_value.text = "not valid json"
+
+    with pytest.raises(json.JSONDecodeError):
         await crawler.crawl()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from unittest.mock import patch
 
 import pytest
@@ -48,6 +49,48 @@ def crawler_data():
 
 
 @pytest.fixture
+def crawler_data_with_external(crawler_data):
+    data = deepcopy(crawler_data)
+    data["appnews"]["newsitems"].append(
+        {
+            "gid": "6000000000000000000",
+            "title": "External Feature",
+            "url": "https://example.com/external-feature",
+            "is_external_url": True,
+            "author": "Someone Else",
+            "contents": "External Content",
+            "feedlabel": "Community Announcements",
+            "date": 1694000000,
+            "feedname": "steam_community_announcements",
+            "feed_type": 0,
+            "appid": 730,
+        }
+    )
+    return data
+
+
+@pytest.fixture
+def crawler_data_with_unknown_feed_type(crawler_data):
+    data = deepcopy(crawler_data)
+    data["appnews"]["newsitems"].append(
+        {
+            "gid": "7000000000000000000",
+            "title": "Ignore Me",
+            "url": "https://example.com/ignore-me",
+            "is_external_url": True,
+            "author": "Ignored",
+            "contents": "Ignored",
+            "feedlabel": "Community Announcements",
+            "date": 1695000000,
+            "feedname": "steam_community_announcements",
+            "feed_type": 999,
+            "appid": 730,
+        }
+    )
+    return data
+
+
+@pytest.fixture
 def crawler_data_steam_clan_image():
     return {
         "appnews": {
@@ -81,6 +124,16 @@ def cs2_posts_steam_clan_image(crawler_data_steam_clan_image):
     return CounterStrike2Posts(crawler_data_steam_clan_image)
 
 
+@pytest.fixture
+def cs2_posts_with_external(crawler_data_with_external):
+    return CounterStrike2Posts(crawler_data_with_external)
+
+
+@pytest.fixture
+def cs2_posts_with_unknown_feed_type(crawler_data_with_unknown_feed_type):
+    return CounterStrike2Posts(crawler_data_with_unknown_feed_type)
+
+
 def test_cs2_validate_replace_steam_clan_image_url(cs2_posts_steam_clan_image):
     with patch("cs2posts.utils.Utils.is_valid_url", return_value=True):
         cs2_posts_steam_clan_image.validate()
@@ -95,26 +148,16 @@ def test_cs2_net_post_empty():
 
 
 def test_cs2_net_post_none():
-    cs2_posts = CounterStrike2Posts({})
+    cs2_posts = CounterStrike2Posts(None)
     assert len(cs2_posts.posts) == 0
 
 
-def test_cs2_net_post_no_events():
-    cs2_posts = CounterStrike2Posts({'not_events': 'not_events'})
-    assert len(cs2_posts.posts) == 0
-
-
-def test_cs2_net_post_unknown_event_type():
-    cs2_posts = CounterStrike2Posts(
-        {'events': [
-            {
-                'event_type': 999,
-                'gid': 1,
-                'announcement_body': {
-                    'headline': 'headline',
-                }
-            }
-        ]})
+@pytest.mark.parametrize("payload", [
+    {"not_appnews": "not_appnews"},
+    {"appnews": {}},
+])
+def test_cs2_net_post_missing_expected_keys(payload):
+    cs2_posts = CounterStrike2Posts(payload)
     assert len(cs2_posts.posts) == 0
 
 
@@ -128,6 +171,24 @@ def test_cs2_net_news_posts(cs2_posts):
 
 def test_cs2_net_update_posts(cs2_posts):
     assert len(cs2_posts.update_posts) == 1
+
+
+def test_cs2_net_external_posts(cs2_posts_with_external):
+    assert len(cs2_posts_with_external.external_posts) == 1
+    assert cs2_posts_with_external.latest_external_post.gid == "6000000000000000000"
+    assert cs2_posts_with_external.oldest_external_post.gid == "6000000000000000000"
+
+
+def test_cs2_net_is_latest_post_external(cs2_posts_with_external):
+    assert cs2_posts_with_external.is_latest_post_external()
+
+    cs2_posts = CounterStrike2Posts(None)
+    assert not cs2_posts.is_latest_post_external()
+
+
+def test_cs2_net_ignores_unknown_feed_type(cs2_posts_with_unknown_feed_type):
+    assert len(cs2_posts_with_unknown_feed_type.posts) == 2
+    assert all(post.gid != "7000000000000000000" for post in cs2_posts_with_unknown_feed_type.posts)
 
 
 def test_cs2_net_latest(cs2_posts):
