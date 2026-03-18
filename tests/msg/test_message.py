@@ -77,9 +77,6 @@ def test_telegram_message_msg_split():
     assert len(telegram_msg.messages) == 2
 
 
-# TODO: Add test for CounterStrikeNewsMessage
-
-
 def test_counter_strike_update_message(mocked_cs2_update_post):
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
@@ -89,6 +86,25 @@ def test_counter_strike_update_message(mocked_cs2_update_post):
         expected = "<b>Release Notes for 2/13/2009</b>\n(2009-02-13 23:31:30)\n\nmy content\n\n(Author: Valve)\n\nSource: <a href='https://test.com'>Link</a>"
         assert len(msg.messages) == 1
         assert msg.message == expected
+
+
+def test_counter_strike_external_message_uses_read_more_link_and_strips_media(mocked_cs2_external_news):
+    mocked_cs2_external_news.contents = (
+        "<p><img src='https://example.com/image.jpg'/>"
+        "Lead paragraph<br/>"
+        "<a href='https://example.com/story'>Read more</a></p>"
+    )
+
+    with patch('requests.get') as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://test.com"
+
+        msg = CounterStrikeExternalMessage(post=mocked_cs2_external_news)
+
+    assert "Read more" not in msg.message
+    assert "<img" not in msg.message
+    assert "Lead paragraph" in msg.message
+    assert "Source: <a href='https://example.com/story'>Link</a>" in msg.message
 
 
 @pytest.mark.asyncio
@@ -104,6 +120,15 @@ async def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_
 
         msg = await TelegramMessageFactory.create(mocked_cs2_external_news)
         assert isinstance(msg, CounterStrikeExternalMessage)
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_factory_raises_for_unknown_post_type(mocked_cs2_update_post):
+    with patch.object(mocked_cs2_update_post, 'is_news', return_value=False), \
+            patch.object(mocked_cs2_update_post, 'is_update', return_value=False), \
+            patch.object(mocked_cs2_update_post, 'is_external', return_value=False):
+        with pytest.raises(ValueError, match="Unknown post type"):
+            await TelegramMessageFactory.create(mocked_cs2_update_post)
 
 
 @pytest.mark.asyncio
