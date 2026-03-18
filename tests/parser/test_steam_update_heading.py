@@ -59,3 +59,8 @@ def test_steam_update_heading_parser_leading_backslash(steam_parser):
 def test_steam_update_heading_parser_leading_backslash_by_heading_item(steam_parser):
     steam_parser.text = "start\\[ITEMS]Some text"
     assert steam_parser.parse() == "start<b>[ITEMS]</b>\nSome text"
+
+
+def test_steam_update_heading_parser_leading_backslash_hyphenated_heading(steam_parser):
+    steam_parser.text = "\n\\[ X-Ray Scanner ]\n"
+    assert steam_parser.parse() == "\n<b>[ X-Ray Scanner ]</b>\n"
