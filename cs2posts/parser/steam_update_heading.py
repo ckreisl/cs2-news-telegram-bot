@@ -27,6 +27,14 @@ class SteamUpdateHeadingParser(Parser):
     def is_heading(self, start: int, end: int) -> bool:
         return self.is_heading_by_newlines(start, end)
 
+    def count_trailing_newlines(self, end: int) -> int:
+        count = 0
+        i = end
+        while i < len(self.text) and self.text[i] == '\n':
+            count += 1
+            i += 1
+        return count
+
     def is_single_element_heading(self, word: str) -> bool:
         stripped = word.strip()
         return len(stripped) == 1
@@ -54,6 +62,12 @@ class SteamUpdateHeadingParser(Parser):
         formatted_heading = f"<b>{bracketed_heading}</b>"
 
         if self.is_heading(start, end):
+            trailing_newlines = self.count_trailing_newlines(end)
+
+            if trailing_newlines == 0:
+                return f"{formatted_heading}\n\n"
+            if trailing_newlines == 1:
+                return f"{formatted_heading}\n"
             return formatted_heading
 
         return f"{formatted_heading}\n"

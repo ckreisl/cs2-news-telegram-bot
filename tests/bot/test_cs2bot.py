@@ -619,7 +619,9 @@ async def test_cs2_bot_send_message_raises_exception(bot):
     mocked_msg.send.side_effect = Exception("Exception")
     chat = Chat(42)
 
-    await bot.send_message(mocked_context, mocked_msg, chat)
+    with pytest.raises(Exception, match="Exception"):
+        await bot.send_message(mocked_context, mocked_msg, chat)
+
     mocked_msg.send.assert_called_once_with(
         mocked_context.bot, chat_id=chat.chat_id)
     bot.chat_db.remove.assert_not_called()

@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 
+import httpcore
+import httpx
 from telegram import InputMediaPhoto
 from telegram.constants import ParseMode
 
-from .telegram import resilient_send
 from .telegram import TelegramMessage
 from cs2posts.content import Carousel
 from cs2posts.content import ContentExtractor
@@ -69,7 +70,6 @@ class CounterStrikeNewsMessage(TelegramMessage):
     def get_header(self) -> str:
         return f"<b>{self.post.title}</b>\n({self.post.date_as_datetime})"
 
-    @resilient_send
     async def send_message(self, bot, chat_id: int, message: TextBlock) -> None:
         chunks = self.split(message.text)
         for i, text in enumerate(chunks):
@@ -81,7 +81,6 @@ class CounterStrikeNewsMessage(TelegramMessage):
             if i < len(chunks) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
-    @resilient_send
     async def send_image(self, bot, chat_id: int, image: Image) -> None:
         image_url = Utils.extract_url(image.url)
 
@@ -97,7 +96,6 @@ class CounterStrikeNewsMessage(TelegramMessage):
             caption=caption,
             parse_mode=ParseMode.HTML)
 
-    @resilient_send
     async def send_carousel(self, bot, chat_id: int, carousel: Carousel) -> None:
         media = []
         for image in carousel.images:
@@ -119,7 +117,6 @@ class CounterStrikeNewsMessage(TelegramMessage):
             if i < len(chunks) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
-    @resilient_send
     async def send_video(self, bot, chat_id: int, video: Video) -> None:
         if video.is_empty():
             return
@@ -153,7 +150,6 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
         await bot.send_video(**args)
 
-    @resilient_send
     async def send_youtube_video(self, bot, chat_id: int, youtube: Youtube) -> None:
         text: str = ""
         if youtube.is_heading:
@@ -166,17 +162,42 @@ class CounterStrikeNewsMessage(TelegramMessage):
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=False)
 
+    async def send_content(self, bot, chat_id: int, content) -> None:
+        if isinstance(content, TextBlock):
+            await self.send_message(bot, chat_id, content)
+        elif isinstance(content, Image):
+            await self.send_image(bot, chat_id, content)
+        elif isinstance(content, Carousel):
+            await self.send_carousel(bot, chat_id, content)
+        elif isinstance(content, Video):
+            await self.send_video(bot, chat_id, content)
+        elif isinstance(content, Youtube):
+            await self.send_youtube_video(bot, chat_id, content)
+        else:
+            raise TypeError(f"Unsupported content type: {type(content)!r}")
+
+    async def _send_with_retry(self, bot, chat_id: int, content, max_retries: int = 3) -> bool:
+        for attempt in range(max_retries + 1):
+            try:
+                await self.send_content(bot, chat_id, content)
+                return True
+            except (httpx.ReadTimeout, httpcore.ReadTimeout, httpx.ConnectError) as e:
+                if attempt >= max_retries:
+                    logger.exception(f"Giving up after retries for chat {chat_id=}, content={type(content).__name__}, reason={e}")
+                    return False
+                delay = TELEGRAM_SEND_DELAY_SECONDS * (2 ** attempt)
+                logger.warning(
+                    f"Transient error for chat {chat_id=}, content={type(content).__name__}, "
+                    f"attempt={attempt + 1}/{max_retries + 1}, retry_in={delay}s, reason={e}")
+                await asyncio.sleep(delay)
+            except Exception as e:
+                logger.exception(f"Could not send message to chat {chat_id=}, content={type(content).__name__}, reason={e}")
+                return False
+
+        return False
+
     async def send(self, bot, chat_id: int) -> None:
         for i, content in enumerate(self.content):
-            if isinstance(content, TextBlock):
-                await self.send_message(bot, chat_id, content)
-            elif isinstance(content, Image):
-                await self.send_image(bot, chat_id, content)
-            elif isinstance(content, Carousel):
-                await self.send_carousel(bot, chat_id, content)
-            elif isinstance(content, Video):
-                await self.send_video(bot, chat_id, content)
-            elif isinstance(content, Youtube):
-                await self.send_youtube_video(bot, chat_id, content)
+            await self._send_with_retry(bot, chat_id, content)
             if i < len(self.content) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
