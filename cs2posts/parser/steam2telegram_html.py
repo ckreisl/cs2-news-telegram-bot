@@ -19,6 +19,23 @@ NEWLINE_FORMAT = {
     },
 }
 
+# Patterns that must be resolved before sub-parsers run (e.g. before
+# SteamUpdateHeadingParser, which would otherwise match [/p] as a heading).
+PRE_PARSER_FORMAT = {
+    "strike": {
+        'pattern': re.compile(r'\[strike\](.*?)\[/strike\]', re.IGNORECASE | re.DOTALL),
+        'replace': r'\1',
+    },
+    "p_empty": {
+        'pattern': re.compile(r'\[p\]\[/p\]', re.IGNORECASE),
+        'replace': '\n',
+    },
+    "p": {
+        'pattern': re.compile(r'\[p\](.*?)\[/p\]', re.IGNORECASE | re.DOTALL),
+        'replace': r'\1',
+    },
+}
+
 STEAM_FORMAT = {
     "h2": {
         'pattern': r'\[h2\](.*?)\[/h2\]',
@@ -31,11 +48,6 @@ STEAM_FORMAT = {
     "dash": {
         'pattern': r'&ndash;',
         'replace': r'—',
-    },
-    "p": {
-        'pattern': r'\[p\](.*?)\[/p\]',
-        # For now remove, later on it should rather be r'\1\n'
-        'replace': r'\1',
     },
 }
 
@@ -58,6 +70,13 @@ class Steam2TelegramHTML(Parser):
             replace = value['replace']
             self.text = self.text.replace(pattern, replace)
 
+        for value in PRE_PARSER_FORMAT.values():
+            self.text = value['pattern'].sub(value['replace'], self.text)
+
+        # Replace non-breaking spaces with regular spaces so that
+        # headings like "[ SOUND\xa0]" normalise to "[ SOUND ]".
+        self.text = self.text.replace('\xa0', ' ')
+
         parser_by_priority = sorted(self.__parser, key=lambda x: x[1])
         for parser, _ in parser_by_priority:
             self.text = parser(self.text).parse()
@@ -68,5 +87,9 @@ class Steam2TelegramHTML(Parser):
             self.text = re.sub(
                 pattern, replace, self.text,
                 flags=re.IGNORECASE | re.DOTALL)
+
+        # Strip trailing whitespace on each line and collapse 3+ newlines.
+        self.text = re.sub(r'[^\S\n]+\n', '\n', self.text)
+        self.text = re.sub(r'\n{3,}', '\n\n', self.text)
 
         return self.text
