@@ -24,7 +24,7 @@ NEWLINE_FORMAT = {
 PRE_PARSER_FORMAT = {
     "strike": {
         'pattern': re.compile(r'\[strike\](.*?)\[/strike\]', re.IGNORECASE | re.DOTALL),
-        'replace': r'<s>\1</s>',
+        'replace': r'\1',
     },
     "p_empty": {
         'pattern': re.compile(r'\[p\]\[/p\]', re.IGNORECASE),
@@ -73,6 +73,10 @@ class Steam2TelegramHTML(Parser):
         for value in PRE_PARSER_FORMAT.values():
             self.text = value['pattern'].sub(value['replace'], self.text)
 
+        # Replace non-breaking spaces with regular spaces so that
+        # headings like "[ SOUND\xa0]" normalise to "[ SOUND ]".
+        self.text = self.text.replace('\xa0', ' ')
+
         parser_by_priority = sorted(self.__parser, key=lambda x: x[1])
         for parser, _ in parser_by_priority:
             self.text = parser(self.text).parse()
@@ -84,7 +88,8 @@ class Steam2TelegramHTML(Parser):
                 pattern, replace, self.text,
                 flags=re.IGNORECASE | re.DOTALL)
 
-        # Collapse runs of 3+ newlines down to 2 (one blank line).
+        # Strip trailing whitespace on each line and collapse 3+ newlines.
+        self.text = re.sub(r'[^\S\n]+\n', '\n', self.text)
         self.text = re.sub(r'\n{3,}', '\n\n', self.text)
 
         return self.text
