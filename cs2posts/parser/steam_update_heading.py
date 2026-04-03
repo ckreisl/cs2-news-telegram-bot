@@ -65,8 +65,6 @@ class SteamUpdateHeadingParser(Parser):
             trailing_newlines = self.count_trailing_newlines(end)
 
             if trailing_newlines == 0:
-                return f"{formatted_heading}\n\n"
-            if trailing_newlines == 1:
                 return f"{formatted_heading}\n"
             return formatted_heading
 

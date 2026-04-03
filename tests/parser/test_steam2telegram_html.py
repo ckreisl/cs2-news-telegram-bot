@@ -42,7 +42,7 @@ def test_steam2telegram_html_dash(steam2telegram_html):
 
 def test_steam2telegram_html_sanitize_p_tag_empty(steam2telegram_html):
     steam2telegram_html.text = '[p][/p]'
-    expected = ''
+    expected = '\n'
     assert steam2telegram_html.parse() == expected
 
 
@@ -102,11 +102,11 @@ def test_steam2telegram_html_h3_case_insensitive(steam2telegram_html):
 
 def test_steam2telegram_html_multiple_h2_tags(steam2telegram_html):
     steam2telegram_html.text = '[h2]First[/h2][h2]Second[/h2]'
-    expected = '\n\n<b>First</b>\n\n\n\n<b>Second</b>\n\n'
+    expected = '\n\n<b>First</b>\n\n<b>Second</b>\n\n'
     assert steam2telegram_html.parse() == expected
 
 
 def test_steam2telegram_html_mixed_h2_h3_tags(steam2telegram_html):
     steam2telegram_html.text = '[h2]Main[/h2][h3]Sub[/h3]'
-    expected = '\n\n<b>Main</b>\n\n\n\n<b>Sub</b>\n\n'
+    expected = '\n\n<b>Main</b>\n\n<b>Sub</b>\n\n'
     assert steam2telegram_html.parse() == expected
