@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 from telegram.constants import ParseMode
 
@@ -47,7 +48,7 @@ class TelegramMessage:
 
         return chunks
 
-    async def send(self, bot, chat_id: int) -> None:
+    async def send(self, bot: Any, chat_id: int) -> None:
         """Default implementation: sends each text chunk in ``self.messages``.
 
         Subclasses that handle richer content (images, carousels, etc.) should

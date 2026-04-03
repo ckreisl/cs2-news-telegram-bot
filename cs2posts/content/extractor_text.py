@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from .content import Content
 from .content import TextBlock
 from .extractor import Extractor
@@ -12,10 +14,10 @@ from .extractor_youtube import YoutubeExtractor
 class TextBlockExtractor(Extractor):
 
     def __init__(self, text: str,
-                 videos: list[Content] | None = None,
-                 carousel: list[Content] | None = None,
-                 images: list[Content] | None = None,
-                 youtube: list[Content] | None = None) -> None:
+                 videos: Sequence[Content] | None = None,
+                 carousel: Sequence[Content] | None = None,
+                 images: Sequence[Content] | None = None,
+                 youtube: Sequence[Content] | None = None) -> None:
         super().__init__(text)
 
         videos = VideoExtractor(self.text).extract() if videos is None else videos

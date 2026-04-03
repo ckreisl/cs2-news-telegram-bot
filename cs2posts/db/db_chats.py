@@ -72,7 +72,7 @@ class ChatDatabase(SQLite):
             """) as cursor:
                 return [Chat.from_dict(dict(row)) for row in await cursor.fetchall()]
 
-    async def is_empty(self) -> bool:
+    async def is_empty(self, table_name: str | None = None) -> bool:
         return await super().is_empty("chats")
 
     async def get(self, chat_id: int) -> Chat | None:

@@ -110,6 +110,11 @@ def test_spam_protector_is_timeouted(spam_protector, chat):
     assert spam_protector.is_timeouted(chat) is False
 
 
+def test_spam_protector_is_timeouted_does_not_wrap_after_one_day(spam_protector, chat):
+    chat.last_activity = get_utc_now() - timedelta(days=1, seconds=1)
+    assert spam_protector.is_timeouted(chat) is False
+
+
 @pytest.mark.asyncio
 async def test_spam_protector_check(spam_protector, chat):
     mock_bot = AsyncMock()
@@ -162,3 +167,39 @@ async def test_spam_protector_strike(spam_protector, chat):
             chat, settings.CHAT_BAN_TIMEOUT_SECONDS, settings.CHAT_MAX_STRIKES),
         parse_mode=ParseMode.HTML)
     assert chat.is_banned
+
+
+def test_spam_protector_recover_strikes_no_recovery_before_interval(spam_protector, chat):
+    chat.strikes = 2
+    chat.last_activity = get_utc_now()
+    spam_protector.recover_strikes(chat)
+    assert chat.strikes == 2
+
+
+def test_spam_protector_recover_strikes_after_interval(spam_protector, chat):
+    chat.strikes = 2
+    chat.last_activity = get_utc_now(
+    ) - timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1)
+    spam_protector.recover_strikes(chat)
+    assert chat.strikes == 1
+
+
+def test_spam_protector_recover_strikes_does_not_go_below_zero(spam_protector, chat):
+    chat.strikes = 0
+    chat.last_activity = get_utc_now(
+    ) - timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1)
+    spam_protector.recover_strikes(chat)
+    assert chat.strikes == 0
+
+
+@pytest.mark.asyncio
+async def test_spam_protector_check_recovers_strikes_on_good_behavior(spam_protector, chat):
+    mock_bot = AsyncMock()
+    chat.strikes = 2
+    # Set last activity to 61 minutes ago (beyond recovery interval)
+    chat.last_activity = get_utc_now(
+    ) - timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1)
+
+    await spam_protector.check(mock_bot, chat)
+    # Should have recovered one strike
+    assert chat.strikes == 1

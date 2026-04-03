@@ -629,9 +629,37 @@ async def test_cs2_bot_send_message_raises_exception(bot):
 
 @pytest.mark.asyncio
 async def test_cs2_bot_backup_chats_db_from_settings(tmp_path, bot):
-    bot.chat_db.backup = AsyncMock()
-    await bot.backup_chats_db(Mock())
-    bot.chat_db.backup.assert_called_once()
+    with patch('cs2posts.bot.cs2.ChatDatabaseBackupManager') as mocked_manager:
+        backup_manager = Mock()
+        backup_manager.backup = AsyncMock(return_value=tmp_path / 'backup_20260403_120000.db')
+        mocked_manager.return_value = backup_manager
+
+        await bot.backup_chats_db(Mock())
+
+        mocked_manager.assert_called_once()
+        backup_manager.backup.assert_called_once()
+        backup_manager.rotate_backups.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_backup_chats_db_creates_timestamped_file(tmp_path, bot):
+    backup_path = tmp_path / "backup.db"
+
+    with patch('cs2posts.bot.cs2.settings') as mocked_settings:
+        with patch('cs2posts.bot.cs2.ChatDatabaseBackupManager') as mocked_manager:
+            backup_manager = Mock()
+            backup_manager.backup = AsyncMock(return_value=tmp_path / 'backup_20260403_120000.db')
+            mocked_manager.return_value = backup_manager
+            mocked_settings.CHAT_DB_BACKUP_FILEPATH = str(backup_path)
+            mocked_settings.CHAT_DB_BACKUP_COUNT = 5
+
+            await bot.backup_chats_db(Mock())
+
+            mocked_manager.assert_called_once_with(
+                chat_db=bot.chat_db,
+                backup_filepath=str(backup_path),
+                max_backups=5,
+            )
 
 
 def test_cs2_bot_run(bot):

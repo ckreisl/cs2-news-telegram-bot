@@ -12,11 +12,11 @@ class Content:
 
 @dataclass
 class Video(Content):
-    webm: str
-    mp4: str
+    webm: str | None
+    mp4: str | None
     poster: str | None
-    autoplay: bool
-    controls: bool
+    autoplay: bool | None
+    controls: bool | None
 
     def is_empty(self) -> bool:
         return not (self.webm or self.mp4)

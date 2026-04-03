@@ -22,12 +22,11 @@ class Utils:
         if not url.startswith("http"):
             return False
 
-        args = {"url": url, "timeout": timeout, "allow_redirects": True}
         try:
-            response = requests.head(**args)
+            response = requests.head(url=url, timeout=timeout, allow_redirects=True)
             # Fallback if server does not allow HEAD requests
             if response.status_code == 405:
-                response = requests.get(**args)
+                response = requests.get(url=url, timeout=timeout, allow_redirects=True)
         except Exception as e:
             logger.error(f"Failed to get image from {url}: {e}")
             return False
@@ -36,12 +35,11 @@ class Utils:
 
     @staticmethod
     def get_redirected_url(url: str, timeout: int = REQUESTS_TIMEOUT) -> str:
-        args = {"url": url, "timeout": timeout, "allow_redirects": True}
         try:
-            response = requests.head(**args)
+            response = requests.head(url=url, timeout=timeout, allow_redirects=True)
             # Fallback if server does not allow HEAD requests
             if response.status_code == 405:
-                response = requests.get(**args)
+                response = requests.get(url=url, timeout=timeout, allow_redirects=True)
         except Exception as e:
             logger.error(f"Could not fetch data due to {e}")
             return url

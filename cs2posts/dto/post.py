@@ -98,10 +98,10 @@ class Post:
     def __getitem__(self, key: str) -> Any:
         return self.to_dict()[key]
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, self.__class__):
             return self.to_dict() == other.to_dict()
         return False
 
-    def __ne__(self, other) -> bool:
+    def __ne__(self, other: object) -> bool:
         return not self.__eq__(other)
