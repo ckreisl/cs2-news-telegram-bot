@@ -629,64 +629,37 @@ async def test_cs2_bot_send_message_raises_exception(bot):
 
 @pytest.mark.asyncio
 async def test_cs2_bot_backup_chats_db_from_settings(tmp_path, bot):
-    bot.chat_db.backup = AsyncMock()
-    await bot.backup_chats_db(Mock())
-    bot.chat_db.backup.assert_called_once()
+    with patch('cs2posts.bot.cs2.ChatDatabaseBackupManager') as mocked_manager:
+        backup_manager = Mock()
+        backup_manager.backup = AsyncMock(return_value=tmp_path / 'backup_20260403_120000.db')
+        mocked_manager.return_value = backup_manager
+
+        await bot.backup_chats_db(Mock())
+
+        mocked_manager.assert_called_once()
+        backup_manager.backup.assert_called_once()
+        backup_manager.rotate_backups.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_cs2_bot_backup_chats_db_creates_timestamped_file(tmp_path, bot):
-    bot.chat_db.backup = AsyncMock()
     backup_path = tmp_path / "backup.db"
 
     with patch('cs2posts.bot.cs2.settings') as mocked_settings:
-        mocked_settings.CHAT_DB_BACKUP_FILEPATH = str(backup_path)
-        mocked_settings.CHAT_DB_BACKUP_COUNT = 5
-        await bot.backup_chats_db(Mock())
+        with patch('cs2posts.bot.cs2.ChatDatabaseBackupManager') as mocked_manager:
+            backup_manager = Mock()
+            backup_manager.backup = AsyncMock(return_value=tmp_path / 'backup_20260403_120000.db')
+            mocked_manager.return_value = backup_manager
+            mocked_settings.CHAT_DB_BACKUP_FILEPATH = str(backup_path)
+            mocked_settings.CHAT_DB_BACKUP_COUNT = 5
 
-    call_args = bot.chat_db.backup.call_args[0][0]
-    assert call_args.parent == tmp_path
-    assert call_args.name.startswith("backup_")
-    assert call_args.suffix == ".db"
+            await bot.backup_chats_db(Mock())
 
-
-def test_cleanup_old_backups_removes_oldest(tmp_path):
-    dates = ["20260401_120000", "20260402_120000", "20260403_120000", "20260404_120000", "20260405_120000"]
-    for date in dates:
-        (tmp_path / f"backup_{date}.db").touch()
-
-    CounterStrike2UpdateBot.cleanup_old_backups(tmp_path, ".db", 3)
-    remaining = sorted(tmp_path.glob("*.db"), key=lambda p: p.stem)
-    assert len(remaining) == 3
-    assert remaining[0].name == "backup_20260403_120000.db"
-    assert remaining[1].name == "backup_20260404_120000.db"
-    assert remaining[2].name == "backup_20260405_120000.db"
-
-
-def test_cleanup_old_backups_no_removal_needed(tmp_path):
-    dates = ["20260401_120000", "20260402_120000", "20260403_120000"]
-    for date in dates:
-        (tmp_path / f"backup_{date}.db").touch()
-
-    CounterStrike2UpdateBot.cleanup_old_backups(tmp_path, ".db", 5)
-    remaining = list(tmp_path.glob("*.db"))
-    assert len(remaining) == 3
-
-
-def test_cleanup_old_backups_zero_max(tmp_path):
-    dates = ["20260401_120000", "20260402_120000", "20260403_120000"]
-    for date in dates:
-        (tmp_path / f"backup_{date}.db").touch()
-
-    CounterStrike2UpdateBot.cleanup_old_backups(tmp_path, ".db", 0)
-    remaining = list(tmp_path.glob("*.db"))
-    assert len(remaining) == 3
-
-
-def test_cleanup_old_backups_empty_dir(tmp_path):
-    CounterStrike2UpdateBot.cleanup_old_backups(tmp_path, ".db", 5)
-    remaining = list(tmp_path.glob("*.db"))
-    assert len(remaining) == 0
+            mocked_manager.assert_called_once_with(
+                chat_db=bot.chat_db,
+                backup_filepath=str(backup_path),
+                max_backups=5,
+            )
 
 
 def test_cs2_bot_run(bot):

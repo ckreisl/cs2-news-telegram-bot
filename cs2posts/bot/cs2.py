@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 
 from telegram import Update
@@ -20,6 +19,7 @@ from telegram.request import HTTPXRequest
 
 import cs2posts.bot.constants as const
 from cs2posts.bot import settings
+from cs2posts.bot.backup import ChatDatabaseBackupManager
 from cs2posts.bot.options import Options
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.crawler import CounterStrike2Crawler
@@ -420,26 +420,15 @@ class CounterStrike2UpdateBot:
     async def backup_chats_db(self, context: CallbackContext) -> None:
         logger.info('Backing up chat database ...')
 
-        filepath = Path(settings.CHAT_DB_BACKUP_FILEPATH)
-        if filepath is None:
-            filepath = Path(__file__).parent.parent.parent / \
-                "backups" / "backup.db"
+        backup_manager = ChatDatabaseBackupManager(
+            chat_db=self.chat_db,
+            backup_filepath=settings.CHAT_DB_BACKUP_FILEPATH,
+            max_backups=settings.CHAT_DB_BACKUP_COUNT,
+        )
 
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        timestamped_filepath = filepath.with_stem(f"{filepath.stem}_{timestamp}")
-
-        await self.chat_db.backup(timestamped_filepath)
-        self.cleanup_old_backups(filepath.parent, filepath.suffix, settings.CHAT_DB_BACKUP_COUNT)
-
-    def cleanup_old_backups(self, backup_dir: Path, suffix: str, max_backups: int) -> None:
-        if max_backups <= 0:
-            return
-
-        backups = sorted(backup_dir.glob(f"*{suffix}"), key=lambda p: p.stem)
-        while len(backups) > max_backups:
-            oldest = backups.pop(0)
-            logger.info(f'Removing old backup: {oldest}')
-            oldest.unlink()
+        backup_filepath = await backup_manager.backup()
+        logger.info(f'Created backup: {backup_filepath}')
+        backup_manager.rotate_backups()
 
     async def error(self, update: Update, context: CallbackContext) -> None:
         logger.error(f'Update {update} caused error {context.error}')
