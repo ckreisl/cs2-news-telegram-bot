@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from telegram import Update
@@ -419,12 +420,26 @@ class CounterStrike2UpdateBot:
     async def backup_chats_db(self, context: CallbackContext) -> None:
         logger.info('Backing up chat database ...')
 
-        filepath = settings.CHAT_DB_BACKUP_FILEPATH
+        filepath = Path(settings.CHAT_DB_BACKUP_FILEPATH)
         if filepath is None:
             filepath = Path(__file__).parent.parent.parent / \
                 "backups" / "backup.db"
 
-        await self.chat_db.backup(filepath)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamped_filepath = filepath.with_stem(f"{filepath.stem}_{timestamp}")
+
+        await self.chat_db.backup(timestamped_filepath)
+        self.cleanup_old_backups(filepath.parent, filepath.suffix, settings.CHAT_DB_BACKUP_COUNT)
+
+    def cleanup_old_backups(self, backup_dir: Path, suffix: str, max_backups: int) -> None:
+        if max_backups <= 0:
+            return
+
+        backups = sorted(backup_dir.glob(f"*{suffix}"), key=lambda p: p.stem)
+        while len(backups) > max_backups:
+            oldest = backups.pop(0)
+            logger.info(f'Removing old backup: {oldest}')
+            oldest.unlink()
 
     async def error(self, update: Update, context: CallbackContext) -> None:
         logger.error(f'Update {update} caused error {context.error}')

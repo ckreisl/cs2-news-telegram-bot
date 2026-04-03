@@ -19,6 +19,7 @@ POST_DB_FILEPATH = os.getenv('POST_DB_FILEPATH', None)
 # Backup filepaths (default: /backups/backup.db if None)
 CHAT_DB_BACKUP_FILEPATH = os.getenv('CHAT_DB_BACKUP_FILEPATH', None)
 CHAT_DB_BACKUP_INTERVAL = int(os.getenv('CHAT_DB_BACKUP_INTERVAL', 86400))
+CHAT_DB_BACKUP_COUNT = int(os.getenv('CHAT_DB_BACKUP_COUNT', 5))
 
 CHAT_SPAM_INTERVAL_MS = int(os.getenv('CHAT_SPAM_INTERVAL_MS', 750))
 CHAT_BAN_TIMEOUT_SECONDS = int(os.getenv('CHAT_BAN_TIMEOUT_SECONDS', 600))
