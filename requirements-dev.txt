@@ -11,5 +11,5 @@ pytest-mock==3.14.0
 pytest-cov==6.0.0
 flake8==7.1.2
 mypy==1.20.0
-types-requests==2.32.0
+types-requests==2.33.0.20260402
 pre-commit
