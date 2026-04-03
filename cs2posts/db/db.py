@@ -19,7 +19,7 @@ class Database:
         return self.__filepath
 
     @abc.abstractmethod
-    async def create(self, *, overwrite=False) -> None:
+    async def create(self, *, overwrite: bool = False) -> None:
         pass  # pragma: no cover
 
     @abc.abstractmethod

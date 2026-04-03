@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from datetime import timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from telegram.constants import ParseMode
@@ -30,7 +31,7 @@ class SpamProtector:
     MAX_STRIKES = settings.CHAT_MAX_STRIKES
     BAN_TIMEOUT = settings.CHAT_BAN_TIMEOUT_SECONDS
 
-    async def check(self, bot, chat: Chat) -> None:
+    async def check(self, bot: Any, chat: Chat | None) -> None:
         if chat is None:
             return
 
@@ -87,7 +88,7 @@ class SpamProtector:
         time_diff = self._get_utc_now() - chat.last_activity
         return time_diff.seconds < self.BAN_TIMEOUT
 
-    async def strike(self, bot, chat: Chat) -> None:
+    async def strike(self, bot: Any, chat: Chat) -> None:
         if chat.is_banned:
             logger.info(f'Chat {chat.chat_id} is already banned')
             return

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from telegram import Update
 from telegram.constants import ChatType
@@ -35,31 +36,31 @@ from cs2posts.msg import TelegramMessageFactory
 logger = logging.getLogger(__name__)
 
 
-def admin(func):
-    async def wrapper(self, update: Update, context: CallbackContext):
+def admin(func: Any) -> Any:
+    async def wrapper(self: Any, update: Update, context: CallbackContext) -> Any:
         if update.message is None or update.message.from_user is None:
-            return
+            return None
 
         chat = await self.chat_db.get(chat_id=update.message.chat_id)
         if chat is None:
-            return
+            return None
         if update.message.from_user.id != chat.chat_id_admin:
             logger.warning(
                 f'Unauthorized access to {func.__name__} by {update.message.from_user.id}')
-            return
+            return None
         return await func(self, update, context)
     return wrapper
 
 
-def spam_protected(func):
-    async def wrapper(self, update: Update, context: CallbackContext):
+def spam_protected(func: Any) -> Any:
+    async def wrapper(self: Any, update: Update, context: CallbackContext) -> Any:
         if update.message is None:
-            return
+            return None
 
         chat = await self.chat_db.get(update.message.chat_id)
         await self.spam_protector.check(context.bot, chat)
         if chat is not None and chat.is_banned:
-            return
+            return None
         if chat is not None:
             await self.chat_db.update(chat)
         return await func(self, update, context)
@@ -68,7 +69,7 @@ def spam_protected(func):
 
 class CounterStrike2UpdateBot:
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         request = HTTPXRequest(
             read_timeout=30,
             write_timeout=30,
@@ -119,7 +120,12 @@ class CounterStrike2UpdateBot:
             await self.chat_db.create()
         await self.chat_db.create_table()
 
-    async def _try_import_json(self, filepath: str | None, import_callback, label: str) -> None:
+    async def _try_import_json(
+        self,
+        filepath: str | None,
+        import_callback: Any,
+        label: str,
+    ) -> None:
         if filepath is None:
             return
 

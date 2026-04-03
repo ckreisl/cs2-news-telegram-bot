@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 import httpcore
 import httpx
@@ -15,6 +16,7 @@ from cs2posts.content import Image
 from cs2posts.content import TextBlock
 from cs2posts.content import Video
 from cs2posts.content import Youtube
+from cs2posts.content.content import Content
 from cs2posts.dto.post import Post
 from cs2posts.msg.constants import MAX_MEDIA_GROUP_SIZE
 from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
@@ -70,7 +72,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
     def get_header(self) -> str:
         return f"<b>{self.post.title}</b>\n({self.post.date_as_datetime})"
 
-    async def send_message(self, bot, chat_id: int, message: TextBlock) -> None:
+    async def send_message(self, bot: Any, chat_id: int, message: TextBlock) -> None:
         chunks = self.split(message.text)
         for i, text in enumerate(chunks):
             await bot.send_message(
@@ -81,7 +83,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             if i < len(chunks) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
-    async def send_image(self, bot, chat_id: int, image: Image) -> None:
+    async def send_image(self, bot: Any, chat_id: int, image: Image) -> None:
         image_url = Utils.extract_url(image.url)
 
         if not Utils.is_valid_url(image_url):
@@ -96,7 +98,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             caption=caption,
             parse_mode=ParseMode.HTML)
 
-    async def send_carousel(self, bot, chat_id: int, carousel: Carousel) -> None:
+    async def send_carousel(self, bot: Any, chat_id: int, carousel: Carousel) -> None:
         media = []
         for image in carousel.images:
             image_url = Utils.extract_url(image.url)
@@ -117,7 +119,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             if i < len(chunks) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
-    async def send_video(self, bot, chat_id: int, video: Video) -> None:
+    async def send_video(self, bot: Any, chat_id: int, video: Video) -> None:
         if video.is_empty():
             return
 
@@ -150,7 +152,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
         await bot.send_video(**args)
 
-    async def send_youtube_video(self, bot, chat_id: int, youtube: Youtube) -> None:
+    async def send_youtube_video(self, bot: Any, chat_id: int, youtube: Youtube) -> None:
         text: str = ""
         if youtube.is_heading:
             text = self.get_header() + "\n\n"
@@ -162,7 +164,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=False)
 
-    async def send_content(self, bot, chat_id: int, content) -> None:
+    async def send_content(self, bot: Any, chat_id: int, content: Content) -> None:
         if isinstance(content, TextBlock):
             await self.send_message(bot, chat_id, content)
         elif isinstance(content, Image):
@@ -176,7 +178,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
         else:
             raise TypeError(f"Unsupported content type: {type(content)!r}")
 
-    async def _send_with_retry(self, bot, chat_id: int, content, max_retries: int = 3) -> bool:
+    async def _send_with_retry(self, bot: Any, chat_id: int, content: Content, max_retries: int = 3) -> bool:
         for attempt in range(max_retries + 1):
             try:
                 await self.send_content(bot, chat_id, content)
@@ -196,7 +198,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
         return False
 
-    async def send(self, bot, chat_id: int) -> None:
+    async def send(self, bot: Any, chat_id: int) -> None:
         for i, content in enumerate(self.content):
             await self._send_with_retry(bot, chat_id, content)
             if i < len(self.content) - 1:

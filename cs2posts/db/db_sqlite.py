@@ -25,7 +25,7 @@ class SQLite(Database):
                     return True
                 return result[0] == 0
 
-    async def create(self, *, overwrite=False) -> None:
+    async def create(self, *, overwrite: bool = False) -> None:
         if overwrite and self.filepath.exists():
             self.filepath.unlink()
 
