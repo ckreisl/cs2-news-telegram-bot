@@ -19,9 +19,11 @@ NEWLINE_FORMAT = {
     },
 }
 
+PatternSubRule = dict[str, re.Pattern[str] | str]
+
 # Patterns that must be resolved before sub-parsers run (e.g. before
 # SteamUpdateHeadingParser, which would otherwise match [/p] as a heading).
-PRE_PARSER_FORMAT = {
+PRE_PARSER_FORMAT: dict[str, PatternSubRule] = {
     "strike": {
         'pattern': re.compile(r'\[strike\](.*?)\[/strike\]', re.IGNORECASE | re.DOTALL),
         'replace': r'\1',
@@ -66,12 +68,18 @@ class Steam2TelegramHTML(Parser):
 
         # TODO: Must be placed here now before parsers due to HeadingParser
         for value in NEWLINE_FORMAT.values():
-            pattern = value['pattern']
+            plain_pattern = value['pattern']
             replace = value['replace']
-            self.text = self.text.replace(pattern, replace)
+            self.text = self.text.replace(plain_pattern, replace)
 
-        for value in PRE_PARSER_FORMAT.values():
-            self.text = value['pattern'].sub(value['replace'], self.text)
+        for pre_value in PRE_PARSER_FORMAT.values():
+            pattern = pre_value['pattern']
+            if not isinstance(pattern, re.Pattern):
+                continue
+            pre_replace = pre_value['replace']
+            if not isinstance(pre_replace, str):
+                continue
+            self.text = pattern.sub(pre_replace, self.text)
 
         # Replace non-breaking spaces with regular spaces so that
         # headings like "[ SOUND\xa0]" normalise to "[ SOUND ]".

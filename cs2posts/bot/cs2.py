@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 def admin(func):
     async def wrapper(self, update: Update, context: CallbackContext):
+        if update.message is None or update.message.from_user is None:
+            return
+
         chat = await self.chat_db.get(chat_id=update.message.chat_id)
         if chat is None:
             return
@@ -50,6 +53,9 @@ def admin(func):
 
 def spam_protected(func):
     async def wrapper(self, update: Update, context: CallbackContext):
+        if update.message is None:
+            return
+
         chat = await self.chat_db.get(update.message.chat_id)
         await self.spam_protector.check(context.bot, chat)
         if chat is not None and chat.is_banned:
@@ -102,7 +108,7 @@ class CounterStrike2UpdateBot:
         # self.app.add_error_handler(self.error)
         self.is_running = False
 
-    async def async_init(self) -> None:
+    async def _ensure_databases_exist(self) -> None:
         if not self.post_db.filepath.exists():
             logger.info('Post database not found. Creating new one...')
             await self.post_db.create()
@@ -113,35 +119,53 @@ class CounterStrike2UpdateBot:
             await self.chat_db.create()
         await self.chat_db.create_table()
 
-        if settings.IMPORT_CHATS_FROM_JSON is not None:
-            try:
-                await self.chat_db.import_from_json(
-                    Path(settings.IMPORT_CHATS_FROM_JSON))
-            except Exception as e:
-                logger.error(f'Could not import chats from json: {e}')
+    async def _try_import_json(self, filepath: str | None, import_callback, label: str) -> None:
+        if filepath is None:
+            return
 
-        if settings.IMPORT_POSTS_FROM_JSON is not None:
-            try:
-                await self.post_db.import_from_json(
-                    Path(settings.IMPORT_POSTS_FROM_JSON))
-            except Exception as e:
-                logger.error(f'Could not import posts from json: {e}')
+        try:
+            await import_callback(Path(filepath))
+        except Exception as e:
+            logger.error(f'Could not import {label} from json: {e}')
 
-        if await self.post_db.is_empty():
-            # TODO: Maybe ensure that there is a latest update and news post
-            # As of now we just fetch 100 items.
-            logger.info('No post data found. Fetching latest posts...')
-            # TODO: What happens here if crawler fails?
-            data = await self.crawler.crawl()
-            posts = CounterStrike2Posts(data)
+    async def _seed_posts_if_empty(self) -> None:
+        if not await self.post_db.is_empty():
+            return
+
+        # TODO: Maybe ensure that there is a latest update and news post
+        # As of now we just fetch 100 items.
+        logger.info('No post data found. Fetching latest posts...')
+        # TODO: What happens here if crawler fails?
+        data = await self.crawler.crawl()
+        posts = CounterStrike2Posts(data)
+
+        if posts.latest_update_post is not None:
             await self.post_db.save(posts.latest_update_post)
+        if posts.latest_news_post is not None:
             await self.post_db.save(posts.latest_news_post)
+        if posts.latest_external_post is not None:
             await self.post_db.save(posts.latest_external_post)
 
-        self.latest_post: Post = await self.post_db.get_latest_post()
-        self.latest_news_post: Post = await self.post_db.get_latest_news_post()
-        self.latest_update_post: Post = await self.post_db.get_latest_update_post()
-        self.latest_external_post: Post = await self.post_db.get_latest_external_post()
+    async def _load_latest_posts(self) -> None:
+        self.latest_post = await self.post_db.get_latest_post()
+        self.latest_news_post = await self.post_db.get_latest_news_post()
+        self.latest_update_post = await self.post_db.get_latest_update_post()
+        self.latest_external_post = await self.post_db.get_latest_external_post()
+
+    async def async_init(self) -> None:
+        await self._ensure_databases_exist()
+        await self._try_import_json(
+            settings.IMPORT_CHATS_FROM_JSON,
+            self.chat_db.import_from_json,
+            'chats',
+        )
+        await self._try_import_json(
+            settings.IMPORT_POSTS_FROM_JSON,
+            self.post_db.import_from_json,
+            'posts',
+        )
+        await self._seed_posts_if_empty()
+        await self._load_latest_posts()
 
         self.options.set_chat_db(self.chat_db)
 
@@ -151,18 +175,21 @@ class CounterStrike2UpdateBot:
         self.username = application.bot.username
         logger.info(f'Bot username: {self.username}. Bot is ready.')
 
-    async def post_shutdown(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def post_shutdown(self, application: Application) -> None:
         logger.info('Shutting down bot...')
         # saving chats is not required anymore
         # since we directly operate on the database
         # Keep function for future use
         self.is_running = False
-        await self.post_db.save(self.latest_news_post)
-        await self.post_db.save(self.latest_update_post)
-        await self.post_db.save(self.latest_external_post)
+        if self.latest_news_post is not None:
+            await self.post_db.save(self.latest_news_post)
+        if self.latest_update_post is not None:
+            await self.post_db.save(self.latest_update_post)
+        if self.latest_external_post is not None:
+            await self.post_db.save(self.latest_external_post)
 
     async def new_chat_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update is None or update.message is None:
+        if update is None or update.message is None or update.message.from_user is None:
             return
 
         logger.info(f'New chat member {update.message.new_chat_members} ...')
@@ -185,6 +212,8 @@ class CounterStrike2UpdateBot:
     async def left_chat_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if update is None or update.message is None:
             return
+        if update.message.left_chat_member is None:
+            return
 
         logger.info(f'Left chat member {update.message.left_chat_member} ...')
 
@@ -201,6 +230,9 @@ class CounterStrike2UpdateBot:
         await self.chat_db.remove(chat)
 
     async def migrate_chat(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
         if update.message.migrate_from_chat_id is None:
             # Someone two events are fired for the same chat migration
             # ignore the second event where migrate_from_chat_id is None
@@ -222,6 +254,9 @@ class CounterStrike2UpdateBot:
 
     @spam_protected
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None or update.message.from_user is None:
+            return
+
         logger.info(f'Starting bot for chat_id={update.message.chat_id} ...')
 
         chat_id = update.message.chat_id
@@ -251,6 +286,9 @@ class CounterStrike2UpdateBot:
             return
 
         # Check for posts every X seconds
+        if context.job_queue is None:
+            return
+
         context.job_queue.run_repeating(
             callback=self.post_checker,
             interval=settings.CS2_UPDATE_CHECK_INTERVAL)
@@ -263,6 +301,9 @@ class CounterStrike2UpdateBot:
 
     @spam_protected
     async def stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
         logger.info(f'Stopping bot for chat_id={update.message.chat_id} ...')
 
         chat = await self.chat_db.get(update.message.chat_id)
@@ -286,6 +327,9 @@ class CounterStrike2UpdateBot:
 
     @spam_protected
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
         logger.info(
             f'Sending help message to chat_id={update.message.chat_id} ...')
 
@@ -307,6 +351,13 @@ class CounterStrike2UpdateBot:
 
     @spam_protected
     async def latest(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
+        if self.latest_post is None:
+            logger.info('No latest post available.')
+            return
+
         logger.info('Sending latest saved post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
         msg = await TelegramMessageFactory.create(self.latest_post)
@@ -314,6 +365,13 @@ class CounterStrike2UpdateBot:
 
     @spam_protected
     async def news(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
+        if self.latest_news_post is None:
+            logger.info('No latest news post available.')
+            return
+
         logger.info('Sending latest news post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
         msg = await TelegramMessageFactory.create(self.latest_news_post)
@@ -321,6 +379,13 @@ class CounterStrike2UpdateBot:
 
     @spam_protected
     async def update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
+        if self.latest_update_post is None:
+            logger.info('No latest update post available.')
+            return
+
         logger.info('Sending latest update post to chats ...')
         chat = await self.chat_db.get(update.message.chat_id)
         msg = await TelegramMessageFactory.create(self.latest_update_post)
@@ -328,12 +393,19 @@ class CounterStrike2UpdateBot:
 
     @spam_protected
     async def external(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
+        if self.latest_external_post is None:
+            logger.info('No latest external post available.')
+            return
+
         logger.info('Sending latest external post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
         msg = await TelegramMessageFactory.create(self.latest_external_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
-    async def _post_checker(self, context: CallbackContext, post: Post) -> None:
+    async def _post_checker(self, context: CallbackContext, post: Post | None) -> None:
         if post is None:
             return
 
@@ -390,7 +462,7 @@ class CounterStrike2UpdateBot:
         for chat in chats:
             await self.send_message(context=context, msg=msg, chat=chat)
 
-    async def send_message(self, context: CallbackContext, msg: TelegramMessage, chat: Chat) -> None:
+    async def send_message(self, context: CallbackContext, msg: TelegramMessage, chat: Chat | None) -> None:
 
         if chat is None:
             logger.error('Chat is None. Not sending any message.')

@@ -32,7 +32,7 @@ class PostDatabase(SQLite):
             """)
             await conn.commit()
 
-    async def save(self, post: Post) -> None:
+    async def save(self, post: Post | None) -> None:
         if post is None:
             return
 
@@ -76,9 +76,10 @@ class PostDatabase(SQLite):
             async with conn.execute("""
                 SELECT * FROM posts
             """) as cursor:
-                return [await self._convert_row_to_post(row) for row in await cursor.fetchall()]
+                posts = [await self._convert_row_to_post(row) for row in await cursor.fetchall()]
+                return [post for post in posts if post is not None]
 
-    async def is_empty(self) -> bool:
+    async def is_empty(self, table_name: str | None = None) -> bool:
         return await super().is_empty('posts')
 
     async def import_from_json(self, filepath: Path) -> None:
@@ -95,7 +96,7 @@ class PostDatabase(SQLite):
         if posts.get('external') is not None:
             await self.save(Post.from_dict(posts['external']))
 
-    async def _convert_row_to_post(self, row: aiosqlite.Row) -> Post:
+    async def _convert_row_to_post(self, row: aiosqlite.Row | None) -> Post | None:
         if row is None:
             return None
         data = dict(row)
@@ -127,7 +128,7 @@ class PostDatabase(SQLite):
             """) as cursor:
                 return await self._convert_row_to_post(await cursor.fetchone())
 
-    async def get_latest_post(self) -> Post:
+    async def get_latest_post(self) -> Post | None:
         async with aiosqlite.connect(self.filepath) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute("""

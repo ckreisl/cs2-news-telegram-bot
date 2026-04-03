@@ -25,14 +25,18 @@ class CounterStrike2Posts:
         if 'appnews' not in posts:
             return
 
-        posts = posts['appnews']
-
-        if 'newsitems' not in posts:
+        appnews = posts.get('appnews')
+        if not isinstance(appnews, dict):
             return
 
-        posts = posts['newsitems']
+        newsitems = appnews.get('newsitems')
+        if not isinstance(newsitems, list):
+            return
 
-        for post in posts:
+        for post in newsitems:
+            if not isinstance(post, dict):
+                continue
+
             feed_type = FeedType(post['feed_type'])
             if feed_type not in [FeedType.INTERN, FeedType.EXTERN]:
                 logger.info(

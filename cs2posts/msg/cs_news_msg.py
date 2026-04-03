@@ -101,7 +101,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
         for image in carousel.images:
             image_url = Utils.extract_url(image.url)
 
-            if not Utils.is_valid_url(image_url):
+            if image_url is None or not Utils.is_valid_url(image_url):
                 logger.error(
                     f"Not sending image due to invalid image URL {image_url=}")
                 continue
@@ -136,7 +136,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             video_url = Utils.extract_url(video.webm)
             args['video'] = video_url
 
-        if not Utils.is_valid_url(video_url):
+        if video_url is None or not Utils.is_valid_url(video_url):
             logger.error(
                 f"Not sending video due to invalid video URL {video_url=}")
             return
