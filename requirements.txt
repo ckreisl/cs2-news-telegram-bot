@@ -1,4 +1,4 @@
-requests==2.32.5
+requests==2.33
 python-telegram-bot==21.10
 python-telegram-bot[job-queue]==21.10
 bbcode==1.1.0
