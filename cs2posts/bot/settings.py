@@ -24,6 +24,7 @@ CHAT_DB_BACKUP_COUNT = int(os.getenv('CHAT_DB_BACKUP_COUNT', 5))
 CHAT_SPAM_INTERVAL_MS = int(os.getenv('CHAT_SPAM_INTERVAL_MS', 750))
 CHAT_BAN_TIMEOUT_SECONDS = int(os.getenv('CHAT_BAN_TIMEOUT_SECONDS', 600))
 CHAT_MAX_STRIKES = int(os.getenv('CHAT_MAX_STRIKES', 3))
+CHAT_STRIKE_RECOVERY_MINUTES = int(os.getenv('CHAT_STRIKE_RECOVERY_MINUTES', 60))
 
 # On startup import chats and posts from a JSON file (old behavior)
 IMPORT_CHATS_FROM_JSON = os.getenv('IMPORT_CHATS_FROM_JSON', None)

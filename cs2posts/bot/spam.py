@@ -46,8 +46,9 @@ class SpamProtector:
 
         if self.is_spamming(chat):
             await self.strike(bot, chat)
-
-        logger.info(f'Chat {chat.chat_id} is not spamming')
+        else:
+            logger.info(f'Chat {chat.chat_id} is not spamming')
+            self.recover_strikes(chat)
 
         self.update_chat_activity(chat)
 
@@ -62,6 +63,13 @@ class SpamProtector:
         logger.info(f'Reduce strike level for {chat.chat_id}')
         if chat.strikes > 0:
             chat.strikes -= 1
+
+    def recover_strikes(self, chat: Chat) -> None:
+        time_diff = self._get_utc_now() - chat.last_activity
+        recovery_interval = timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES)
+        if time_diff >= recovery_interval and chat.strikes > 0:
+            logger.info(f'Chat {chat.chat_id} recovered from inactivity, reducing strikes')
+            self.reduce_strike_level(chat)
 
     def increase_strike_level(self, chat: Chat) -> None:
         logger.info(f'Increase strike level for {chat.chat_id}')
@@ -86,7 +94,7 @@ class SpamProtector:
 
     def is_timeouted(self, chat: Chat) -> bool:
         time_diff = self._get_utc_now() - chat.last_activity
-        return time_diff.seconds < self.BAN_TIMEOUT
+        return 0 <= time_diff.total_seconds() < self.BAN_TIMEOUT
 
     async def strike(self, bot: Any, chat: Chat) -> None:
         if chat.is_banned:

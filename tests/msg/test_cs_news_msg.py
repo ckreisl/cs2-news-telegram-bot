@@ -224,10 +224,10 @@ async def test_counter_strike_news_message_send_image_valid_url():
 
     with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
         mock_extract.return_value = "https://example.com/image.jpg"
-        with patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url') as mock_valid:
-            mock_valid.return_value = True
+        with patch('cs2posts.msg.cs_news_msg.asyncio.to_thread', new=AsyncMock(return_value=True)) as mock_to_thread:
             await msg.send_image(mocked_bot, 42, image)
             mocked_bot.send_photo.assert_called_once()
+            mock_to_thread.assert_awaited_once()
 
 
 @pytest.mark.asyncio

@@ -72,6 +72,9 @@ class CounterStrikeNewsMessage(TelegramMessage):
     def get_header(self) -> str:
         return f"<b>{self.post.title}</b>\n({self.post.date_as_datetime})"
 
+    async def _is_valid_media_url(self, url: str | None) -> bool:
+        return await asyncio.to_thread(Utils.is_valid_url, url)
+
     async def send_message(self, bot: Any, chat_id: int, message: TextBlock) -> None:
         chunks = self.split(message.text)
         for i, text in enumerate(chunks):
@@ -86,7 +89,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
     async def send_image(self, bot: Any, chat_id: int, image: Image) -> None:
         image_url = Utils.extract_url(image.url)
 
-        if not Utils.is_valid_url(image_url):
+        if not await self._is_valid_media_url(image_url):
             logger.error(
                 f"Not sending image due to invalid image URL {image_url=}")
             return
@@ -103,7 +106,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
         for image in carousel.images:
             image_url = Utils.extract_url(image.url)
 
-            if image_url is None or not Utils.is_valid_url(image_url):
+            if image_url is None or not await self._is_valid_media_url(image_url):
                 logger.error(
                     f"Not sending image due to invalid image URL {image_url=}")
                 continue
@@ -138,7 +141,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             video_url = Utils.extract_url(video.webm)
             args['video'] = video_url
 
-        if video_url is None or not Utils.is_valid_url(video_url):
+        if video_url is None or not await self._is_valid_media_url(video_url):
             logger.error(
                 f"Not sending video due to invalid video URL {video_url=}")
             return
