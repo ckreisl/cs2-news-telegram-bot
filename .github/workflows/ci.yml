@@ -1,52 +1,45 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+# This workflow installs dependencies, runs lint, tests, and coverage with Python 3.12.
 
-name: Run Tests & Coverage Report
+name: Run Tests, Lint & Coverage
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python 3.12
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: "3.12"
+        cache: pip
+        cache-dependency-path: requirements-dev.txt
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements-dev.txt
+        python -m pip install -r requirements-dev.txt
+
+    - name: Run pre-commit hooks
+      run: |
+        pre-commit run --all-files --show-diff-on-failure
+
+    - name: Lint
+      run: |
+        flake8 cs2posts tests
 
     - name: Run Tests & Build coverage file
       run: |
         python -m pytest -v --cov-report=term-missing:skip-covered --cov-report xml:coverage.xml --cov=cs2posts tests/ --junitxml=pytest.xml
-
-    - name: Pytest coverage comment
-      id: coverageComment
-      uses: MishaKav/pytest-coverage-comment@main
-      with:
-        pytest-xml-coverage-path: coverage.xml
-        junitxml-path: pytest.xml
-
-    - name: Check the output coverage
-      run: |
-        echo "Coverage Percantage - ${{ steps.coverageComment.outputs.coverage }}"
-        echo "Coverage Color - ${{ steps.coverageComment.outputs.color }}"
-        echo "Coverage Html - ${{ steps.coverageComment.outputs.coverageHtml }}"
-
-        echo "Coverage Warnings - ${{ steps.coverageComment.outputs.warnings }}"
-
-        echo "Coverage Errors - ${{ steps.coverageComment.outputs.errors }}"
-        echo "Coverage Failures - ${{ steps.coverageComment.outputs.failures }}"
-        echo "Coverage Skipped - ${{ steps.coverageComment.outputs.skipped }}"
-        echo "Coverage Tests - ${{ steps.coverageComment.outputs.tests }}"
-        echo "Coverage Time - ${{ steps.coverageComment.outputs.time }}"
-        echo "Not Success Test Info - ${{ steps.coverageComment.outputs.notSuccessTestInfo }}"
