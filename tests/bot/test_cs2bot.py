@@ -348,7 +348,28 @@ async def test_cs2_bot_stop_command_chat_is_private(bot):
 
     bot.chat_db.reset_mock()
     await bot.stop(mocked_update, mocked_context)
+    mocked_update.message.reply_text.assert_called_once_with(
+        'Bot has been stopped for this chat. You can start it again with /start')
     bot.chat_db.remove.assert_called_once_with(chat)
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_stop_command_chat_is_unknown_type(bot):
+    mocked_context = AsyncMock()
+    mocked_update = AsyncMock()
+    mocked_update.message.chat.type = 'UNKNOWN_CHAT_TYPE'
+    mocked_update.message.chat_id = 42
+
+    chat = Chat(42)
+    bot.chat_db.get.return_value = chat
+
+    with patch('cs2posts.bot.cs2.logger.error') as mocked_logger_error:
+        await bot.stop(mocked_update, mocked_context)
+
+    mocked_update.message.reply_text.assert_not_called()
+    bot.chat_db.remove.assert_not_called()
+    mocked_logger_error.assert_called_once_with(
+        'Unknown chat type UNKNOWN_CHAT_TYPE for chat_id=42')
 
 
 @pytest.mark.asyncio

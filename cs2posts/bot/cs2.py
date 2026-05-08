@@ -322,14 +322,15 @@ class CounterStrike2UpdateBot:
             chat.is_running = False
             await self.chat_db.update(chat)
             await update.message.reply_text(
-                'Bot is stopped for this chat. You can start it again with /start')
+                'Bot has been stopped for this chat. You can start it again with /start')
             # We do not remove the chat here, because we want to keep the chat
             # and only remove it if the bot is removed from the group chat.
-            return
-
-        if chat_type == ChatType.PRIVATE:
+        elif chat_type == ChatType.PRIVATE:
+            await update.message.reply_text(
+                'Bot has been stopped for this chat. You can start it again with /start')
             await self.chat_db.remove(chat)
-            return
+        else:
+            logger.error(f'Unknown chat type {chat_type} for chat_id={chat.chat_id}')
 
     @spam_protected
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
