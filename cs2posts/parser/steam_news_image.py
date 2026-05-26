@@ -14,9 +14,6 @@ class SteamNewsImageParser(Parser):
     URL_REGEX = r'<a .*?>.*?</a>'
     IMG_REGEX = r'\[img\].*?\[/img\]'
 
-    def __init__(self, text: str) -> None:
-        super().__init__(text)
-
     def parse(self) -> str:
         # As of now every news post has a image at the top
         # so we can remove the first (count=1) url and including image tag

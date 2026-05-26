@@ -12,9 +12,6 @@ class SteamListParser(Parser):
     LIST_ITEM_ICON = "•"
     LIST_ITEM_ICON_NESTED = "◦"
 
-    def __init__(self, text: str):
-        super().__init__(text)
-
     def is_tag(self, tag: str, i: int) -> bool:
         return self.text[i:i + len(tag)] == tag
 

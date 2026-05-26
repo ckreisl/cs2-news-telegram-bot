@@ -6,6 +6,7 @@ from .telegram import TelegramMessage
 from cs2posts.dto.post import Post
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
+from cs2posts.parser.steam_news_table import SteamNewsTableParser
 from cs2posts.parser.steam_update_heading import SteamUpdateHeadingParser
 from cs2posts.utils import Utils
 
@@ -20,7 +21,8 @@ class CounterStrikeUpdateMessage(TelegramMessage):
 
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
-        parser.add_parser(parser=SteamUpdateHeadingParser, priority=2)
+        parser.add_parser(parser=SteamNewsTableParser, priority=2)
+        parser.add_parser(parser=SteamUpdateHeadingParser, priority=3)
 
         msg = f"<b>{post.title}</b>\n"
         msg += f"({post.date_as_datetime})\n"

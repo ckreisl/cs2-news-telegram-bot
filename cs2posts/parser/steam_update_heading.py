@@ -16,9 +16,6 @@ class SteamUpdateHeadingParser(Parser):
     HEADING_LIST_IGNORE = ["CT"]
     MIN_HEADING_LENGTH = 2
 
-    def __init__(self, text: str):
-        super().__init__(text)
-
     def is_heading_by_newlines(self, start: int, end: int) -> bool:
         is_left_newline = start == 0 or self.text[start - 1] == '\n'
         is_right_newline = end == len(self.text) or self.text[end] == '\n'
