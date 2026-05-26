@@ -47,6 +47,14 @@ STEAM_FORMAT = {
         'pattern': r'\[h3\](.*?)\[/h3\]',
         'replace': r'\n\n<b>\1</b>\n\n',
     },
+    "h4": {
+        'pattern': r'\[h4\](.*?)\[/h4\]',
+        'replace': r'\n\n<b>\1</b>\n\n',
+    },
+    "h5": {
+        'pattern': r'\[h5\](.*?)\[/h5\]',
+        'replace': r'\n\n<b>\1</b>\n\n',
+    },
     "dash": {
         'pattern': r'&ndash;',
         'replace': r'—',

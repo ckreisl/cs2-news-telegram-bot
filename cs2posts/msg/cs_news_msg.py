@@ -22,6 +22,7 @@ from cs2posts.msg.constants import MAX_MEDIA_GROUP_SIZE
 from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
+from cs2posts.parser.steam_news_table import SteamNewsTableParser
 from cs2posts.utils import Utils
 
 
@@ -34,6 +35,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
         self.post = post
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
+        parser.add_parser(parser=SteamNewsTableParser, priority=2)
 
         self.content = ContentExtractor(parser.parse()).extract()
         self.__add_header()
