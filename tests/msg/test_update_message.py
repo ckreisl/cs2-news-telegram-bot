@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from cs2posts.msg import CounterStrikeUpdateMessage
-from cs2posts.msg import TelegramMessageFactory
+from cs2posts.msg import create_message
 
 
 def test_counter_strike_update_message(mocked_cs2_update_post):
@@ -25,7 +25,7 @@ async def test_telegram_message_send_update(mocked_cs2_update_post):
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
-        msg = await TelegramMessageFactory.create(mocked_cs2_update_post)
+        msg = await create_message(mocked_cs2_update_post)
         mocked_bot = AsyncMock()
 
     await msg.send(bot=mocked_bot, chat_id=1337)
@@ -39,7 +39,7 @@ async def test_telegram_message_send_update_raises_on_chunk_failure(mocked_cs2_u
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
-        msg = await TelegramMessageFactory.create(mocked_cs2_update_post)
+        msg = await create_message(mocked_cs2_update_post)
 
     msg._TelegramMessage__messages = ["chunk1", "chunk2"]
 

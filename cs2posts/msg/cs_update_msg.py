@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 
 from .telegram import TelegramMessage
@@ -8,7 +9,7 @@ from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
 from cs2posts.parser.steam_news_table import SteamNewsTableParser
 from cs2posts.parser.steam_update_heading import SteamUpdateHeadingParser
-from cs2posts.utils import Utils
+from cs2posts.utils import get_redirected_url
 
 
 logger = logging.getLogger(__name__)
@@ -17,20 +18,20 @@ logger = logging.getLogger(__name__)
 class CounterStrikeUpdateMessage(TelegramMessage):
 
     def __init__(self, post: Post) -> None:
-        post.url = Utils.get_redirected_url(post.url)
+        source_url = get_redirected_url(post.url)
 
         parser = Steam2TelegramHTML(post.contents)
         parser.add_parser(parser=SteamListParser, priority=1)
         parser.add_parser(parser=SteamNewsTableParser, priority=2)
         parser.add_parser(parser=SteamUpdateHeadingParser, priority=3)
 
-        msg = f"<b>{post.title}</b>\n"
+        msg = f"<b>{html.escape(post.title)}</b>\n"
         msg += f"({post.date_as_datetime})\n"
         msg += "\n"
         msg += parser.parse()
         msg += "\n\n" if not msg.endswith("\n\n") else ""
-        msg += f"(Author: {post.author})"
+        msg += f"(Author: {html.escape(post.author)})"
         msg += "\n\n"
-        msg += f"Source: <a href='{post.url}'>Link</a>"
+        msg += f"Source: <a href='{html.escape(source_url, quote=True)}'>Link</a>"
 
         super().__init__(msg)

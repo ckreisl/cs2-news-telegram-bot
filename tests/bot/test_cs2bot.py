@@ -9,8 +9,10 @@ import pytest
 from telegram import Update
 from telegram.constants import ChatType
 from telegram.error import BadRequest
+from telegram.error import ChatMigrated
 from telegram.error import Forbidden
 
+from cs2posts.bot import settings
 from cs2posts.bot.cs2 import CounterStrike2UpdateBot
 from cs2posts.dto.chats import Chat
 from cs2posts.dto.post import Post
@@ -107,6 +109,17 @@ def test_cs2_bot_init_sets_custom_timeouts(mocked_httpx_request, mocked_builder)
 async def test_cs2_bot_post_init(bot):
     mocked_app = AsyncMock()
     mocked_app.bot.username = "test_bot"
+    mocked_app.job_queue = Mock()
+    await bot.post_init(mocked_app)
+    assert bot.username == "test_bot"
+    assert mocked_app.job_queue.run_repeating.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_post_init_without_job_queue(bot):
+    mocked_app = AsyncMock()
+    mocked_app.bot.username = "test_bot"
+    mocked_app.job_queue = None
     await bot.post_init(mocked_app)
     assert bot.username == "test_bot"
 
@@ -119,7 +132,6 @@ async def test_cs2_bot_post_shutdown(bot):
 
     await bot.post_shutdown(Mock())
 
-    assert not bot.is_running
     assert call(bot.latest_news_post) in bot.post_db.save.call_args_list
     assert call(bot.latest_update_post) in bot.post_db.save.call_args_list
     assert call(bot.latest_external_post) in bot.post_db.save.call_args_list
@@ -239,7 +251,6 @@ async def test_cs2_bot_start_command_new_user(bot):
     mocked_update.message.from_user.id = 42
 
     chat = Chat(42)
-    bot.is_running = False
     bot.chat_db.get.return_value = None
     bot.chat_db.add.return_value = chat
 
@@ -254,9 +265,6 @@ async def test_cs2_bot_start_command_new_user(bot):
     # assert chat.is_running
     mocked_update.message.reply_text.assert_called_once()
 
-    mocked_context.job_queue.run_repeating.call_count == 2
-    assert bot.is_running
-
 
 @pytest.mark.asyncio
 async def test_cs2_bot_start_command_existing_user(bot):
@@ -270,7 +278,6 @@ async def test_cs2_bot_start_command_existing_user(bot):
     chat = Chat(42)
     chat.is_running = True
     chat.is_removed_while_banned = True
-    bot.is_running = True
     bot.chat_db.get.return_value = chat
 
     bot.chat_db.reset_mock()
@@ -315,7 +322,9 @@ async def test_cs2_bot_stop_command_chat_is_banned(bot):
 
     mocked_update.message.reply_text.assert_not_called()
     bot.chat_db.remove.assert_not_called()
-    # bot.chat_db.save.assert_not_called()
+    # Regression (#3): the spam check's mutations (including the ban itself)
+    # must be persisted even when the message is subsequently dropped.
+    bot.chat_db.update.assert_called_once_with(chat)
 
 
 @pytest.mark.asyncio
@@ -398,7 +407,7 @@ async def test_cs2_bot_latest_command(bot):
     bot.chat_db.get.return_value = chat
     bot.latest_post = Mock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         bot.send_message = AsyncMock()
@@ -417,7 +426,7 @@ async def test_cs2_bot_news_command(bot):
     bot.chat_db.get.return_value = chat
     bot.latest_news_post = Mock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         bot.send_message = AsyncMock()
@@ -436,7 +445,7 @@ async def test_cs2_bot_update_command(bot):
     bot.chat_db.get.return_value = chat
     bot.latest_update_post = Mock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         bot.send_message = AsyncMock()
@@ -491,7 +500,7 @@ async def test_cs2_bot_send_news_post_to_chats(bot):
         Chat(13)]
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         await bot.send_post_to_chats(mocked_context, mocked_post)
@@ -512,7 +521,7 @@ async def test_cs2_bot_send_update_post_to_chats(bot):
         Chat(13)]
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         await bot.send_post_to_chats(mocked_context, mocked_post)
@@ -536,7 +545,7 @@ async def test_cs2_bot_send_external_post_to_chats(bot):
         Chat(42)]
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         await bot.send_post_to_chats(mocked_context, mocked_post)
@@ -555,7 +564,7 @@ async def test_cs2_bot_send_unknown_post_to_chats(bot):
     mocked_post.is_external.return_value = False
     bot.send_message = AsyncMock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         await bot.send_post_to_chats(mocked_context, mocked_post)
         bot.chat_db.get_running_and_interested_in_updates_chats.assert_not_called()
         bot.chat_db.get_running_and_interested_in_news_chats.assert_not_called()
@@ -629,6 +638,25 @@ async def test_cs2_bot_send_message_raises_forbidden(bot):
     mocked_msg.send.assert_called_once_with(
         mocked_context.bot, chat_id=chat.chat_id)
     bot.chat_db.remove.assert_called_once_with(chat)
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_send_message_raises_chat_migrated(bot):
+    mocked_context = AsyncMock()
+    mocked_context.bot = AsyncMock()
+    chat = Chat(42)
+    migrated_chat = Chat(1337)
+
+    mocked_msg = AsyncMock()
+    # First send triggers the migration, the retry after migrating succeeds.
+    mocked_msg.send = AsyncMock(side_effect=[ChatMigrated(1337), None])
+    bot.chat_db.migrate = AsyncMock(return_value=migrated_chat)
+
+    await bot.send_message(mocked_context, mocked_msg, chat)
+
+    bot.chat_db.migrate.assert_awaited_once_with(chat, 1337)
+    assert mocked_msg.send.await_count == 2
+    mocked_msg.send.assert_awaited_with(mocked_context.bot, chat_id=migrated_chat.chat_id)
 
 
 @pytest.mark.asyncio
@@ -828,7 +856,7 @@ async def test_cs2_bot_external_command(bot):
     bot.chat_db.get.return_value = chat
     bot.latest_external_post = Mock()
 
-    with patch('cs2posts.msg.TelegramMessageFactory.create') as mocked_factory:
+    with patch('cs2posts.bot.cs2.create_message') as mocked_factory:
         mocked_msg = Mock()
         mocked_factory.return_value = mocked_msg
         bot.send_message = AsyncMock()
@@ -849,7 +877,6 @@ async def test_cs2_bot_start_not_running_chat(bot):
 
     chat = Chat(42)
     chat.is_running = False
-    bot.is_running = True
     bot.chat_db.get.return_value = chat
 
     bot.chat_db.reset_mock()
@@ -892,3 +919,104 @@ async def test_cs2_bot_stop_command_chat_is_channel(bot):
     assert chat.is_running is False
     mocked_update.message.reply_text.assert_called_once()
     bot.chat_db.remove.assert_not_called()
+
+
+def _crawl_payload_with_one_post_of_each_type():
+    update_item = create_update_post().to_dict()
+    update_item["date"] = 1700000000
+
+    news_item = create_news_post().to_dict()
+    news_item["gid"] = "news-1"
+    news_item["date"] = 1700000001
+
+    external_item = create_news_post().to_dict()
+    external_item["gid"] = "external-1"
+    external_item["feed_type"] = 0
+    external_item["date"] = 1700000002
+
+    return {"appnews": {"appid": 730, "newsitems": [update_item, news_item, external_item]}}
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_async_init_seeds_when_post_db_empty(bot):
+    bot.post_db.filepath = Mock()
+    bot.chat_db.filepath = Mock()
+    bot.post_db.filepath.exists.return_value = True
+    bot.chat_db.filepath.exists.return_value = True
+    bot.post_db.is_empty = AsyncMock(return_value=True)
+    bot.crawler.crawl = AsyncMock(return_value=_crawl_payload_with_one_post_of_each_type())
+    bot.options.set_chat_db = Mock()
+
+    await bot.async_init()
+
+    bot.post_db.create_table.assert_awaited()
+    bot.chat_db.create_table.assert_awaited()
+    bot.crawler.crawl.assert_awaited_once()
+    # One save for each seeded post type (news, update, external).
+    assert bot.post_db.save.await_count == 3
+    bot.options.set_chat_db.assert_called_once_with(bot.chat_db)
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_async_init_skips_seed_when_not_empty(bot):
+    bot.post_db.filepath = Mock()
+    bot.chat_db.filepath = Mock()
+    bot.post_db.filepath.exists.return_value = True
+    bot.chat_db.filepath.exists.return_value = True
+    bot.post_db.is_empty = AsyncMock(return_value=False)
+    bot.crawler.crawl = AsyncMock()
+    bot.options.set_chat_db = Mock()
+
+    await bot.async_init()
+
+    bot.crawler.crawl.assert_not_awaited()
+    bot.post_db.save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_async_init_creates_missing_databases(bot):
+    bot.post_db.filepath = Mock()
+    bot.chat_db.filepath = Mock()
+    bot.post_db.filepath.exists.return_value = False
+    bot.chat_db.filepath.exists.return_value = False
+    bot.post_db.is_empty = AsyncMock(return_value=False)
+    bot.options.set_chat_db = Mock()
+
+    await bot.async_init()
+
+    bot.post_db.create.assert_awaited_once()
+    bot.chat_db.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_async_init_imports_json_when_configured(bot):
+    bot.post_db.filepath = Mock()
+    bot.chat_db.filepath = Mock()
+    bot.post_db.filepath.exists.return_value = True
+    bot.chat_db.filepath.exists.return_value = True
+    bot.post_db.is_empty = AsyncMock(return_value=False)
+    bot.options.set_chat_db = Mock()
+
+    with patch.object(settings, "IMPORT_CHATS_FROM_JSON", "chats.json"), \
+            patch.object(settings, "IMPORT_POSTS_FROM_JSON", "posts.json"):
+        await bot.async_init()
+
+    bot.chat_db.import_from_json.assert_awaited_once()
+    bot.post_db.import_from_json.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cs2_bot_async_init_swallows_json_import_errors(bot):
+    bot.post_db.filepath = Mock()
+    bot.chat_db.filepath = Mock()
+    bot.post_db.filepath.exists.return_value = True
+    bot.chat_db.filepath.exists.return_value = True
+    bot.post_db.is_empty = AsyncMock(return_value=False)
+    bot.options.set_chat_db = Mock()
+    bot.chat_db.import_from_json = AsyncMock(side_effect=Exception("boom"))
+
+    with patch.object(settings, "IMPORT_CHATS_FROM_JSON", "chats.json"):
+        # The error must be swallowed so startup can continue.
+        await bot.async_init()
+
+    bot.chat_db.import_from_json.assert_awaited_once()

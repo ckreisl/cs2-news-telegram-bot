@@ -6,7 +6,7 @@ from collections.abc import Iterator
 
 from .content import Image
 from .extractor import Extractor
-from cs2posts.utils import Utils
+from cs2posts.utils import resolve_steam_clan_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class ImageExtractor(Extractor):
             if html_encoded_quot in src_url:
                 src_url = src_url.replace(html_encoded_quot, "")
 
-            url = Utils.resolve_steam_clan_image_url(src_url)
+            url = resolve_steam_clan_image_url(src_url)
 
             if url == "":
                 logger.warning("Image URL is empty in text!")

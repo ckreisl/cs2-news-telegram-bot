@@ -28,74 +28,59 @@ class ButtonData(Enum):
     CLOSE = "CLOSE"
 
 
-class IconGenerator:
-
-    @staticmethod
-    def get_enabled_icon(enabled: bool) -> str:
-        return "✅" if enabled else "⛔️"
+def enabled_icon(enabled: bool) -> str:
+    return "✅" if enabled else "⛔️"
 
 
-class OptionsMessageFactory:
+def create_options_message(chat: Chat) -> tuple[str, InlineKeyboardMarkup]:
+    return create_options_text(chat), create_options_reply_markup(chat)
 
-    @staticmethod
-    def create(chat: Chat) -> tuple[str, InlineKeyboardMarkup]:
-        text = OptionsMessageFactory.create_text(chat)
-        reply_markup = OptionsMessageFactory.create_reply_markup(chat)
-        return text, reply_markup
 
-    @staticmethod
-    def create_keyboard(chat: Chat) -> list[list[InlineKeyboardButton]]:
+def create_options_keyboard(chat: Chat) -> list[list[InlineKeyboardButton]]:
+    btn_updates_text = "Disable" if chat.is_update_interested else "Enable"
+    btn_news_text = "Disable" if chat.is_news_interested else "Enable"
+    btn_external_news_text = "Disable" if chat.is_external_news_interested else "Enable"
 
-        btn_updates_text = "Disable" if chat.is_update_interested else "Enable"
-        btn_news_text = "Disable" if chat.is_news_interested else "Enable"
-        btn_external_news_text = "Disable" if chat.is_external_news_interested else "Enable"
+    return [
+        [
+            InlineKeyboardButton(f"{btn_updates_text} Updates",
+                                 callback_data=ButtonData.UPDATE.value),
+            InlineKeyboardButton(f"{btn_news_text} News",
+                                 callback_data=ButtonData.NEWS.value),
+        ],
+        [
+            InlineKeyboardButton(f"{btn_external_news_text} External News",
+                                 callback_data=ButtonData.EXTERNAL_NEWS.value),
+        ],
+        [
+            InlineKeyboardButton("Close",
+                                 callback_data=ButtonData.CLOSE.value)
+        ],
+    ]
 
-        keyboard = [
-            [
-                InlineKeyboardButton(f"{btn_updates_text} Updates",
-                                     callback_data=ButtonData.UPDATE.value),
-                InlineKeyboardButton(f"{btn_news_text} News",
-                                     callback_data=ButtonData.NEWS.value),
-            ],
-            [
-                InlineKeyboardButton(f"{btn_external_news_text} External News",
-                                     callback_data=ButtonData.EXTERNAL_NEWS.value),
-            ],
-            [
-                InlineKeyboardButton("Close",
-                                     callback_data=ButtonData.CLOSE.value)
-            ],
-        ]
 
-        return keyboard
+def create_options_reply_markup(chat: Chat) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(create_options_keyboard(chat))
 
-    @staticmethod
-    def create_reply_markup(chat: Chat) -> InlineKeyboardMarkup:
-        keyboard = OptionsMessageFactory.create_keyboard(chat)
-        return InlineKeyboardMarkup(keyboard)
 
-    @staticmethod
-    def create_text(chat: Chat) -> str:
-        icon_is_update_interested = IconGenerator.get_enabled_icon(
-            chat.is_update_interested)
-        icon_is_news_interested = IconGenerator.get_enabled_icon(
-            chat.is_news_interested)
-        icon_is_external_news_interested = IconGenerator.get_enabled_icon(
-            chat.is_external_news_interested)
+def create_options_text(chat: Chat) -> str:
+    icon_is_update_interested = enabled_icon(chat.is_update_interested)
+    icon_is_news_interested = enabled_icon(chat.is_news_interested)
+    icon_is_external_news_interested = enabled_icon(chat.is_external_news_interested)
 
-        text_enabled_update = "enabled" if chat.is_update_interested else "disabled"
-        text_enabled_news = "enabled" if chat.is_news_interested else "disabled"
-        text_enabled_external_news = "enabled" if chat.is_external_news_interested else "disabled"
+    text_enabled_update = "enabled" if chat.is_update_interested else "disabled"
+    text_enabled_news = "enabled" if chat.is_news_interested else "disabled"
+    text_enabled_external_news = "enabled" if chat.is_external_news_interested else "disabled"
 
-        return (f"<b>Options</b>\n\n"
-                "Handle the automatically send Counter-Strike post notifications.\n\n"
-                f"{icon_is_update_interested} - Send Update Posts ("
-                f"{text_enabled_update})\n"
-                f"{icon_is_news_interested} - Send News Posts ("
-                f"{text_enabled_news})\n"
-                f"{icon_is_external_news_interested} - Send External News Posts ("
-                f"{text_enabled_external_news})\n\n"
-                f"Select an option to change, or press 'Close' to keep everything as it is.")
+    return (f"<b>Options</b>\n\n"
+            "Handle the automatically send Counter-Strike post notifications.\n\n"
+            f"{icon_is_update_interested} - Send Update Posts ("
+            f"{text_enabled_update})\n"
+            f"{icon_is_news_interested} - Send News Posts ("
+            f"{text_enabled_news})\n"
+            f"{icon_is_external_news_interested} - Send External News Posts ("
+            f"{text_enabled_external_news})\n\n"
+            f"Select an option to change, or press 'Close' to keep everything as it is.")
 
 
 class Options:
@@ -130,7 +115,7 @@ class Options:
         if chat.chat_id_admin != from_user.id:
             return
 
-        text, reply_markup = OptionsMessageFactory.create(chat)
+        text, reply_markup = create_options_message(chat)
 
         logger.info(
             f'Sending options message to chat_id={message.chat_id} ...')
@@ -183,7 +168,7 @@ class Options:
         if query.message is None or not hasattr(query.message, "message_id"):
             return
 
-        text, reply_markup = OptionsMessageFactory.create(chat)
+        text, reply_markup = create_options_message(chat)
         await context.bot.edit_message_text(
             text=text,
             chat_id=chat.chat_id,

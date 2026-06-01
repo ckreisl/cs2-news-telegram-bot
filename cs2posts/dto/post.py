@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
+from dataclasses import fields
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -13,7 +14,7 @@ class PostType(Enum):
     NEWS = "news"
     UPDATE = "update"
     EXTERNAL = "external"
-    UNKOWN = "unknown"
+    UNKNOWN = "unknown"
 
     def __str__(self) -> str:
         return str(self.value)
@@ -29,7 +30,7 @@ class PostType(Enum):
             return cls.UPDATE
         if post.is_external():
             return cls.EXTERNAL
-        return cls.UNKOWN
+        return cls.UNKNOWN
 
 
 class FeedType(Enum):
@@ -60,12 +61,15 @@ class Post:
 
     @classmethod
     def from_dict(cls, json: dict[str, Any]) -> Post:
-        return cls(**json)
+        # Ignore unknown keys so new fields added by the Steam API do not
+        # break construction.
+        field_names = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in json.items() if k in field_names})
 
     @property
-    def date_as_datetime(self, tz: ZoneInfo = ZoneInfo('UTC')) -> datetime:
+    def date_as_datetime(self) -> datetime:
         # Do not return a timezone-aware datetime object
-        return datetime.fromtimestamp(self.date, tz=tz).replace(tzinfo=None)
+        return datetime.fromtimestamp(self.date, tz=ZoneInfo('UTC')).replace(tzinfo=None)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

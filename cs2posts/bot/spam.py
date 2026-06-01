@@ -15,15 +15,12 @@ from cs2posts.dto.chats import Chat
 logger = logging.getLogger(__name__)
 
 
-class SpamProtectorMessages:
+def spam_warning_message(chat: Chat, max_strikes: int) -> str:
+    return f"<b>Spamming</b> bot results in Timeout <b>({chat.strikes}/{max_strikes})</b>."
 
-    @staticmethod
-    def warning(chat: Chat, max_strikes: int) -> str:
-        return f"<b>Spamming</b> bot results in Timeout <b>({chat.strikes}/{max_strikes})</b>."
 
-    @staticmethod
-    def banned(chat: Chat, timout: int, max_strikes: int) -> str:
-        return f"<b>Strike ({chat.strikes}/{max_strikes})</b> Chat is now <b>banned</b> for spamming (Timeout: {int(timout / 60)} mins)."
+def spam_banned_message(chat: Chat, timout: int, max_strikes: int) -> str:
+    return f"<b>Strike ({chat.strikes}/{max_strikes})</b> Chat is now <b>banned</b> for spamming (Timeout: {int(timout / 60)} mins)."
 
 
 class SpamProtector:
@@ -109,12 +106,12 @@ class SpamProtector:
             self.ban(chat)
             await bot.send_message(
                 chat_id=chat.chat_id,
-                text=SpamProtectorMessages.banned(
+                text=spam_banned_message(
                     chat, self.BAN_TIMEOUT, self.MAX_STRIKES),
                 parse_mode=ParseMode.HTML)
             return
 
         await bot.send_message(
             chat_id=chat.chat_id,
-            text=SpamProtectorMessages.warning(chat, self.MAX_STRIKES),
+            text=spam_warning_message(chat, self.MAX_STRIKES),
             parse_mode=ParseMode.HTML)

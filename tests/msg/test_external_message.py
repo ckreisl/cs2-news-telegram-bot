@@ -7,7 +7,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from cs2posts.msg import CounterStrikeExternalMessage
-from cs2posts.msg import TelegramMessageFactory
+from cs2posts.msg import create_message
 from cs2posts.msg.cs_external_msg import build_content
 from cs2posts.msg.cs_external_msg import build_message
 from cs2posts.msg.cs_external_msg import cleanup_soup
@@ -96,7 +96,7 @@ async def test_telegram_message_send_external_raises_on_chunk_failure(mocked_cs2
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
-        msg = await TelegramMessageFactory.create(mocked_cs2_external_news)
+        msg = await create_message(mocked_cs2_external_news)
 
     msg._TelegramMessage__messages = ["chunk1", "chunk2"]
 

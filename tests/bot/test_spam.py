@@ -9,8 +9,9 @@ import pytest
 from telegram.constants import ParseMode
 
 from cs2posts.bot import settings
+from cs2posts.bot.spam import spam_banned_message
+from cs2posts.bot.spam import spam_warning_message
 from cs2posts.bot.spam import SpamProtector
-from cs2posts.bot.spam import SpamProtectorMessages
 from cs2posts.dto.chats import Chat
 
 
@@ -32,7 +33,7 @@ def test_spam_protector_messages_warning(chat: Chat):
     chat.strikes = 1
     max_strikes = 3
     expected = "<b>Spamming</b> bot results in Timeout <b>(1/3)</b>."
-    assert SpamProtectorMessages.warning(chat, max_strikes) == expected
+    assert spam_warning_message(chat, max_strikes) == expected
 
 
 def test_spam_protector_messages_banned(chat: Chat):
@@ -40,7 +41,7 @@ def test_spam_protector_messages_banned(chat: Chat):
     timout = 180
     max_strikes = 3
     expected = "<b>Strike (3/3)</b> Chat is now <b>banned</b> for spamming (Timeout: 3 mins)."
-    assert SpamProtectorMessages.banned(chat, timout, max_strikes) == expected
+    assert spam_banned_message(chat, timout, max_strikes) == expected
 
 
 def test_spam_protector_init(spam_protector):
@@ -147,7 +148,7 @@ async def test_spam_protector_strike(spam_protector, chat):
     assert chat.strikes == 1
     mock_bot.send_message.assert_called_once_with(
         chat_id=chat.chat_id,
-        text=SpamProtectorMessages.warning(chat, settings.CHAT_MAX_STRIKES),
+        text=spam_warning_message(chat, settings.CHAT_MAX_STRIKES),
         parse_mode=ParseMode.HTML)
     mock_bot.reset_mock()
 
@@ -155,7 +156,7 @@ async def test_spam_protector_strike(spam_protector, chat):
     assert chat.strikes == 2
     mock_bot.send_message.assert_called_once_with(
         chat_id=chat.chat_id,
-        text=SpamProtectorMessages.warning(chat, settings.CHAT_MAX_STRIKES),
+        text=spam_warning_message(chat, settings.CHAT_MAX_STRIKES),
         parse_mode=ParseMode.HTML)
     mock_bot.reset_mock()
 
@@ -163,7 +164,7 @@ async def test_spam_protector_strike(spam_protector, chat):
     assert chat.strikes == 3
     mock_bot.send_message.assert_called_once_with(
         chat_id=chat.chat_id,
-        text=SpamProtectorMessages.banned(
+        text=spam_banned_message(
             chat, settings.CHAT_BAN_TIMEOUT_SECONDS, settings.CHAT_MAX_STRIKES),
         parse_mode=ParseMode.HTML)
     assert chat.is_banned

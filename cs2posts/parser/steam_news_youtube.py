@@ -18,4 +18,4 @@ class SteamNewsYoutubeParser(Parser):
         return re.sub(self.YOUTUBE_REGEX,
                       self.YOUTUBE_REPLACE,
                       self.text,
-                      re.IGNORECASE)
+                      flags=re.IGNORECASE)

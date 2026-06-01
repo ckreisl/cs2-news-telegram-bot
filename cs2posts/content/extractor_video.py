@@ -5,7 +5,7 @@ import re
 
 from .content import Video
 from .extractor import Extractor
-from cs2posts.utils import Utils
+from cs2posts.utils import resolve_steam_clan_image_url
 
 
 class VideoExtractor(Extractor):
@@ -70,11 +70,11 @@ class VideoExtractor(Extractor):
             poster_url = self._extract_url(attrs.get("poster", "")) if "poster" in attrs else ""
 
             if webm_url:
-                webm_url = Utils.resolve_steam_clan_image_url(webm_url)
+                webm_url = resolve_steam_clan_image_url(webm_url)
             if mp4_url:
-                mp4_url = Utils.resolve_steam_clan_image_url(mp4_url)
+                mp4_url = resolve_steam_clan_image_url(mp4_url)
             if poster_url:
-                poster_url = Utils.resolve_steam_clan_image_url(poster_url)
+                poster_url = resolve_steam_clan_image_url(poster_url)
 
             videos.append(Video(
                 text_pos_start=m.start(),

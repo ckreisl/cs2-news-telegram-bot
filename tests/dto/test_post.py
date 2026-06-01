@@ -37,6 +37,28 @@ def post_fixture2():
                 appid=730)
 
 
+def test_from_dict_ignores_unknown_keys():
+    data = {
+        "gid": "1",
+        "title": "Test",
+        "url": "http://test.com",
+        "is_external_url": True,
+        "author": "author",
+        "contents": "body",
+        "date": 1234567890,
+        "feedlabel": "label",
+        "feedname": "feed",
+        "feed_type": 0,
+        "appid": 730,
+        "tags": [],
+        # Field the Steam API might add in the future:
+        "some_new_field": "should be ignored",
+    }
+    post = Post.from_dict(data)
+    assert post.gid == "1"
+    assert not hasattr(post, "some_new_field")
+
+
 def test_feed_type():
     assert FeedType(12) == FeedType.NOT_DEFINED
     assert FeedType(-1) == FeedType.NOT_DEFINED

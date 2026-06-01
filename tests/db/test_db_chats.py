@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
+
 import pytest
 import pytest_asyncio
 
@@ -10,6 +13,12 @@ from cs2posts.dto import Chat
 @pytest.fixture
 def data_chats():
     return {"chats": [Chat(1337), Chat(42)]}
+
+
+def _chat_as_json_dict(chat: Chat) -> dict:
+    data = asdict(chat)
+    data["last_activity"] = chat.last_activity.isoformat()
+    return data
 
 
 @pytest_asyncio.fixture
@@ -194,3 +203,17 @@ async def test_chat_database_len(chats_database):
     assert await chats_database.size() == 3
     await chats_database.remove(chat)
     assert await chats_database.size() == 2
+
+
+@pytest.mark.asyncio
+async def test_chats_database_import_from_json_legacy_format(
+        chats_empty_database, tmp_path):
+    # Old on-disk format wraps the chats in a top-level "chats" key.
+    payload = {"chats": [_chat_as_json_dict(Chat(1337)), _chat_as_json_dict(Chat(42))]}
+    json_file = tmp_path / "chats.json"
+    json_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    await chats_empty_database.import_from_json(json_file)
+
+    chats = await chats_empty_database.load()
+    assert {chat.chat_id for chat in chats} == {1337, 42}

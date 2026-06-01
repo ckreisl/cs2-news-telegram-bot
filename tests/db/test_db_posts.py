@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 import pytest_asyncio
 
@@ -162,3 +164,32 @@ async def test_post_database_load(post_database, data_latest):
         Post(**data_latest["external"]),
     ]
     assert actual_posts == expected_posts
+
+
+@pytest.mark.asyncio
+async def test_post_database_get_post_by_gid(post_database, data_latest):
+    expected = Post(**data_latest["news"])
+    actual = await post_database.get_post_by_gid(expected.gid)
+    assert actual == expected
+
+
+@pytest.mark.asyncio
+async def test_post_database_get_post_by_gid_missing(post_empty_database):
+    assert await post_empty_database.get_post_by_gid("does-not-exist") is None
+
+
+@pytest.mark.asyncio
+async def test_post_database_import_from_json_legacy_format(
+        post_empty_database, data_latest, tmp_path):
+    # Old on-disk format keyed by post type.
+    json_file = tmp_path / "posts.json"
+    json_file.write_text(json.dumps(data_latest), encoding="utf-8")
+
+    await post_empty_database.import_from_json(json_file)
+
+    loaded = await post_empty_database.load()
+    assert {post.gid for post in loaded} == {
+        data_latest["update"]["gid"],
+        data_latest["news"]["gid"],
+        data_latest["external"]["gid"],
+    }
