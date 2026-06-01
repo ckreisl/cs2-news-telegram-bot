@@ -8,8 +8,8 @@ import pytest
 from cs2posts.msg import CounterStrikeExternalMessage
 from cs2posts.msg import CounterStrikeNewsMessage
 from cs2posts.msg import CounterStrikeUpdateMessage
+from cs2posts.msg import create_message
 from cs2posts.msg import TelegramMessage
-from cs2posts.msg import TelegramMessageFactory
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 
@@ -31,13 +31,13 @@ async def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
-        msg = await TelegramMessageFactory.create(mocked_cs2_news_post)
+        msg = await create_message(mocked_cs2_news_post)
         assert isinstance(msg, CounterStrikeNewsMessage)
 
-        msg = await TelegramMessageFactory.create(mocked_cs2_update_post)
+        msg = await create_message(mocked_cs2_update_post)
         assert isinstance(msg, CounterStrikeUpdateMessage)
 
-        msg = await TelegramMessageFactory.create(mocked_cs2_external_news)
+        msg = await create_message(mocked_cs2_external_news)
         assert isinstance(msg, CounterStrikeExternalMessage)
 
 
@@ -47,15 +47,15 @@ async def test_telegram_message_factory_raises_for_unknown_post_type(mocked_cs2_
             patch.object(mocked_cs2_update_post, 'is_update', return_value=False), \
             patch.object(mocked_cs2_update_post, 'is_external', return_value=False):
         with pytest.raises(ValueError, match="Unknown post type"):
-            await TelegramMessageFactory.create(mocked_cs2_update_post)
+            await create_message(mocked_cs2_update_post)
 
 
 @pytest.mark.asyncio
 async def test_telegram_message_send_news(mocked_cs2_news_post):
     with patch('requests.get') as mocked_get, \
-            patch('cs2posts.utils.Utils.is_valid_url', return_value=True):
+            patch('cs2posts.msg.cs_news_msg.is_valid_url', return_value=True):
         mocked_get.return_value.ok = True
-        msg = await TelegramMessageFactory.create(mocked_cs2_news_post)
+        msg = await create_message(mocked_cs2_news_post)
 
         mocked_bot = AsyncMock()
         await msg.send(bot=mocked_bot, chat_id=1337)

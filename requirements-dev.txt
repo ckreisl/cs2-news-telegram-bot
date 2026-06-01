@@ -1,10 +1,5 @@
-requests==2.33
-python-telegram-bot==21.10
-python-telegram-bot[job-queue]==21.10
-bbcode==1.1.0
-beautifulsoup4==4.13.3
-python-dotenv==1.0.1
-aiosqlite==0.21.0
+-r requirements.txt
+
 pytest==9.0.3
 pytest-asyncio==1.4.0
 pytest-mock==3.14.0

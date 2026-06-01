@@ -10,7 +10,7 @@ from cs2posts.content.content import Content
 from cs2posts.content.content import Image
 from cs2posts.content.content import TextBlock
 from cs2posts.dto.post import Post
-from cs2posts.msg import TelegramMessageFactory
+from cs2posts.msg import create_message
 
 
 def load_data(type: str, date: str) -> Post:
@@ -35,7 +35,7 @@ def get_video_blocks(content: list[Content]) -> list[Video]:
 @pytest.mark.asyncio
 async def test_news_2024_05_23():
     post = load_data("news", "2024-05-23")
-    msg = await TelegramMessageFactory.create(post)
+    msg = await create_message(post)
     assert len(msg.content) == 5
 
     expected_text_blocks = 3
@@ -55,7 +55,7 @@ async def test_news_2024_05_23():
 @pytest.mark.asyncio
 async def test_news_2024_10_02():
     post = load_data("news", "2024-10-02")
-    msg = await TelegramMessageFactory.create(post)
+    msg = await create_message(post)
     assert len(msg.content) == 3
 
     expected_text_blocks = 2
@@ -72,7 +72,7 @@ async def test_news_2024_10_02():
 @pytest.mark.asyncio
 async def test_news_2024_11_13():
     post = load_data("news", "2024-11-13")
-    msg = await TelegramMessageFactory.create(post)
+    msg = await create_message(post)
     assert len(msg.content) == 5
 
     expected_text_blocks = 3

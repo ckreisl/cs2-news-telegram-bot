@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 from typing import Any
 
@@ -23,7 +24,9 @@ from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_list import SteamListParser
 from cs2posts.parser.steam_news_table import SteamNewsTableParser
-from cs2posts.utils import Utils
+from cs2posts.utils import extract_url
+from cs2posts.utils import get_redirected_url
+from cs2posts.utils import is_valid_url
 
 
 logger = logging.getLogger(__name__)
@@ -56,10 +59,10 @@ class CounterStrikeNewsMessage(TelegramMessage):
                     self.content[0].text
 
     def __add_footer(self) -> None:
-        url = Utils.get_redirected_url(self.post.url)
+        url = get_redirected_url(self.post.url)
         footer = (
-            f"\n\n(Author: {self.post.author})\n\n"
-            f"Source: <a href='{url}'>Link</a>"
+            f"\n\n(Author: {html.escape(self.post.author)})\n\n"
+            f"Source: <a href='{html.escape(url, quote=True)}'>Link</a>"
         )
 
         if isinstance(self.content[-1], TextBlock):
@@ -72,10 +75,10 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 text=footer))
 
     def get_header(self) -> str:
-        return f"<b>{self.post.title}</b>\n({self.post.date_as_datetime})"
+        return f"<b>{html.escape(self.post.title)}</b>\n({self.post.date_as_datetime})"
 
     async def _is_valid_media_url(self, url: str | None) -> bool:
-        return await asyncio.to_thread(Utils.is_valid_url, url)
+        return await asyncio.to_thread(is_valid_url, url)
 
     async def send_message(self, bot: Any, chat_id: int, message: TextBlock) -> None:
         chunks = self.split(message.text)
@@ -89,7 +92,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
     async def send_image(self, bot: Any, chat_id: int, image: Image) -> None:
-        image_url = Utils.extract_url(image.url)
+        image_url = extract_url(image.url)
 
         if not await self._is_valid_media_url(image_url):
             logger.error(
@@ -106,7 +109,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
     async def send_carousel(self, bot: Any, chat_id: int, carousel: Carousel) -> None:
         media = []
         for image in carousel.images:
-            image_url = Utils.extract_url(image.url)
+            image_url = extract_url(image.url)
 
             if image_url is None or not await self._is_valid_media_url(image_url):
                 logger.error(
@@ -136,11 +139,11 @@ class CounterStrikeNewsMessage(TelegramMessage):
 
         video_url = None
         if video.mp4:
-            video_url = Utils.extract_url(video.mp4)
+            video_url = extract_url(video.mp4)
             args['video'] = video_url
 
         if video.mp4 is None and video.webm:
-            video_url = Utils.extract_url(video.webm)
+            video_url = extract_url(video.webm)
             args['video'] = video_url
 
         if video_url is None or not await self._is_valid_media_url(video_url):
@@ -149,7 +152,7 @@ class CounterStrikeNewsMessage(TelegramMessage):
             return
 
         if video.poster:
-            thumbnail_url = Utils.extract_url(video.poster)
+            thumbnail_url = extract_url(video.poster)
             args['thumbnail'] = thumbnail_url
 
         caption = self.get_header() if video.is_heading else None

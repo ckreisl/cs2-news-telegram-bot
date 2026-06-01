@@ -113,6 +113,23 @@ def test_counter_strike_news_message_get_header(mocked_news_post):
         assert "2009-02-13" in header
 
 
+def test_counter_strike_news_message_escapes_html_in_title_and_author(mocked_news_post):
+    mocked_news_post.title = "Dust2 & Mirage <Update>"
+    mocked_news_post.author = "Valve & Co <team>"
+    with patch('requests.get') as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
+        msg = CounterStrikeNewsMessage(mocked_news_post)
+
+    header = msg.get_header()
+    assert "Dust2 &amp; Mirage &lt;Update&gt;" in header
+    # Raw unescaped characters would produce invalid Telegram HTML.
+    assert "<Update>" not in header
+
+    footer_text = msg.content[-1].text
+    assert "Valve &amp; Co &lt;team&gt;" in footer_text
+
+
 def test_counter_strike_news_message_add_header_text_block(mocked_news_post):
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
@@ -139,7 +156,7 @@ def test_counter_strike_news_message_with_image_heading(mocked_news_post_with_im
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
-        with patch('cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url') as mock_resolve:
+        with patch('cs2posts.content.extractor_image.resolve_steam_clan_image_url') as mock_resolve:
             mock_resolve.return_value = "https://example.com/image.jpg"
             msg = CounterStrikeNewsMessage(mocked_news_post_with_image)
             # Should have image as first content
@@ -222,7 +239,7 @@ async def test_counter_strike_news_message_send_image_valid_url():
     mocked_bot = AsyncMock()
     image = Image(0, 50, False, "https://example.com/image.jpg")
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
+    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
         mock_extract.return_value = "https://example.com/image.jpg"
         with patch('cs2posts.msg.cs_news_msg.asyncio.to_thread', new=AsyncMock(return_value=True)) as mock_to_thread:
             await msg.send_image(mocked_bot, 42, image)
@@ -253,9 +270,9 @@ async def test_counter_strike_news_message_send_image_invalid_url():
     mocked_bot = AsyncMock()
     image = Image(0, 50, False, "invalid-url")
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
+    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
         mock_extract.return_value = "invalid-url"
-        with patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url') as mock_valid:
+        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
             mock_valid.return_value = False
             await msg.send_image(mocked_bot, 42, image)
             mocked_bot.send_photo.assert_not_called()
@@ -284,9 +301,9 @@ async def test_counter_strike_news_message_send_image_with_heading():
     mocked_bot = AsyncMock()
     image = Image(0, 50, True, "https://example.com/image.jpg")
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
+    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
         mock_extract.return_value = "https://example.com/image.jpg"
-        with patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url') as mock_valid:
+        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
             mock_valid.return_value = True
             await msg.send_image(mocked_bot, 42, image)
             call_kwargs = mocked_bot.send_photo.call_args[1]
@@ -320,9 +337,9 @@ async def test_counter_strike_news_message_send_carousel():
     ]
     carousel = Carousel(0, 100, False, images)
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
+    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
         mock_extract.side_effect = lambda x: x
-        with patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url') as mock_valid:
+        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
             mock_valid.return_value = True
             await msg.send_carousel(mocked_bot, 42, carousel)
             mocked_bot.send_media_group.assert_called()
@@ -355,9 +372,9 @@ async def test_counter_strike_news_message_send_carousel_invalid_urls():
     ]
     carousel = Carousel(0, 100, False, images)
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
+    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
         mock_extract.side_effect = lambda x: x
-        with patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url') as mock_valid:
+        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
             mock_valid.return_value = False
             await msg.send_carousel(mocked_bot, 42, carousel)
             # Should not send if all images are invalid
@@ -387,9 +404,9 @@ async def test_counter_strike_news_message_send_video():
     mocked_bot = AsyncMock()
     video = Video(0, 50, False, webm="", mp4="https://example.com/video.mp4", poster="https://example.com/poster.jpg", autoplay=True, controls=True)
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
+    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
         mock_extract.side_effect = lambda x: x
-        with patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url') as mock_valid:
+        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
             mock_valid.return_value = True
             await msg.send_video(mocked_bot, 42, video)
             mocked_bot.send_video.assert_called_once()
@@ -445,9 +462,9 @@ async def test_counter_strike_news_message_send_video_invalid_url():
     mocked_bot = AsyncMock()
     video = Video(0, 50, False, webm="", mp4="invalid", poster="", autoplay=False, controls=False)
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url') as mock_extract:
+    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
         mock_extract.return_value = "invalid"
-        with patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url') as mock_valid:
+        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
             mock_valid.return_value = False
             await msg.send_video(mocked_bot, 42, video)
             mocked_bot.send_video.assert_not_called()
@@ -598,7 +615,7 @@ def test_counter_strike_news_message_add_footer_to_non_textblock():
     with patch('requests.get') as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
-        with patch('cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url') as mock_resolve:
+        with patch('cs2posts.content.extractor_image.resolve_steam_clan_image_url') as mock_resolve:
             mock_resolve.return_value = "https://example.com/image.jpg"
             msg = CounterStrikeNewsMessage(post)
             # Should append a TextBlock with footer
@@ -637,8 +654,8 @@ async def test_counter_strike_news_message_send_continues_after_block_failure():
     # Image block will fail at the Telegram API level; text blocks must still send
     mocked_bot.send_photo.side_effect = RuntimeError("Telegram error")
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url', return_value="https://example.com/image.jpg"), \
-            patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url', return_value=True):
+    with patch('cs2posts.msg.cs_news_msg.extract_url', return_value="https://example.com/image.jpg"), \
+            patch('cs2posts.msg.cs_news_msg.is_valid_url', return_value=True):
         await msg.send(mocked_bot, 42)
 
     # Both TextBlock sends must have been attempted despite the image failure
@@ -678,8 +695,8 @@ async def test_counter_strike_news_message_send_all_blocks_attempted_on_multiple
     # Image block fails; text and youtube blocks should still be attempted
     mocked_bot.send_photo.side_effect = RuntimeError("Telegram error")
 
-    with patch('cs2posts.msg.cs_news_msg.Utils.extract_url', return_value="https://example.com/img1.jpg"), \
-            patch('cs2posts.msg.cs_news_msg.Utils.is_valid_url', return_value=True):
+    with patch('cs2posts.msg.cs_news_msg.extract_url', return_value="https://example.com/img1.jpg"), \
+            patch('cs2posts.msg.cs_news_msg.is_valid_url', return_value=True):
         await msg.send(mocked_bot, 42)
 
     # 2 TextBlocks + 1 Youtube each call bot.send_message → 3 total

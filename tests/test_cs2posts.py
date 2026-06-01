@@ -135,7 +135,7 @@ def cs2_posts_with_unknown_feed_type(crawler_data_with_unknown_feed_type):
 
 
 def test_cs2_validate_replace_steam_clan_image_url(cs2_posts_steam_clan_image):
-    with patch("cs2posts.utils.Utils.is_valid_url", return_value=True):
+    with patch("cs2posts.utils.is_valid_url", return_value=True):
         cs2_posts_steam_clan_image.validate()
     expected = "https://clan.akamai.steamstatic.com/images"
     assert cs2_posts_steam_clan_image.posts[0].contents == expected

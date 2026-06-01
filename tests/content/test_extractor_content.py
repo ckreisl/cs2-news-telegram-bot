@@ -13,7 +13,7 @@ from cs2posts.content.extractor_content import ContentExtractor
 def test_content_extractor_extract_empty_string():
     text = ""
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.return_value = ""
         content = extractor.extract()
     # Should return at least one content item (text block)
@@ -38,7 +38,7 @@ def test_content_extractor_first_item_is_heading():
 def test_content_extractor_extract_with_image():
     text = 'text [img src="https://example.com/image.png"][/img]'
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         content = extractor.extract()
     assert len(content) >= 1
@@ -64,7 +64,7 @@ def test_content_extractor_extract_with_youtube():
 def test_content_extractor_extract_with_carousel():
     text = 'text [carousel][img src="https://example.com/image.png"][/img][/carousel]'
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         content = extractor.extract()
     assert len(content) >= 1
@@ -83,7 +83,7 @@ def test_content_extractor_sorted_by_position():
 def test_content_extractor_removes_carousel_images():
     text = '[carousel][img src="https://example.com/image.png"][/img][/carousel] [img src="https://example.com/image.png"][/img]'
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         content = extractor.extract()
     # Images that are in carousel should be removed from standalone images
@@ -98,7 +98,7 @@ def test_content_extractor_removes_carousel_images():
 def test_content_extractor_extract_mixed_content():
     text = 'header text [img src="https://example.com/image.png"][/img] middle [previewyoutube=abc;full][/previewyoutube] end'
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         content = extractor.extract()
     assert len(content) >= 3  # At least text, image, and youtube
@@ -110,7 +110,7 @@ def test_content_extractor_extract_all_types():
     [carousel][img src="https://example.com/carousel.png"][/img][/carousel]
     [previewyoutube=vid123;full][/previewyoutube] end'''
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.side_effect = lambda x: x
         content = extractor.extract()
 
@@ -124,7 +124,7 @@ def test_content_extractor_carousel_removes_duplicate_images():
     carousel_img_url = "https://example.com/same_image.png"
     text = f'[carousel][img src="{carousel_img_url}"][/img][/carousel] [img src="{carousel_img_url}"][/img]'
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.return_value = carousel_img_url
         content = extractor.extract()
 
@@ -136,7 +136,7 @@ def test_content_extractor_carousel_removes_duplicate_images():
 def test_content_extractor_no_carousel_keeps_images():
     text = '[img src="https://example.com/image1.png"][/img] [img src="https://example.com/image2.png"][/img]'
     extractor = ContentExtractor(text)
-    with patch("cs2posts.content.extractor_image.Utils.resolve_steam_clan_image_url") as mock_resolve:
+    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
         mock_resolve.side_effect = ["https://example.com/image1.png", "https://example.com/image2.png"]
         content = extractor.extract()
 

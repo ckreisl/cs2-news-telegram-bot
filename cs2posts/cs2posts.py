@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from cs2posts.dto.post import FeedType
 from cs2posts.dto.post import Post
-from cs2posts.utils import Utils
+from cs2posts.utils import resolve_steam_clan_image_url
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class CounterStrike2Posts:
                     f" {feed_type=}")
                 continue
 
-            self.__posts.append(Post(**post))
+            self.__posts.append(Post.from_dict(post))
 
         self.__posts.sort(key=lambda x: x.date, reverse=True)
 
@@ -58,20 +59,21 @@ class CounterStrike2Posts:
     def posts(self) -> list[Post]:
         return self.__posts
 
+    def _posts_since_cs2(self, predicate: Callable[[Post], bool]) -> list[Post]:
+        return [post for post in self.__posts
+                if post.date >= self.INITIAL_EPOCH_TIME_CS2 and predicate(post)]
+
     @property
     def news_posts(self) -> list[Post]:
-        return list(filter(lambda x: (x.date >= self.INITIAL_EPOCH_TIME_CS2) and x.is_news(),
-                           self.__posts))
+        return self._posts_since_cs2(Post.is_news)
 
     @property
     def update_posts(self) -> list[Post]:
-        return list(filter(lambda x: (x.date >= self.INITIAL_EPOCH_TIME_CS2) and x.is_update(),
-                           self.__posts))
+        return self._posts_since_cs2(Post.is_update)
 
     @property
     def external_posts(self) -> list[Post]:
-        return list(filter(lambda x: (x.date >= self.INITIAL_EPOCH_TIME_CS2) and x.is_external(),
-                           self.__posts))
+        return self._posts_since_cs2(Post.is_external)
 
     @property
     def posts_json(self) -> list[dict]:
@@ -111,7 +113,7 @@ class CounterStrike2Posts:
 
     def validate(self) -> None:
         for post in self.news_posts:
-            post.contents = Utils.resolve_steam_clan_image_url(post.contents)
+            post.contents = resolve_steam_clan_image_url(post.contents)
 
     def is_latest_post_news(self) -> bool:
         if self.latest is None:

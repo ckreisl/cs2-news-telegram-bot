@@ -29,27 +29,11 @@ from cs2posts.db import ChatDatabase
 from cs2posts.db import PostDatabase
 from cs2posts.dto.chats import Chat
 from cs2posts.dto.post import Post
+from cs2posts.msg import create_message
 from cs2posts.msg import TelegramMessage
-from cs2posts.msg import TelegramMessageFactory
 
 
 logger = logging.getLogger(__name__)
-
-
-def admin(func: Any) -> Any:
-    async def wrapper(self: Any, update: Update, context: CallbackContext) -> Any:
-        if update.message is None or update.message.from_user is None:
-            return None
-
-        chat = await self.chat_db.get(chat_id=update.message.chat_id)
-        if chat is None:
-            return None
-        if update.message.from_user.id != chat.chat_id_admin:
-            logger.warning(
-                f'Unauthorized access to {func.__name__} by {update.message.from_user.id}')
-            return None
-        return await func(self, update, context)
-    return wrapper
 
 
 def spam_protected(func: Any) -> Any:
@@ -59,17 +43,27 @@ def spam_protected(func: Any) -> Any:
 
         chat = await self.chat_db.get(update.message.chat_id)
         await self.spam_protector.check(context.bot, chat)
+        if chat is not None:
+            # Persist any state mutated by the spam check (strikes, ban,
+            # last activity) before deciding whether to drop the message.
+            await self.chat_db.update(chat)
         if chat is not None and chat.is_banned:
             return None
-        if chat is not None:
-            await self.chat_db.update(chat)
         return await func(self, update, context)
     return wrapper
 
 
 class CounterStrike2UpdateBot:
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *,
+        token: str,
+        crawler: CounterStrike2Crawler,
+        spam_protector: SpamProtector,
+        post_db: PostDatabase,
+        chat_db: ChatDatabase,
+    ) -> None:
         request = HTTPXRequest(
             read_timeout=30,
             write_timeout=30,
@@ -79,14 +73,14 @@ class CounterStrike2UpdateBot:
         self.app = (Application.builder()
                     .post_init(self.post_init)
                     .post_shutdown(self.post_shutdown)
-                    .token(kwargs['token'])
+                    .token(token)
                     .request(request)
                     .build())
 
-        self.crawler: CounterStrike2Crawler = kwargs['crawler']
-        self.spam_protector: SpamProtector = kwargs['spam_protector']
-        self.post_db: PostDatabase = kwargs['post_db']
-        self.chat_db: ChatDatabase = kwargs['chat_db']
+        self.crawler = crawler
+        self.spam_protector = spam_protector
+        self.post_db = post_db
+        self.chat_db = chat_db
 
         self.options = Options(app=self.app)
 
@@ -107,7 +101,6 @@ class CounterStrike2UpdateBot:
         ])
 
         # self.app.add_error_handler(self.error)
-        self.is_running = False
 
     async def _ensure_databases_exist(self) -> None:
         if not self.post_db.filepath.exists():
@@ -181,12 +174,24 @@ class CounterStrike2UpdateBot:
         self.username = application.bot.username
         logger.info(f'Bot username: {self.username}. Bot is ready.')
 
+        # Schedule the recurring jobs up-front so crawling and backups run
+        # regardless of whether any chat has issued /start yet.
+        if application.job_queue is None:
+            logger.error('Job queue is not available. Periodic jobs not scheduled.')
+            return
+
+        application.job_queue.run_repeating(
+            callback=self.post_checker,
+            interval=settings.CS2_UPDATE_CHECK_INTERVAL)
+        application.job_queue.run_repeating(
+            callback=self.backup_chats_db,
+            interval=settings.CHAT_DB_BACKUP_INTERVAL)
+
     async def post_shutdown(self, application: Application) -> None:
         logger.info('Shutting down bot...')
         # saving chats is not required anymore
         # since we directly operate on the database
         # Keep function for future use
-        self.is_running = False
         if self.latest_news_post is not None:
             await self.post_db.save(self.latest_news_post)
         if self.latest_update_post is not None:
@@ -288,23 +293,6 @@ class CounterStrike2UpdateBot:
             chat.is_removed_while_banned = False
             await self.chat_db.update(chat)
 
-        if self.is_running:
-            return
-
-        # Check for posts every X seconds
-        if context.job_queue is None:
-            return
-
-        context.job_queue.run_repeating(
-            callback=self.post_checker,
-            interval=settings.CS2_UPDATE_CHECK_INTERVAL)
-
-        context.job_queue.run_repeating(
-            callback=self.backup_chats_db,
-            interval=settings.CHAT_DB_BACKUP_INTERVAL)
-
-        self.is_running = True
-
     @spam_protected
     async def stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if update.message is None:
@@ -367,7 +355,7 @@ class CounterStrike2UpdateBot:
 
         logger.info('Sending latest saved post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = await TelegramMessageFactory.create(self.latest_post)
+        msg = await create_message(self.latest_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     @spam_protected
@@ -381,7 +369,7 @@ class CounterStrike2UpdateBot:
 
         logger.info('Sending latest news post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = await TelegramMessageFactory.create(self.latest_news_post)
+        msg = await create_message(self.latest_news_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     @spam_protected
@@ -395,7 +383,7 @@ class CounterStrike2UpdateBot:
 
         logger.info('Sending latest update post to chats ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = await TelegramMessageFactory.create(self.latest_update_post)
+        msg = await create_message(self.latest_update_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     @spam_protected
@@ -409,7 +397,7 @@ class CounterStrike2UpdateBot:
 
         logger.info('Sending latest external post to chat ...')
         chat = await self.chat_db.get(update.message.chat_id)
-        msg = await TelegramMessageFactory.create(self.latest_external_post)
+        msg = await create_message(self.latest_external_post)
         await self.send_message(context=context, msg=msg, chat=chat)
 
     async def _post_checker(self, context: CallbackContext, post: Post | None) -> None:
@@ -464,7 +452,7 @@ class CounterStrike2UpdateBot:
                 f'Unknown post type {post.to_dict()}. Not sending any message.')
             return
 
-        msg = await TelegramMessageFactory.create(post=post)
+        msg = await create_message(post=post)
 
         for chat in chats:
             await self.send_message(context=context, msg=msg, chat=chat)
