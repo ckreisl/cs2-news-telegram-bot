@@ -12,6 +12,10 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CS2_UPDATE_CHECK_INTERVAL = int(os.getenv('CS2_UPDATE_CHECK_INTERVAL', 900))
 
+# Liveness heartbeat consumed by the container HEALTHCHECK. The bot refreshes
+# this file once per crawl cycle; the healthcheck fails it if it goes stale.
+HEARTBEAT_FILEPATH = os.getenv('HEARTBEAT_FILEPATH', '/tmp/cs2-news-bot.heartbeat')
+
 # Database filepaths (default: database/sqlite.db for both if None)
 CHAT_DB_FILEPATH = os.getenv('CHAT_DB_FILEPATH', None)
 POST_DB_FILEPATH = os.getenv('POST_DB_FILEPATH', None)
