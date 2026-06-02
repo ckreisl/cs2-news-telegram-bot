@@ -21,6 +21,7 @@ from telegram.request import HTTPXRequest
 import cs2posts.bot.constants as const
 from cs2posts.bot import settings
 from cs2posts.bot.backup import ChatDatabaseBackupManager
+from cs2posts.bot.heartbeat import write_heartbeat
 from cs2posts.bot.options import Options
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.crawler import CounterStrike2Crawler
@@ -173,6 +174,10 @@ class CounterStrike2UpdateBot:
         # Bot username is only available after initialization
         self.username = application.bot.username
         logger.info(f'Bot username: {self.username}. Bot is ready.')
+
+        # Seed the heartbeat immediately so the healthcheck passes before the
+        # first crawl cycle (which only runs after CS2_UPDATE_CHECK_INTERVAL).
+        write_heartbeat(settings.HEARTBEAT_FILEPATH)
 
         # Schedule the recurring jobs up-front so crawling and backups run
         # regardless of whether any chat has issued /start yet.
@@ -417,6 +422,10 @@ class CounterStrike2UpdateBot:
         await self.post_db.save(post)
 
     async def post_checker(self, context: CallbackContext) -> None:
+        # Refresh liveness before crawling so a flaky crawl still proves the
+        # job queue is alive; the healthcheck only cares that this loop runs.
+        write_heartbeat(settings.HEARTBEAT_FILEPATH)
+
         logger.info('Crawling latest posts ...')
         try:
             data = await self.crawler.crawl(count=10)

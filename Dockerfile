@@ -22,7 +22,7 @@ RUN pip install --upgrade pip \
 COPY --chown=dev:dev cs2posts/ cs2posts/
 COPY --chown=dev:dev main.py .
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)"
+HEALTHCHECK --interval=60s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -m cs2posts.healthcheck
 
 CMD ["python", "main.py"]
