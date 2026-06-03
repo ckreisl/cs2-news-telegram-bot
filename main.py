@@ -5,6 +5,7 @@ import logging
 
 from cs2posts.bot import settings
 from cs2posts.bot.cs2 import CounterStrike2UpdateBot
+from cs2posts.bot.heartbeat import write_heartbeat
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.crawler import CounterStrike2Crawler
 from cs2posts.db import ChatDatabase
@@ -20,6 +21,11 @@ logging.getLogger('httpx').setLevel(logging.WARNING)
 
 
 def main() -> int:
+    # Write heartbeat immediately on startup, before Telegram connection.
+    # This ensures the healthcheck passes before the first crawl cycle.
+    # The heartbeat will be refreshed in post_checker() each crawl cycle.
+    write_heartbeat(settings.HEARTBEAT_FILEPATH)
+
     cs2_update_bot = CounterStrike2UpdateBot(
         crawler=CounterStrike2Crawler(),
         spam_protector=SpamProtector(),
