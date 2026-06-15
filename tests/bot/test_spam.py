@@ -92,8 +92,11 @@ def test_spam_protector_ban(spam_protector, chat):
 
 def test_spam_protector_unban(spam_protector, chat):
     chat.is_banned = True
+    chat.strikes = SpamProtector.MAX_STRIKES
     spam_protector.unban(chat)
     assert chat.is_banned is False
+    # Serving the timeout resets strikes so the chat is not re-banned at once.
+    assert chat.strikes == 0
 
 
 def test_spam_protector_is_banned(spam_protector, chat):
@@ -134,6 +137,21 @@ async def test_spam_protector_check(spam_protector, chat):
     chat.strikes = 3
     await spam_protector.check(mock_bot, chat)
     assert chat.is_banned
+
+
+@pytest.mark.asyncio
+async def test_spam_protector_check_resets_strikes_after_ban_timeout(spam_protector, chat):
+    mock_bot = AsyncMock()
+    # Chat was banned at MAX_STRIKES and the ban timeout has now expired.
+    chat.is_banned = True
+    chat.strikes = SpamProtector.MAX_STRIKES
+    chat.last_activity = get_utc_now(
+    ) - timedelta(seconds=settings.CHAT_BAN_TIMEOUT_SECONDS + 1)
+
+    await spam_protector.check(mock_bot, chat)
+
+    assert chat.is_banned is False
+    assert chat.strikes == 0
 
 
 @pytest.mark.asyncio

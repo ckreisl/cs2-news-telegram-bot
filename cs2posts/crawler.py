@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import asyncio
 import json
 import logging
@@ -14,22 +13,7 @@ logger = logging.getLogger(__name__)
 CRAWLER_REQUEST_TIMEOUT = 3
 
 
-class WebCrawler(abc.ABC):
-    """Base class for crawlers.
-
-    This abstraction exists mostly for typing and future extensibility.
-    """
-
-    @abc.abstractmethod
-    async def crawl(self, *args: Any, **kwargs: Any) -> Any:
-        """Fetch data from the remote source."""
-
-
-class SteamAPICrawler(WebCrawler):
-    """Base Steam Web API crawler."""
-
-
-class CounterStrike2Crawler(SteamAPICrawler):
+class CounterStrike2Crawler:
     """Fetches latest CS2 news updates from the Steam API."""
 
     BASE_URL = (
@@ -40,7 +24,6 @@ class CounterStrike2Crawler(SteamAPICrawler):
     )
 
     def __init__(self) -> None:
-        super().__init__()
         self.url = self.BASE_URL
 
     def _validate_args(self, *, count: int) -> None:

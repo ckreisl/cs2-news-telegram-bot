@@ -85,6 +85,9 @@ class SpamProtector:
     def unban(self, chat: Chat) -> None:
         logger.info(f'Unban chat {chat.chat_id}')
         chat.is_banned = False
+        # Serving the ban timeout earns a clean slate; otherwise strikes stay
+        # at MAX_STRIKES and the next fast message would immediately re-ban.
+        chat.strikes = 0
 
     def is_banned(self, chat: Chat) -> bool:
         return chat.is_banned
