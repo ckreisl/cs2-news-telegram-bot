@@ -60,9 +60,9 @@ def heartbeat_settings(tmp_path, monkeypatch):
     return filepath
 
 
-def test_healthcheck_fails_when_file_missing(heartbeat_settings, capsys):
+def test_healthcheck_fails_when_file_missing(heartbeat_settings, caplog):
     assert healthcheck.main() == 1
-    assert 'missing' in capsys.readouterr().err
+    assert 'missing' in caplog.text
 
 
 def test_healthcheck_passes_when_fresh(heartbeat_settings):
@@ -80,10 +80,10 @@ def test_healthcheck_passes_at_threshold_boundary(heartbeat_settings):
     assert healthcheck.main() == 0
 
 
-def test_healthcheck_fails_when_stale(heartbeat_settings, capsys):
+def test_healthcheck_fails_when_stale(heartbeat_settings, caplog):
     write_heartbeat(str(heartbeat_settings))
     stale = time.time() - 3600
     os.utime(heartbeat_settings, (stale, stale))
 
     assert healthcheck.main() == 1
-    assert 'stale' in capsys.readouterr().err
+    assert 'stale' in caplog.text

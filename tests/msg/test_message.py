@@ -26,6 +26,17 @@ def test_telegram_message_msg_split():
     assert len(telegram_msg.messages) == 2
 
 
+def test_telegram_message_hard_splits_overlong_single_line():
+    # A single line with no newlines that exceeds the limit must still be
+    # broken up, otherwise Telegram rejects the whole message.
+    long_line = "x" * (TELEGRAM_MAX_MESSAGE_LENGTH * 2 + 100)
+    telegram_msg = TelegramMessage(long_line)
+
+    assert len(telegram_msg.messages) == 3
+    assert all(len(chunk) <= TELEGRAM_MAX_MESSAGE_LENGTH for chunk in telegram_msg.messages)
+    assert "".join(telegram_msg.messages).strip() == long_line
+
+
 @pytest.mark.asyncio
 async def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post, mocked_cs2_external_news):
     with patch('requests.get') as mocked_get:

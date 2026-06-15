@@ -29,22 +29,31 @@ class TelegramMessage:
 
     def split(self, message: str) -> list[str]:
 
-        if len(message) < TELEGRAM_MAX_MESSAGE_LENGTH:
+        if len(message) <= TELEGRAM_MAX_MESSAGE_LENGTH:
             return [message]
 
-        lines = message.split('\n')
-        chunks = []
+        chunks: list[str] = []
         chunk = ''
 
-        for line in lines:
-            if (len(chunk) + len(line)) < TELEGRAM_MAX_MESSAGE_LENGTH:
-                chunk += line + "\n"
+        for line in message.split('\n'):
+            candidate = f'{chunk}{line}\n'
+            if len(candidate) <= TELEGRAM_MAX_MESSAGE_LENGTH:
+                chunk = candidate
                 continue
 
-            chunks.append(chunk)
-            chunk = line + "\n"
+            if chunk:
+                chunks.append(chunk)
 
-        chunks.append(chunk)
+            # A single line can itself exceed the limit; hard-split it so we
+            # never hand Telegram an over-long message that it would reject.
+            while len(line) > TELEGRAM_MAX_MESSAGE_LENGTH:
+                chunks.append(line[:TELEGRAM_MAX_MESSAGE_LENGTH])
+                line = line[TELEGRAM_MAX_MESSAGE_LENGTH:]
+
+            chunk = f'{line}\n'
+
+        if chunk:
+            chunks.append(chunk)
 
         return chunks
 

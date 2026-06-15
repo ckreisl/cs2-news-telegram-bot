@@ -83,6 +83,15 @@ class CounterStrike2UpdateBot:
         self.post_db = post_db
         self.chat_db = chat_db
 
+        # Populated later: username in post_init, the cached latest posts in
+        # async_init / _load_latest_posts. Declared here so the attributes
+        # always exist (e.g. for the getattr/setattr in _post_checker).
+        self.username: str | None = None
+        self.latest_post: Post | None = None
+        self.latest_news_post: Post | None = None
+        self.latest_update_post: Post | None = None
+        self.latest_external_post: Post | None = None
+
         self.options = Options(app=self.app)
 
         self.app.add_handlers([
