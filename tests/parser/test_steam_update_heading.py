@@ -69,3 +69,16 @@ def test_steam_update_heading_parser_leading_backslash_hyphenated_heading(steam_
 def test_steam_update_heading_parser_keeps_existing_blank_line(steam_parser):
     steam_parser.text = "\n[MAP GUIDES]\n\n• test"
     assert steam_parser.parse() == "\n\n<b>[MAP GUIDES]</b>\n\n• test"
+
+
+def test_steam_update_heading_parser_ignores_img_tags(steam_parser):
+    expected = "Some text:\n\n[img]https://example.com/image.png[/img]\nMore text."
+    steam_parser.text = expected
+    assert steam_parser.parse() == expected
+
+
+@pytest.mark.parametrize("tag", ["img", "/img", "video", "/video", "carousel", "/carousel", "IMG", "/IMG"])
+def test_steam_update_heading_parser_ignores_bbcode_tags(steam_parser, tag):
+    expected = f"\n[{tag}]\n"
+    steam_parser.text = expected
+    assert steam_parser.parse() == expected
