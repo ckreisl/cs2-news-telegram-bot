@@ -14,6 +14,9 @@ class SteamUpdateHeadingParser(Parser):
     HEADING_REGEX = re.compile(r"(?P<escape>\\)?\[(?P<heading>[a-zA-Z0-9&/'\-\s]+)\]")
     # Will be completed if needed
     HEADING_LIST_IGNORE = ["CT"]
+    # bbcode tags (opening and closing, e.g. [img]...[/img]) that are
+    # consumed by the content extractors and must survive this parser.
+    BBCODE_TAGS_IGNORE = ["IMG", "VIDEO", "CAROUSEL"]
     MIN_HEADING_LENGTH = 2
 
     def is_heading_by_newlines(self, start: int, end: int) -> bool:
@@ -52,9 +55,16 @@ class SteamUpdateHeadingParser(Parser):
         stripped = word.strip().upper()
         return stripped in self.HEADING_LIST_IGNORE
 
+    def is_bbcode_tag(self, word: str) -> bool:
+        stripped = word.strip().upper().removeprefix("/")
+        return stripped in self.BBCODE_TAGS_IGNORE
+
     def format_heading(self, match: re.Match[str]) -> str:
         heading = match.group("heading")
         bracketed_heading = f"[{heading}]"
+
+        if self.is_bbcode_tag(heading):
+            return match.group(0)
 
         if not self.has_min_size(heading) or self.is_single_element_heading(heading):
             return match.group(0)

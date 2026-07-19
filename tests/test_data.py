@@ -70,6 +70,26 @@ async def test_news_2024_10_02():
 
 
 @pytest.mark.asyncio
+async def test_update_2026_07_16():
+    post = load_data("update", "2026-07-16")
+    msg = await create_message(post)
+    assert len(msg.content) == 3
+
+    expected_text_blocks = 2
+    expected_image_blocks = 1
+
+    actual_values = content_count(msg.content)
+
+    assert actual_values[TextBlock.__name__] == expected_text_blocks
+    assert actual_values[Image.__name__] == expected_image_blocks
+
+    for content in msg.content:
+        if isinstance(content, TextBlock):
+            assert "[img]" not in content.text
+            assert "[/img]" not in content.text
+
+
+@pytest.mark.asyncio
 async def test_news_2024_11_13():
     post = load_data("news", "2024-11-13")
     msg = await create_message(post)
