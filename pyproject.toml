@@ -1,3 +1,36 @@
+[project]
+name = "cs2-news-telegram-bot"
+version = "1.0.0"
+description = "Telegram bot that posts the latest Counter-Strike 2 news and updates"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "requests==2.33",
+    "python-telegram-bot[job-queue]==21.10",
+    "bbcode==1.1.0",
+    "beautifulsoup4==4.14.3",
+    "python-dotenv==1.2.2",
+    "aiosqlite==0.22.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "pytest-asyncio==1.4.0",
+    "pytest-mock==3.14.0",
+    "pytest-cov==6.0.0",
+    "ruff==0.16.4",
+    "mypy==1.20.0",
+    "types-requests==2.33.0.20260402",
+    "pre-commit",
+]
+
+[tool.uv]
+# The bot runs from the source tree (main.py + cs2posts/); it is not built or
+# installed as a distribution, so uv only manages the environment.
+package = false
+
 [tool.ruff]
 target-version = "py312"
 
@@ -18,6 +51,9 @@ no-lines-before = ["local-folder"]
 asyncio_mode = "strict"
 testpaths = ["tests"]
 addopts = "-q"
+# cs2posts is imported from the source tree rather than installed, so the
+# project root has to be on sys.path no matter how pytest is invoked.
+pythonpath = ["."]
 
 [tool.mypy]
 python_version = "3.12"

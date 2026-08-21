@@ -3,7 +3,7 @@
   <h1 align="center">Counter-Strike 2 News Telegram Bot</h1>
 </p>
 
-[![CI](https://github.com/ckreisl/cs2-posts-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ckreisl/cs2-posts-telegram-bot/actions/workflows/ci.yml)
+[![CI](https://github.com/ckreisl/cs2-news-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ckreisl/cs2-news-telegram-bot/actions/workflows/ci.yml)
 
 This is a simple Telegram bot that provides the latest Counter-Strike 2 posts (news, updates, and events). Stay up to date by receiving automatic update messages via Telegram.
 
@@ -84,6 +84,28 @@ docker run -d -v backups:/app/backups/ -v database:/app/database --env-file .env
 ```
 
 To start periodic checking for news and updates, send `/start` to your bot chat.
+
+
+## Development
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install it, then set up the environment:
+
+```bash
+uv sync
+```
+
+This creates `.venv` from `uv.lock` with the runtime and development dependencies. Common tasks are wrapped in the `Makefile`:
+
+```bash
+make test        # run the test suite
+make lint        # ruff lint + format check
+make format      # apply ruff fixes and formatting
+make typecheck   # mypy
+make check       # lint + test
+make run         # run the bot locally
+```
+
+Anything else can be run through `uv run <command>`. To change dependencies, edit `[project.dependencies]` or the `dev` group in `pyproject.toml`, then run `make lock` (or `make upgrade` to move locked versions forward).
 
 
 ## Contributing

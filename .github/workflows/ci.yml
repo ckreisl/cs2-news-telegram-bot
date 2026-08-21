@@ -1,41 +1,94 @@
-# This workflow installs dependencies, runs lint, tests, and coverage with Python 3.12.
+# Lints, type-checks and tests the bot, and verifies the runtime image builds.
 
 name: Run Tests, Lint & Coverage
 
 on:
+  push:
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
+# Least privilege: nothing here writes back to the repository.
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded pull request runs are disposable; runs on main are not.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@v5
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v6
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
       with:
-        python-version: "3.12"
-        cache: pip
-        cache-dependency-path: requirements-dev.txt
+        version: "0.11.6"
+        enable-cache: true
+        cache-dependency-glob: uv.lock
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install -r requirements-dev.txt
+      run: uv sync --locked
+
+    # pre-commit builds an isolated env per hook; without this every run
+    # reinstalls ruff and mypy from scratch.
+    - name: Cache pre-commit environments
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+        restore-keys: pre-commit-${{ runner.os }}-
 
     - name: Run pre-commit hooks
-      run: |
-        pre-commit run --all-files --show-diff-on-failure
+      run: uv run pre-commit run --all-files --show-diff-on-failure
 
     - name: Run Tests & Build coverage file
       run: |
-        python -m pytest -v --cov-report=term-missing:skip-covered --cov-report xml:coverage.xml --cov=cs2posts tests/ --junitxml=pytest.xml
+        uv run pytest -v \
+          --cov-report=term-missing:skip-covered \
+          --cov-report xml:coverage.xml \
+          --cov=cs2posts tests/ \
+          --junitxml=pytest.xml
+
+    - name: Upload test and coverage reports
+      # Reports are most useful when the suite failed, so publish either way.
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-reports
+        path: |
+          coverage.xml
+          pytest.xml
+        retention-days: 14
+
+  docker:
+    name: Build runtime image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Build image
+      run: docker build -t cs2-news-bot .
+
+    # A green test suite says nothing about the image: the venv is built from
+    # uv.lock in a separate stage and could be missing, mismatched, or short an
+    # extra. apscheduler only arrives via python-telegram-bot[job-queue].
+    - name: Smoke test image
+      run: |
+        docker run --rm -i cs2-news-bot python - <<'PY'
+        import sys
+        import apscheduler, cs2posts, telegram.ext  # noqa: F401
+        import aiosqlite, bbcode, bs4, dotenv, requests  # noqa: F401
+        assert sys.prefix == "/app/.venv", sys.prefix
+        print("image OK:", sys.version.split()[0])
+        PY
