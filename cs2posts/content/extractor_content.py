@@ -10,7 +10,6 @@ from .extractor_youtube import YoutubeExtractor
 
 
 class ContentExtractor(Extractor):
-
     def extract(self) -> list[Content]:
         youtube = YoutubeExtractor(self.text).extract()
         videos = VideoExtractor(self.text).extract()
@@ -22,11 +21,14 @@ class ContentExtractor(Extractor):
             all_img_urls = {img.url for c in carousel for img in c.images}
             images = list(filter(lambda img: img.url not in all_img_urls, images))
 
-        texts = TextBlockExtractor(self.text, videos, carousel, images, youtube).extract()
+        texts = TextBlockExtractor(
+            self.text, videos, carousel, images, youtube
+        ).extract()
 
         content: list[Content] = sorted(
             [*youtube, *videos, *carousel, *images, *texts],
-            key=lambda content: content.text_pos_start)
+            key=lambda content: content.text_pos_start,
+        )
 
         content[0].is_heading = True
 

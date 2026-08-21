@@ -4,7 +4,6 @@ from cs2posts.parser.parser import Parser
 
 
 class SteamListParser(Parser):
-
     LIST_START_TAG = "<ul>"
     LIST_END_TAG = "</ul>"
     LIST_ITEM_START_TAG = "<li>"
@@ -13,7 +12,7 @@ class SteamListParser(Parser):
     LIST_ITEM_ICON_NESTED = "◦"
 
     def is_tag(self, tag: str, i: int) -> bool:
-        return self.text[i:i + len(tag)] == tag
+        return self.text[i : i + len(tag)] == tag
 
     def is_start_tag_list(self, i: int) -> bool:
         return self.is_tag(self.LIST_START_TAG, i)

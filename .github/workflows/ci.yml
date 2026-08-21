@@ -36,10 +36,6 @@ jobs:
       run: |
         pre-commit run --all-files --show-diff-on-failure
 
-    - name: Lint
-      run: |
-        flake8 cs2posts tests
-
     - name: Run Tests & Build coverage file
       run: |
         python -m pytest -v --cov-report=term-missing:skip-covered --cov-report xml:coverage.xml --cov=cs2posts tests/ --junitxml=pytest.xml

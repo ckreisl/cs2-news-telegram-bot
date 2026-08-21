@@ -11,13 +11,12 @@ from cs2posts.crawler import CounterStrike2Crawler
 from cs2posts.db import ChatDatabase
 from cs2posts.db import PostDatabase
 
-
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
 # set higher logging level for httpx to avoid all GET and POST requests being logged
-logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def main() -> int:
@@ -31,7 +30,8 @@ def main() -> int:
         spam_protector=SpamProtector(),
         post_db=PostDatabase(settings.POST_DB_FILEPATH),
         chat_db=ChatDatabase(settings.CHAT_DB_FILEPATH),
-        token=settings.TELEGRAM_TOKEN)
+        token=settings.TELEGRAM_TOKEN,
+    )
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -41,5 +41,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())

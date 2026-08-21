@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
+from cs2posts.dto.post import Post
 from .cs_external_msg import CounterStrikeExternalMessage
 from .cs_news_msg import CounterStrikeNewsMessage
 from .cs_update_msg import CounterStrikeUpdateMessage
 from .telegram import TelegramMessage
-from cs2posts.dto.post import Post
 
 
 async def create_message(post: Post) -> TelegramMessage:

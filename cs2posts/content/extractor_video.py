@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import html
 import re
+from typing import ClassVar
 
+from cs2posts.utils import resolve_steam_clan_image_url
 from .content import Video
 from .extractor import Extractor
-from cs2posts.utils import resolve_steam_clan_image_url
 
 
 class VideoExtractor(Extractor):
-
-    _BOOL_TRUE = {"1", "true", "yes", "on"}
-    _BOOL_FALSE = {"0", "false", "no", "off"}
-    _VIDEO_RE = re.compile(r"\[video\b(?P<attrs>.*?)\](?P<inner>.*?)\[/video\]", re.I | re.S)
+    _BOOL_TRUE: ClassVar[set[str]] = {"1", "true", "yes", "on"}
+    _BOOL_FALSE: ClassVar[set[str]] = {"0", "false", "no", "off"}
+    _VIDEO_RE = re.compile(
+        r"\[video\b(?P<attrs>.*?)\](?P<inner>.*?)\[/video\]", re.I | re.S
+    )
     _URL_IN_TEXT_RE = re.compile(r'(https?://[^\s"<>\]]+)', re.I)
-    _ATTRS_MIXED_RE = re.compile(r"""
+    _ATTRS_MIXED_RE = re.compile(
+        r"""
         (\w+)                                 # key
         \s*=\s*
         (?:&quot;(.*?)&quot;                  # 1: entity-quoted
@@ -23,7 +26,9 @@ class VideoExtractor(Extractor):
         |(<a\b.*?</a>)                        # 4: anchor element
         |([^\s\]]+)                           # 5: bare token up to whitespace or ]
         )
-    """, re.I | re.S | re.X)
+    """,
+        re.I | re.S | re.X,
+    )
 
     def _to_bool(self, s: str | None) -> bool | None:
         if s is None:
@@ -65,9 +70,13 @@ class VideoExtractor(Extractor):
             attrs = self._parse_attrs(attrs_raw)
 
             # Pull urls (handles raw url or <a href="...">)
-            webm_url = self._extract_url(attrs.get("webm", "")) if "webm" in attrs else ""
+            webm_url = (
+                self._extract_url(attrs.get("webm", "")) if "webm" in attrs else ""
+            )
             mp4_url = self._extract_url(attrs.get("mp4", "")) if "mp4" in attrs else ""
-            poster_url = self._extract_url(attrs.get("poster", "")) if "poster" in attrs else ""
+            poster_url = (
+                self._extract_url(attrs.get("poster", "")) if "poster" in attrs else ""
+            )
 
             if webm_url:
                 webm_url = resolve_steam_clan_image_url(webm_url)
@@ -76,15 +85,17 @@ class VideoExtractor(Extractor):
             if poster_url:
                 poster_url = resolve_steam_clan_image_url(poster_url)
 
-            videos.append(Video(
-                text_pos_start=m.start(),
-                text_pos_end=m.end(),
-                webm=webm_url,
-                mp4=mp4_url,
-                poster=poster_url,
-                autoplay=self._to_bool(attrs.get("autoplay")),
-                controls=self._to_bool(attrs.get("controls")),
-                is_heading=False,
-            ))
+            videos.append(
+                Video(
+                    text_pos_start=m.start(),
+                    text_pos_end=m.end(),
+                    webm=webm_url,
+                    mp4=mp4_url,
+                    poster=poster_url,
+                    autoplay=self._to_bool(attrs.get("autoplay")),
+                    controls=self._to_bool(attrs.get("controls")),
+                    is_heading=False,
+                )
+            )
 
         return videos

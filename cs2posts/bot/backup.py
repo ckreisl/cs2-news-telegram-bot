@@ -6,13 +6,10 @@ from typing import Protocol
 
 
 class BackupDatabase(Protocol):
-
-    async def backup(self, filepath: Path) -> None:
-        ...
+    async def backup(self, filepath: Path) -> None: ...
 
 
 class ChatDatabaseBackupManager:
-
     def __init__(
         self,
         chat_db: BackupDatabase,
@@ -34,7 +31,7 @@ class ChatDatabaseBackupManager:
         return self.__max_backups
 
     def create_timestamped_backup_filepath(self) -> Path:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = self.backup_filepath
         return filepath.with_stem(f"{filepath.stem}_{timestamp}")
 

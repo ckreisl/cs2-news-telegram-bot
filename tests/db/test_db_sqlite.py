@@ -11,7 +11,7 @@ from cs2posts.db import SQLite
 
 
 @pytest.mark.asyncio
-@patch('aiosqlite.connect')
+@patch("aiosqlite.connect")
 async def test_sqlite_class_create_db_exists(sqlite_mock):
     mocked_path = Mock()
     mocked_path.exists.return_value = True
@@ -22,7 +22,7 @@ async def test_sqlite_class_create_db_exists(sqlite_mock):
 
 
 @pytest.mark.asyncio
-@patch('aiosqlite.connect')
+@patch("aiosqlite.connect")
 async def test_sqlite_class_create_db_exists_overwrite(sqlite_mock):
     mocked_path = Mock()
     mocked_path.exists.side_effect = [True, False]
@@ -38,6 +38,6 @@ async def test_sqlite_class_create_db_exists_overwrite(sqlite_mock):
 
 @pytest.mark.asyncio
 async def test_sqlite_class_backup(tmp_path):
-    db = SQLite(tmp_path / 'test.db')
-    await db.backup(tmp_path / 'test_backup.db')
-    assert Path(tmp_path / 'test_backup.db').exists()
+    db = SQLite(tmp_path / "test.db")
+    await db.backup(tmp_path / "test_backup.db")
+    assert Path(tmp_path / "test_backup.db").exists()

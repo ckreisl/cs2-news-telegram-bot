@@ -77,7 +77,9 @@ def test_steam_update_heading_parser_ignores_img_tags(steam_parser):
     assert steam_parser.parse() == expected
 
 
-@pytest.mark.parametrize("tag", ["img", "/img", "video", "/video", "carousel", "/carousel", "IMG", "/IMG"])
+@pytest.mark.parametrize(
+    "tag", ["img", "/img", "video", "/video", "carousel", "/carousel", "IMG", "/IMG"]
+)
 def test_steam_update_heading_parser_ignores_bbcode_tags(steam_parser, tag):
     expected = f"\n[{tag}]\n"
     steam_parser.text = expected

@@ -69,7 +69,9 @@ class Post:
     @property
     def date_as_datetime(self) -> datetime:
         # Do not return a timezone-aware datetime object
-        return datetime.fromtimestamp(self.date, tz=ZoneInfo('UTC')).replace(tzinfo=None)
+        return datetime.fromtimestamp(self.date, tz=ZoneInfo("UTC")).replace(
+            tzinfo=None
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -17,7 +17,6 @@ from telegram.ext import ContextTypes
 from cs2posts.db import ChatDatabase
 from cs2posts.dto.chats import Chat
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -43,19 +42,20 @@ def create_options_keyboard(chat: Chat) -> list[list[InlineKeyboardButton]]:
 
     return [
         [
-            InlineKeyboardButton(f"{btn_updates_text} Updates",
-                                 callback_data=ButtonData.UPDATE.value),
-            InlineKeyboardButton(f"{btn_news_text} News",
-                                 callback_data=ButtonData.NEWS.value),
+            InlineKeyboardButton(
+                f"{btn_updates_text} Updates", callback_data=ButtonData.UPDATE.value
+            ),
+            InlineKeyboardButton(
+                f"{btn_news_text} News", callback_data=ButtonData.NEWS.value
+            ),
         ],
         [
-            InlineKeyboardButton(f"{btn_external_news_text} External News",
-                                 callback_data=ButtonData.EXTERNAL_NEWS.value),
+            InlineKeyboardButton(
+                f"{btn_external_news_text} External News",
+                callback_data=ButtonData.EXTERNAL_NEWS.value,
+            ),
         ],
-        [
-            InlineKeyboardButton("Close",
-                                 callback_data=ButtonData.CLOSE.value)
-        ],
+        [InlineKeyboardButton("Close", callback_data=ButtonData.CLOSE.value)],
     ]
 
 
@@ -70,21 +70,24 @@ def create_options_text(chat: Chat) -> str:
 
     text_enabled_update = "enabled" if chat.is_update_interested else "disabled"
     text_enabled_news = "enabled" if chat.is_news_interested else "disabled"
-    text_enabled_external_news = "enabled" if chat.is_external_news_interested else "disabled"
+    text_enabled_external_news = (
+        "enabled" if chat.is_external_news_interested else "disabled"
+    )
 
-    return (f"<b>Options</b>\n\n"
-            "Handle the automatically send Counter-Strike post notifications.\n\n"
-            f"{icon_is_update_interested} - Send Update Posts ("
-            f"{text_enabled_update})\n"
-            f"{icon_is_news_interested} - Send News Posts ("
-            f"{text_enabled_news})\n"
-            f"{icon_is_external_news_interested} - Send External News Posts ("
-            f"{text_enabled_external_news})\n\n"
-            f"Select an option to change, or press 'Close' to keep everything as it is.")
+    return (
+        f"<b>Options</b>\n\n"
+        "Handle the automatically send Counter-Strike post notifications.\n\n"
+        f"{icon_is_update_interested} - Send Update Posts ("
+        f"{text_enabled_update})\n"
+        f"{icon_is_news_interested} - Send News Posts ("
+        f"{text_enabled_news})\n"
+        f"{icon_is_external_news_interested} - Send External News Posts ("
+        f"{text_enabled_external_news})\n\n"
+        f"Select an option to change, or press 'Close' to keep everything as it is."
+    )
 
 
 class Options:
-
     def __init__(self, app: Application) -> None:
         self.__chats_db: ChatDatabase | None = None
 
@@ -117,13 +120,11 @@ class Options:
 
         text, reply_markup = create_options_message(chat)
 
-        logger.info(
-            f'Sending options message to chat_id={message.chat_id} ...')
+        logger.info(f"Sending options message to chat_id={message.chat_id} ...")
 
         await message.reply_text(
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML)
+            text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+        )
 
     async def button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
@@ -164,7 +165,9 @@ class Options:
 
         await self.update(context, query, chat)
 
-    async def update(self, context: ContextTypes.DEFAULT_TYPE, query: CallbackQuery, chat: Chat) -> None:
+    async def update(
+        self, context: ContextTypes.DEFAULT_TYPE, query: CallbackQuery, chat: Chat
+    ) -> None:
         if query.message is None or not hasattr(query.message, "message_id"):
             return
 
@@ -174,16 +177,20 @@ class Options:
             chat_id=chat.chat_id,
             message_id=cast(int, query.message.message_id),
             reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML)
+            parse_mode=ParseMode.HTML,
+        )
 
     async def close(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
         if query is None or query.message is None:
             return
-        if not hasattr(query.message, "chat_id") or not hasattr(query.message, "message_id"):
+        if not hasattr(query.message, "chat_id") or not hasattr(
+            query.message, "message_id"
+        ):
             return
 
         await query.answer()
         await context.bot.delete_message(
             chat_id=cast(int, query.message.chat_id),
-            message_id=cast(int, query.message.message_id))
+            message_id=cast(int, query.message.message_id),
+        )

@@ -8,12 +8,10 @@ from cs2posts.dto.post import FeedType
 from cs2posts.dto.post import Post
 from cs2posts.utils import resolve_steam_clan_image_url
 
-
 logger = logging.getLogger(__name__)
 
 
 class CounterStrike2Posts:
-
     INITIAL_EPOCH_TIME_CS2 = 1679503828
 
     def __init__(self, posts: dict[str, Any]) -> None:
@@ -23,14 +21,14 @@ class CounterStrike2Posts:
         if posts is None or posts == {}:
             return
 
-        if 'appnews' not in posts:
+        if "appnews" not in posts:
             return
 
-        appnews = posts.get('appnews')
+        appnews = posts.get("appnews")
         if not isinstance(appnews, dict):
             return
 
-        newsitems = appnews.get('newsitems')
+        newsitems = appnews.get("newsitems")
         if not isinstance(newsitems, list):
             return
 
@@ -38,13 +36,14 @@ class CounterStrike2Posts:
             if not isinstance(post, dict):
                 continue
 
-            feed_type = FeedType(post['feed_type'])
+            feed_type = FeedType(post["feed_type"])
             if feed_type not in [FeedType.INTERN, FeedType.EXTERN]:
                 logger.info(
                     f"Ignoring feed: {post['gid']}"
                     f" with headline: {post['title']}"
                     f" and url: {post['url']}"
-                    f" {feed_type=}")
+                    f" {feed_type=}"
+                )
                 continue
 
             self.__posts.append(Post.from_dict(post))
@@ -60,8 +59,11 @@ class CounterStrike2Posts:
         return self.__posts
 
     def _posts_since_cs2(self, predicate: Callable[[Post], bool]) -> list[Post]:
-        return [post for post in self.__posts
-                if post.date >= self.INITIAL_EPOCH_TIME_CS2 and predicate(post)]
+        return [
+            post
+            for post in self.__posts
+            if post.date >= self.INITIAL_EPOCH_TIME_CS2 and predicate(post)
+        ]
 
     @property
     def news_posts(self) -> list[Post]:

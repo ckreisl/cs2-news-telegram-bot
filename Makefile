@@ -4,7 +4,7 @@ DOCKER_IMAGE ?= cs2-news-bot
 
 .DEFAULT_GOAL := help
 
-.PHONY: help venv install install-dev test test-cov lint typecheck check pre-commit run docker-build docker-run clean
+.PHONY: help venv install install-dev test test-cov lint format typecheck check pre-commit run docker-build docker-run clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "\nAvailable targets:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -18,8 +18,13 @@ install: ## Install runtime dependencies
 install-dev: ## Install development dependencies
 	$(PIP) install -r requirements-dev.txt
 
-lint: ## Run flake8 lint checks
-	$(PYTHON) -m flake8 cs2posts tests
+lint: ## Run ruff lint checks and verify formatting
+	$(PYTHON) -m ruff check cs2posts tests
+	$(PYTHON) -m ruff format --check cs2posts tests
+
+format: ## Apply ruff fixes and formatting
+	$(PYTHON) -m ruff check --fix cs2posts tests
+	$(PYTHON) -m ruff format cs2posts tests
 
 typecheck: ## Run mypy type checks
 	$(PYTHON) -m mypy cs2posts

@@ -7,10 +7,9 @@ from cs2posts.parser.parser import Parser
 
 
 class SteamNewsTableParser(Parser):
-
-    TABLE_PATTERN = re.compile(r'\[table\](.*?)\[/table\]', re.IGNORECASE | re.DOTALL)
-    ROW_PATTERN = re.compile(r'\[tr\](.*?)\[/tr\]', re.IGNORECASE | re.DOTALL)
-    CELL_PATTERN = re.compile(r'\[t[dh]\](.*?)\[/t[dh]\]', re.IGNORECASE | re.DOTALL)
+    TABLE_PATTERN = re.compile(r"\[table\](.*?)\[/table\]", re.IGNORECASE | re.DOTALL)
+    ROW_PATTERN = re.compile(r"\[tr\](.*?)\[/tr\]", re.IGNORECASE | re.DOTALL)
+    CELL_PATTERN = re.compile(r"\[t[dh]\](.*?)\[/t[dh]\]", re.IGNORECASE | re.DOTALL)
 
     def parse(self) -> str:
         self.text = self.TABLE_PATTERN.sub(self._render_table, self.text)
@@ -21,16 +20,16 @@ class SteamNewsTableParser(Parser):
         rows = self._extract_rows(content)
 
         if not rows:
-            return ''
+            return ""
 
         column_widths = self._column_widths(rows)
         rendered_rows = [self._render_row(row, column_widths) for row in rows]
-        table_text = '\n'.join(rendered_rows)
+        table_text = "\n".join(rendered_rows)
 
-        return f'<pre>{html.escape(table_text)}</pre>'
+        return f"<pre>{html.escape(table_text)}</pre>"
 
     def _normalize_line_breaks(self, text: str) -> str:
-        return text.replace('<br />', '\n').replace('<br/>', '\n')
+        return text.replace("<br />", "\n").replace("<br/>", "\n")
 
     def _extract_rows(self, content: str) -> list[list[str]]:
         rows: list[list[str]] = []
@@ -44,10 +43,12 @@ class SteamNewsTableParser(Parser):
         return rows
 
     def _extract_cells(self, row_text: str) -> list[str]:
-        return [self._normalize_cell(cell) for cell in self.CELL_PATTERN.findall(row_text)]
+        return [
+            self._normalize_cell(cell) for cell in self.CELL_PATTERN.findall(row_text)
+        ]
 
     def _normalize_cell(self, value: str) -> str:
-        return re.sub(r'\s+', ' ', value.strip())
+        return re.sub(r"\s+", " ", value.strip())
 
     def _column_widths(self, rows: list[list[str]]) -> list[int]:
         if not rows:
@@ -66,4 +67,4 @@ class SteamNewsTableParser(Parser):
             padded_cell = cell if index == len(row) - 1 else cell.ljust(widths[index])
             cells.append(padded_cell)
 
-        return ' | '.join(cells)
+        return " | ".join(cells)

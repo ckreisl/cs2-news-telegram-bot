@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import logging
 
-from .cs_news_msg import CounterStrikeNewsMessage
 from cs2posts.dto.post import Post
 from cs2posts.parser.steam2telegram_html import Steam2TelegramHTML
 from cs2posts.parser.steam_update_heading import SteamUpdateHeadingParser
-
+from .cs_news_msg import CounterStrikeNewsMessage
 
 logger = logging.getLogger(__name__)
 

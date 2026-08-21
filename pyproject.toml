@@ -1,3 +1,19 @@
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "SIM", "UP", "RUF"]
+# Line length is left to the formatter; it is not enforced as a lint error.
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+# Preserve the one-import-per-line layout the codebase already uses.
+force-single-line = true
+required-imports = ["from __future__ import annotations"]
+# Relative imports sort after the absolute first-party ones, but stay in the
+# same block rather than being split off behind a blank line.
+no-lines-before = ["local-folder"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
 testpaths = ["tests"]

@@ -4,7 +4,6 @@ import abc
 import logging
 from pathlib import Path
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -24,13 +23,10 @@ class Database(abc.ABC):
         return self.__filepath
 
     @abc.abstractmethod
-    async def create(self, *, overwrite: bool = False) -> None:
-        ...  # pragma: no cover
+    async def create(self, *, overwrite: bool = False) -> None: ...  # pragma: no cover
 
     @abc.abstractmethod
-    async def is_empty(self, table_name: str) -> bool:
-        ...  # pragma: no cover
+    async def is_empty(self, table_name: str) -> bool: ...  # pragma: no cover
 
     @abc.abstractmethod
-    async def backup(self, filepath: Path) -> None:
-        ...  # pragma: no cover
+    async def backup(self, filepath: Path) -> None: ...  # pragma: no cover

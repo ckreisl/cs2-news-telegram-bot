@@ -5,7 +5,7 @@ from .db_posts import PostDatabase
 from .db_sqlite import SQLite
 
 __all__ = [
-    'PostDatabase',
-    'ChatDatabase',
-    'SQLite',
+    "ChatDatabase",
+    "PostDatabase",
+    "SQLite",
 ]

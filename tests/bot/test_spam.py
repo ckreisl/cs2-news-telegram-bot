@@ -9,9 +9,9 @@ import pytest
 from telegram.constants import ParseMode
 
 from cs2posts.bot import settings
+from cs2posts.bot.spam import SpamProtector
 from cs2posts.bot.spam import spam_banned_message
 from cs2posts.bot.spam import spam_warning_message
-from cs2posts.bot.spam import SpamProtector
 from cs2posts.dto.chats import Chat
 
 
@@ -26,7 +26,7 @@ def spam_protector():
 
 
 def get_utc_now():
-    return datetime.now(tz=ZoneInfo('UTC')).replace(tzinfo=None)
+    return datetime.now(tz=ZoneInfo("UTC")).replace(tzinfo=None)
 
 
 def test_spam_protector_messages_warning(chat: Chat):
@@ -40,7 +40,9 @@ def test_spam_protector_messages_banned(chat: Chat):
     chat.strikes = 3
     timout = 180
     max_strikes = 3
-    expected = "<b>Strike (3/3)</b> Chat is now <b>banned</b> for spamming (Timeout: 3 mins)."
+    expected = (
+        "<b>Strike (3/3)</b> Chat is now <b>banned</b> for spamming (Timeout: 3 mins)."
+    )
     assert spam_banned_message(chat, timout, max_strikes) == expected
 
 
@@ -80,8 +82,9 @@ def test_spam_protector_reduce_strike_level(spam_protector, chat):
 def test_spam_protector_is_spamming(spam_protector, chat):
     chat.last_activity = get_utc_now()
     assert spam_protector.is_spamming(chat)
-    chat.last_activity = get_utc_now(
-    ) - timedelta(milliseconds=settings.CHAT_SPAM_INTERVAL_MS + 1)
+    chat.last_activity = get_utc_now() - timedelta(
+        milliseconds=settings.CHAT_SPAM_INTERVAL_MS + 1
+    )
     assert spam_protector.is_spamming(chat) is False
 
 
@@ -109,8 +112,9 @@ def test_spam_protector_is_banned(spam_protector, chat):
 def test_spam_protector_is_timeouted(spam_protector, chat):
     chat.last_activity = get_utc_now()
     assert spam_protector.is_timeouted(chat)
-    chat.last_activity = get_utc_now(
-    ) - timedelta(seconds=settings.CHAT_BAN_TIMEOUT_SECONDS + 1)
+    chat.last_activity = get_utc_now() - timedelta(
+        seconds=settings.CHAT_BAN_TIMEOUT_SECONDS + 1
+    )
     assert spam_protector.is_timeouted(chat) is False
 
 
@@ -128,8 +132,9 @@ async def test_spam_protector_check(spam_protector, chat):
     chat.last_activity = get_utc_now()
     await spam_protector.check(mock_bot, chat)
 
-    chat.last_activity = get_utc_now(
-    ) - timedelta(seconds=settings.CHAT_BAN_TIMEOUT_SECONDS + 1)
+    chat.last_activity = get_utc_now() - timedelta(
+        seconds=settings.CHAT_BAN_TIMEOUT_SECONDS + 1
+    )
     await spam_protector.check(mock_bot, chat)
     chat.is_banned = False
 
@@ -140,13 +145,16 @@ async def test_spam_protector_check(spam_protector, chat):
 
 
 @pytest.mark.asyncio
-async def test_spam_protector_check_resets_strikes_after_ban_timeout(spam_protector, chat):
+async def test_spam_protector_check_resets_strikes_after_ban_timeout(
+    spam_protector, chat
+):
     mock_bot = AsyncMock()
     # Chat was banned at MAX_STRIKES and the ban timeout has now expired.
     chat.is_banned = True
     chat.strikes = SpamProtector.MAX_STRIKES
-    chat.last_activity = get_utc_now(
-    ) - timedelta(seconds=settings.CHAT_BAN_TIMEOUT_SECONDS + 1)
+    chat.last_activity = get_utc_now() - timedelta(
+        seconds=settings.CHAT_BAN_TIMEOUT_SECONDS + 1
+    )
 
     await spam_protector.check(mock_bot, chat)
 
@@ -167,7 +175,8 @@ async def test_spam_protector_strike(spam_protector, chat):
     mock_bot.send_message.assert_called_once_with(
         chat_id=chat.chat_id,
         text=spam_warning_message(chat, settings.CHAT_MAX_STRIKES),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML,
+    )
     mock_bot.reset_mock()
 
     await spam_protector.strike(mock_bot, chat)
@@ -175,7 +184,8 @@ async def test_spam_protector_strike(spam_protector, chat):
     mock_bot.send_message.assert_called_once_with(
         chat_id=chat.chat_id,
         text=spam_warning_message(chat, settings.CHAT_MAX_STRIKES),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML,
+    )
     mock_bot.reset_mock()
 
     await spam_protector.strike(mock_bot, chat)
@@ -183,12 +193,16 @@ async def test_spam_protector_strike(spam_protector, chat):
     mock_bot.send_message.assert_called_once_with(
         chat_id=chat.chat_id,
         text=spam_banned_message(
-            chat, settings.CHAT_BAN_TIMEOUT_SECONDS, settings.CHAT_MAX_STRIKES),
-        parse_mode=ParseMode.HTML)
+            chat, settings.CHAT_BAN_TIMEOUT_SECONDS, settings.CHAT_MAX_STRIKES
+        ),
+        parse_mode=ParseMode.HTML,
+    )
     assert chat.is_banned
 
 
-def test_spam_protector_recover_strikes_no_recovery_before_interval(spam_protector, chat):
+def test_spam_protector_recover_strikes_no_recovery_before_interval(
+    spam_protector, chat
+):
     chat.strikes = 2
     chat.last_activity = get_utc_now()
     spam_protector.recover_strikes(chat)
@@ -197,27 +211,32 @@ def test_spam_protector_recover_strikes_no_recovery_before_interval(spam_protect
 
 def test_spam_protector_recover_strikes_after_interval(spam_protector, chat):
     chat.strikes = 2
-    chat.last_activity = get_utc_now(
-    ) - timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1)
+    chat.last_activity = get_utc_now() - timedelta(
+        minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1
+    )
     spam_protector.recover_strikes(chat)
     assert chat.strikes == 1
 
 
 def test_spam_protector_recover_strikes_does_not_go_below_zero(spam_protector, chat):
     chat.strikes = 0
-    chat.last_activity = get_utc_now(
-    ) - timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1)
+    chat.last_activity = get_utc_now() - timedelta(
+        minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1
+    )
     spam_protector.recover_strikes(chat)
     assert chat.strikes == 0
 
 
 @pytest.mark.asyncio
-async def test_spam_protector_check_recovers_strikes_on_good_behavior(spam_protector, chat):
+async def test_spam_protector_check_recovers_strikes_on_good_behavior(
+    spam_protector, chat
+):
     mock_bot = AsyncMock()
     chat.strikes = 2
     # Set last activity to 61 minutes ago (beyond recovery interval)
-    chat.last_activity = get_utc_now(
-    ) - timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1)
+    chat.last_activity = get_utc_now() - timedelta(
+        minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES + 1
+    )
 
     await spam_protector.check(mock_bot, chat)
     # Should have recovered one strike

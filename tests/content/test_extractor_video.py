@@ -126,7 +126,7 @@ def test_video_extractor_extract_is_heading_false():
 
 
 def test_video_extractor_extract_with_html_entities():
-    text = '[video mp4=&quot;https://example.com/video.mp4&quot;][/video]'
+    text = "[video mp4=&quot;https://example.com/video.mp4&quot;][/video]"
     extractor = VideoExtractor(text)
     videos = extractor.extract()
     assert len(videos) == 1
@@ -198,7 +198,10 @@ def test_video_extractor_extract_url_no_match():
 
 def test_video_extractor_extract_url_direct():
     extractor = VideoExtractor("")
-    assert extractor._extract_url("https://example.com/video.mp4") == "https://example.com/video.mp4"
+    assert (
+        extractor._extract_url("https://example.com/video.mp4")
+        == "https://example.com/video.mp4"
+    )
 
 
 def test_video_extractor_case_insensitive():

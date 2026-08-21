@@ -6,10 +6,9 @@ import logging
 from bs4 import BeautifulSoup
 from bs4 import Tag
 
-from .telegram import TelegramMessage
 from cs2posts.dto.post import Post
 from cs2posts.utils import get_redirected_url
-
+from .telegram import TelegramMessage
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,6 @@ def build_message(post: Post, content: str, source_url: str | None = None) -> st
 
 
 class CounterStrikeExternalMessage(TelegramMessage):
-
     def __init__(self, post: Post) -> None:
         self.post = post
         source_url = get_redirected_url(post.url)

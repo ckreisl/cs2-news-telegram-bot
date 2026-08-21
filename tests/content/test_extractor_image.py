@@ -5,9 +5,9 @@ from unittest.mock import patch
 import pytest
 
 from cs2posts.content.content import Image
+from cs2posts.content.extractor_image import ImageExtractor
 from cs2posts.content.extractor_image import extract_images
 from cs2posts.content.extractor_image import extract_images_deprecated
-from cs2posts.content.extractor_image import ImageExtractor
 
 
 # Tests for extract_images_deprecated function
@@ -48,7 +48,7 @@ def test_extract_images_single_image():
 
 
 def test_extract_images_html_encoded_quotes():
-    text = '[img src=&quot;https://example.com/image.png&quot;][/img]'
+    text = "[img src=&quot;https://example.com/image.png&quot;][/img]"
     matches = list(extract_images(text))
     assert len(matches) == 1
     # Group 1 is for html encoded quotes
@@ -92,7 +92,7 @@ def test_extract_images_mixed_quote_types():
 
 def test_extract_images_html_encoded_quotes_containing_quotes():
     url = 'https://example.com/image_with_"quote".png'
-    text = f'[img src=&quot;{url}&quot;][/img]'
+    text = f"[img src=&quot;{url}&quot;][/img]"
     matches = list(extract_images(text))
     assert len(matches) == 1
     assert matches[0].group(1) == url
@@ -106,7 +106,7 @@ def test_extract_images_empty_src_quoted():
 
 
 def test_extract_images_empty_src_html_encoded():
-    text = '[img src=&quot;&quot;][/img]'
+    text = "[img src=&quot;&quot;][/img]"
     matches = list(extract_images(text))
     assert len(matches) == 1
     assert matches[0].group(1) == ""
@@ -122,7 +122,9 @@ def image_extractor():
 def test_image_extractor_extract_single_image():
     text = '[img src="https://example.com/image.png"][/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         images = extractor.extract()
     assert len(images) == 1
@@ -133,8 +135,13 @@ def test_image_extractor_extract_single_image():
 def test_image_extractor_extract_multiple_images():
     text = '[img src="https://example.com/image1.png"][/img] [img src="https://example.com/image2.png"][/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
-        mock_resolve.side_effect = ["https://example.com/image1.png", "https://example.com/image2.png"]
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
+        mock_resolve.side_effect = [
+            "https://example.com/image1.png",
+            "https://example.com/image2.png",
+        ]
         images = extractor.extract()
     assert len(images) == 2
     assert images[0].url == "https://example.com/image1.png"
@@ -158,7 +165,9 @@ def test_image_extractor_extract_empty_string():
 def test_image_extractor_extract_deprecated_format():
     text = "[img]https://example.com/image.png[/img]"
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         images = extractor.extract()
     assert len(images) == 1
@@ -168,8 +177,13 @@ def test_image_extractor_extract_deprecated_format():
 def test_image_extractor_extract_mixed_formats():
     text = '[img src="https://example.com/image1.png"][/img] [img]https://example.com/image2.png[/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
-        mock_resolve.side_effect = ["https://example.com/image1.png", "https://example.com/image2.png"]
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
+        mock_resolve.side_effect = [
+            "https://example.com/image1.png",
+            "https://example.com/image2.png",
+        ]
         images = extractor.extract()
     assert len(images) == 2
 
@@ -177,7 +191,9 @@ def test_image_extractor_extract_mixed_formats():
 def test_image_extractor_extract_with_html_encoded_quot():
     text = '[img src="https://example.com/image.png&quot;"][/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         images = extractor.extract()
     assert len(images) == 1
@@ -186,7 +202,9 @@ def test_image_extractor_extract_with_html_encoded_quot():
 def test_image_extractor_extract_skips_empty_url():
     text = '[img src="https://example.com/image.png"][/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
         mock_resolve.return_value = ""
         images = extractor.extract()
     assert len(images) == 0
@@ -195,7 +213,9 @@ def test_image_extractor_extract_skips_empty_url():
 def test_image_extractor_extract_image_positions():
     text = '[img src="https://example.com/image.png"][/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         images = extractor.extract()
     assert images[0].text_pos_start == 0
@@ -205,7 +225,9 @@ def test_image_extractor_extract_image_positions():
 def test_image_extractor_extract_is_heading_false():
     text = '[img src="https://example.com/image.png"][/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
         mock_resolve.return_value = "https://example.com/image.png"
         images = extractor.extract()
     assert images[0].is_heading is False
@@ -214,8 +236,12 @@ def test_image_extractor_extract_is_heading_false():
 def test_image_extractor_extract_steam_clan_image():
     text = '[img src="{STEAM_CLAN_IMAGE}/foo/bar.png"][/img]'
     extractor = ImageExtractor(text)
-    with patch("cs2posts.content.extractor_image.resolve_steam_clan_image_url") as mock_resolve:
-        mock_resolve.return_value = "https://clan.akamai.steamstatic.com/images/foo/bar.png"
+    with patch(
+        "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+    ) as mock_resolve:
+        mock_resolve.return_value = (
+            "https://clan.akamai.steamstatic.com/images/foo/bar.png"
+        )
         images = extractor.extract()
     assert len(images) == 1
     assert images[0].url == "https://clan.akamai.steamstatic.com/images/foo/bar.png"

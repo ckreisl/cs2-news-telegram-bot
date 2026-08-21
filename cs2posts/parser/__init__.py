@@ -6,8 +6,8 @@ from .steam_news_table import SteamNewsTableParser
 from .steam_update_heading import SteamUpdateHeadingParser
 
 __all__ = [
+    "Steam2TelegramHTML",
     "SteamListParser",
     "SteamNewsTableParser",
     "SteamUpdateHeadingParser",
-    "Steam2TelegramHTML",
 ]
