@@ -169,7 +169,9 @@ async def test_chats_database_get_running_and_interested_in_news_chats(chats_dat
 
 
 @pytest.mark.asyncio
-async def test_chats_database_get_running_and_interested_in_updates_chats(chats_database):
+async def test_chats_database_get_running_and_interested_in_updates_chats(
+    chats_database,
+):
     assert len(await chats_database.get_running_and_interested_in_updates_chats()) == 0
     chat = await chats_database.get(1337)
     chat.is_running = True
@@ -179,13 +181,21 @@ async def test_chats_database_get_running_and_interested_in_updates_chats(chats_
 
 
 @pytest.mark.asyncio
-async def test_chats_database_get_running_and_interested_in_external_news_chats(chats_database):
-    assert len(await chats_database.get_running_and_interested_in_external_news_chats()) == 0
+async def test_chats_database_get_running_and_interested_in_external_news_chats(
+    chats_database,
+):
+    assert (
+        len(await chats_database.get_running_and_interested_in_external_news_chats())
+        == 0
+    )
     chat = await chats_database.get(1337)
     chat.is_running = True
     chat.is_external_news_interested = True
     await chats_database.update(chat)
-    assert len(await chats_database.get_running_and_interested_in_external_news_chats()) == 1
+    assert (
+        len(await chats_database.get_running_and_interested_in_external_news_chats())
+        == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -207,7 +217,8 @@ async def test_chat_database_len(chats_database):
 
 @pytest.mark.asyncio
 async def test_chats_database_import_from_json_legacy_format(
-        chats_empty_database, tmp_path):
+    chats_empty_database, tmp_path
+):
     # Old on-disk format wraps the chats in a top-level "chats" key.
     payload = {"chats": [_chat_as_json_dict(Chat(1337)), _chat_as_json_dict(Chat(42))]}
     json_file = tmp_path / "chats.json"

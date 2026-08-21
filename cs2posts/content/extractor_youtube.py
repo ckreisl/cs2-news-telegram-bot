@@ -7,7 +7,6 @@ from .extractor import Extractor
 
 
 class YoutubeExtractor(Extractor):
-
     def extract(self) -> list[Youtube]:
         videos = []
 
@@ -15,10 +14,13 @@ class YoutubeExtractor(Extractor):
         matches = re.finditer(youtube_pattern, self.text)
 
         for result in matches:
-            videos.append(Youtube(
-                text_pos_start=result.start(),
-                text_pos_end=result.end(),
-                is_heading=False,
-                url=result.group(1)))
+            videos.append(
+                Youtube(
+                    text_pos_start=result.start(),
+                    text_pos_end=result.end(),
+                    is_heading=False,
+                    url=result.group(1),
+                )
+            )
 
         return videos

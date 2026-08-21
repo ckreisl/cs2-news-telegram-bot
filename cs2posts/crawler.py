@@ -28,7 +28,7 @@ class CounterStrike2Crawler:
 
     def _validate_args(self, *, count: int) -> None:
         if count < 0:
-            raise ValueError('count must be greater than or equal to 0')
+            raise ValueError("count must be greater than or equal to 0")
 
     async def crawl(self, *, count: int | None = None) -> dict[str, Any]:
         """Fetch the latest CS2 news posts.
@@ -45,17 +45,19 @@ class CounterStrike2Crawler:
         url = self.url % count
         try:
             response = await asyncio.to_thread(
-                requests.get, url, timeout=CRAWLER_REQUEST_TIMEOUT)
+                requests.get, url, timeout=CRAWLER_REQUEST_TIMEOUT
+            )
         except Exception:
-            logger.exception('Could not fetch data from Steam API')
+            logger.exception("Could not fetch data from Steam API")
             raise
 
         if not response.ok:
             raise RuntimeError(
-                f'Could not fetch data, received response code={response.status_code}')
+                f"Could not fetch data, received response code={response.status_code}"
+            )
 
         try:
             return json.loads(response.text)
         except json.JSONDecodeError as exc:
-            logger.exception('Received invalid JSON from Steam API: %s', exc)
+            logger.exception("Received invalid JSON from Steam API: %s", exc)
             raise

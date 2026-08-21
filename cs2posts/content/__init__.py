@@ -8,10 +8,10 @@ from .content import Youtube
 from .extractor_content import ContentExtractor
 
 __all__ = [
-    'Carousel',
-    'ContentExtractor',
-    'Image',
-    'Video',
-    'Youtube',
-    'TextBlock',
+    "Carousel",
+    "ContentExtractor",
+    "Image",
+    "TextBlock",
+    "Video",
+    "Youtube",
 ]

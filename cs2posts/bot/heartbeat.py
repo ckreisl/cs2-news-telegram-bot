@@ -4,7 +4,6 @@ import logging
 import time
 from pathlib import Path
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,4 +19,4 @@ def write_heartbeat(filepath: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(str(time.time()))
     except OSError as e:
-        logger.warning(f'Could not write heartbeat to {filepath}: {e}')
+        logger.warning(f"Could not write heartbeat to {filepath}: {e}")

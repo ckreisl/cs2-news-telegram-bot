@@ -31,7 +31,7 @@ def test_video_creation():
         mp4="https://example.com/video.mp4",
         poster="https://example.com/poster.jpg",
         autoplay=True,
-        controls=False
+        controls=False,
     )
     assert video.text_pos_start == 0
     assert video.text_pos_end == 100
@@ -52,7 +52,7 @@ def test_video_is_empty_with_no_urls():
         mp4="",
         poster="",
         autoplay=False,
-        controls=False
+        controls=False,
     )
     assert video.is_empty() is True
 
@@ -66,7 +66,7 @@ def test_video_is_empty_with_webm_only():
         mp4="",
         poster="",
         autoplay=False,
-        controls=False
+        controls=False,
     )
     assert video.is_empty() is False
 
@@ -80,7 +80,7 @@ def test_video_is_empty_with_mp4_only():
         mp4="https://example.com/video.mp4",
         poster="",
         autoplay=False,
-        controls=False
+        controls=False,
     )
     assert video.is_empty() is False
 
@@ -94,7 +94,7 @@ def test_video_is_empty_with_both_urls():
         mp4="https://example.com/video.mp4",
         poster="",
         autoplay=False,
-        controls=False
+        controls=False,
     )
     assert video.is_empty() is False
 
@@ -105,7 +105,7 @@ def test_image_creation():
         text_pos_start=0,
         text_pos_end=50,
         is_heading=False,
-        url="https://example.com/image.png"
+        url="https://example.com/image.png",
     )
     assert image.text_pos_start == 0
     assert image.text_pos_end == 50
@@ -116,14 +116,21 @@ def test_image_creation():
 # Tests for Carousel dataclass
 def test_carousel_creation():
     images = [
-        Image(text_pos_start=10, text_pos_end=20, is_heading=False, url="https://example.com/image1.png"),
-        Image(text_pos_start=30, text_pos_end=40, is_heading=False, url="https://example.com/image2.png"),
+        Image(
+            text_pos_start=10,
+            text_pos_end=20,
+            is_heading=False,
+            url="https://example.com/image1.png",
+        ),
+        Image(
+            text_pos_start=30,
+            text_pos_end=40,
+            is_heading=False,
+            url="https://example.com/image2.png",
+        ),
     ]
     carousel = Carousel(
-        text_pos_start=0,
-        text_pos_end=100,
-        is_heading=False,
-        images=images
+        text_pos_start=0, text_pos_end=100, is_heading=False, images=images
     )
     assert carousel.text_pos_start == 0
     assert carousel.text_pos_end == 100
@@ -134,22 +141,14 @@ def test_carousel_creation():
 
 
 def test_carousel_empty_images():
-    carousel = Carousel(
-        text_pos_start=0,
-        text_pos_end=100,
-        is_heading=False,
-        images=[]
-    )
+    carousel = Carousel(text_pos_start=0, text_pos_end=100, is_heading=False, images=[])
     assert len(carousel.images) == 0
 
 
 # Tests for TextBlock dataclass
 def test_textblock_creation():
     textblock = TextBlock(
-        text_pos_start=0,
-        text_pos_end=50,
-        is_heading=True,
-        text="Hello World"
+        text_pos_start=0, text_pos_end=50, is_heading=True, text="Hello World"
     )
     assert textblock.text_pos_start == 0
     assert textblock.text_pos_end == 50
@@ -158,22 +157,14 @@ def test_textblock_creation():
 
 
 def test_textblock_empty_text():
-    textblock = TextBlock(
-        text_pos_start=0,
-        text_pos_end=0,
-        is_heading=False,
-        text=""
-    )
+    textblock = TextBlock(text_pos_start=0, text_pos_end=0, is_heading=False, text="")
     assert textblock.text == ""
 
 
 # Tests for Youtube dataclass
 def test_youtube_creation():
     youtube = Youtube(
-        text_pos_start=0,
-        text_pos_end=50,
-        is_heading=False,
-        url="dQw4w9WgXcQ"
+        text_pos_start=0, text_pos_end=50, is_heading=False, url="dQw4w9WgXcQ"
     )
     assert youtube.text_pos_start == 0
     assert youtube.text_pos_end == 50
@@ -183,19 +174,13 @@ def test_youtube_creation():
 
 def test_youtube_get_url():
     youtube = Youtube(
-        text_pos_start=0,
-        text_pos_end=50,
-        is_heading=False,
-        url="dQw4w9WgXcQ"
+        text_pos_start=0, text_pos_end=50, is_heading=False, url="dQw4w9WgXcQ"
     )
     assert youtube.get_url() == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 def test_youtube_get_url_with_different_id():
     youtube = Youtube(
-        text_pos_start=0,
-        text_pos_end=50,
-        is_heading=False,
-        url="abc123XYZ"
+        text_pos_start=0, text_pos_end=50, is_heading=False, url="abc123XYZ"
     )
     assert youtube.get_url() == "https://www.youtube.com/watch?v=abc123XYZ"

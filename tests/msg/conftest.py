@@ -7,18 +7,20 @@ from cs2posts.dto.post import Post
 
 @pytest.fixture
 def mocked_cs2_update_post() -> Post:
-    return Post(gid="1337",
-                title="Release Notes for 2/13/2009",
-                url="https://test.com",
-                is_external_url=True,
-                author="Valve",
-                contents="my content",
-                date=1234567890,
-                feedlabel="feedlabel",
-                feedname="feedname",
-                feed_type=1,
-                appid=730,
-                tags=["patchnotes"])
+    return Post(
+        gid="1337",
+        title="Release Notes for 2/13/2009",
+        url="https://test.com",
+        is_external_url=True,
+        author="Valve",
+        contents="my content",
+        date=1234567890,
+        feedlabel="feedlabel",
+        feedname="feedname",
+        feed_type=1,
+        appid=730,
+        tags=["patchnotes"],
+    )
 
 
 @pytest.fixture
@@ -34,7 +36,8 @@ def mocked_cs2_news_post() -> Post:
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
 
 @pytest.fixture
@@ -50,4 +53,5 @@ def mocked_cs2_external_news() -> Post:
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=0,
-        appid=730)
+        appid=730,
+    )

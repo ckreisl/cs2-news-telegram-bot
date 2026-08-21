@@ -11,7 +11,7 @@ from cs2posts.bot.heartbeat import write_heartbeat
 
 
 def test_write_heartbeat_creates_file_with_timestamp(tmp_path):
-    filepath = tmp_path / 'beat'
+    filepath = tmp_path / "beat"
 
     before = time.time()
     write_heartbeat(str(filepath))
@@ -22,7 +22,7 @@ def test_write_heartbeat_creates_file_with_timestamp(tmp_path):
 
 
 def test_write_heartbeat_creates_missing_parent_dirs(tmp_path):
-    filepath = tmp_path / 'nested' / 'dir' / 'beat'
+    filepath = tmp_path / "nested" / "dir" / "beat"
 
     write_heartbeat(str(filepath))
 
@@ -30,7 +30,7 @@ def test_write_heartbeat_creates_missing_parent_dirs(tmp_path):
 
 
 def test_write_heartbeat_refreshes_existing_file(tmp_path):
-    filepath = tmp_path / 'beat'
+    filepath = tmp_path / "beat"
     write_heartbeat(str(filepath))
     first = float(filepath.read_text())
 
@@ -43,26 +43,26 @@ def test_write_heartbeat_refreshes_existing_file(tmp_path):
 
 def test_write_heartbeat_swallows_oserror(tmp_path, caplog):
     # A file standing in for the parent directory makes mkdir/write fail.
-    not_a_dir = tmp_path / 'file'
+    not_a_dir = tmp_path / "file"
     not_a_dir.touch()
 
     # Must not raise: a heartbeat failure may never take down the bot.
-    write_heartbeat(str(not_a_dir / 'beat'))
+    write_heartbeat(str(not_a_dir / "beat"))
 
-    assert 'Could not write heartbeat' in caplog.text
+    assert "Could not write heartbeat" in caplog.text
 
 
 @pytest.fixture
 def heartbeat_settings(tmp_path, monkeypatch):
-    filepath = tmp_path / 'beat'
-    monkeypatch.setattr(settings, 'HEARTBEAT_FILEPATH', str(filepath))
-    monkeypatch.setattr(settings, 'CS2_UPDATE_CHECK_INTERVAL', 900)
+    filepath = tmp_path / "beat"
+    monkeypatch.setattr(settings, "HEARTBEAT_FILEPATH", str(filepath))
+    monkeypatch.setattr(settings, "CS2_UPDATE_CHECK_INTERVAL", 900)
     return filepath
 
 
 def test_healthcheck_fails_when_file_missing(heartbeat_settings, caplog):
     assert healthcheck.main() == 1
-    assert 'missing' in caplog.text
+    assert "missing" in caplog.text
 
 
 def test_healthcheck_passes_when_fresh(heartbeat_settings):
@@ -86,4 +86,4 @@ def test_healthcheck_fails_when_stale(heartbeat_settings, caplog):
     os.utime(heartbeat_settings, (stale, stale))
 
     assert healthcheck.main() == 1
-    assert 'stale' in caplog.text
+    assert "stale" in caplog.text

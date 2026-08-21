@@ -31,7 +31,6 @@ tests/
 .vscode/
 .idea/
 .env
-requirements-dev.txt
 debug.py
 save.py
 

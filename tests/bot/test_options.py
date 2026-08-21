@@ -7,10 +7,10 @@ from unittest.mock import patch
 import pytest
 
 from cs2posts.bot.options import ButtonData
+from cs2posts.bot.options import Options
 from cs2posts.bot.options import create_options_keyboard
 from cs2posts.bot.options import create_options_text
 from cs2posts.bot.options import enabled_icon
-from cs2posts.bot.options import Options
 from cs2posts.dto.chats import Chat
 
 
@@ -22,13 +22,13 @@ def options():
 
 
 @pytest.mark.asyncio
-@patch('cs2posts.bot.options.create_options_message')
+@patch("cs2posts.bot.options.create_options_message")
 async def test_options(mocked_options_factory, options):
     mocked_context = AsyncMock()
     mocked_update = AsyncMock()
     mocked_update.message.from_user.id = 42
 
-    mocked_options_factory.return_value = ('text', 'reply_markup')
+    mocked_options_factory.return_value = ("text", "reply_markup")
 
     chat = Chat(42)
     chat.chat_id_admin = 42
@@ -38,11 +38,12 @@ async def test_options(mocked_options_factory, options):
 
     mocked_update.message.reply_text.assert_awaited_once()
     mocked_update.message.reply_text.assert_called_once_with(
-        text='text', reply_markup='reply_markup', parse_mode='HTML')
+        text="text", reply_markup="reply_markup", parse_mode="HTML"
+    )
 
 
 @pytest.mark.asyncio
-@patch('cs2posts.bot.options.create_options_message')
+@patch("cs2posts.bot.options.create_options_message")
 async def test_options_no_admin(mocked_options_factory, options):
     mocked_context = AsyncMock()
     mocked_update = AsyncMock()
@@ -60,7 +61,7 @@ async def test_options_no_admin(mocked_options_factory, options):
 
 
 @pytest.mark.asyncio
-@patch('cs2posts.bot.options.create_options_message')
+@patch("cs2posts.bot.options.create_options_message")
 async def test_options_no_valid_chat(mocked_options_factory, options):
     mocked_context = AsyncMock()
     mocked_update = AsyncMock()
@@ -139,7 +140,8 @@ async def test_options_buttons_update(options):
     options.chats_db.update.assert_called_once_with(chat)
     assert chat.is_update_interested is False
     options.update.assert_called_once_with(
-        mocked_context, mocked_update.callback_query, chat)
+        mocked_context, mocked_update.callback_query, chat
+    )
 
     mocked_update.callback_query.answer.reset_mock()
     await options.button(mocked_update, mocked_context)
@@ -148,7 +150,8 @@ async def test_options_buttons_update(options):
     options.chats_db.update.assert_called_with(chat)
     assert chat.is_update_interested
     options.update.assert_called_with(
-        mocked_context, mocked_update.callback_query, chat)
+        mocked_context, mocked_update.callback_query, chat
+    )
 
 
 @pytest.mark.asyncio
@@ -171,7 +174,8 @@ async def test_options_buttons_news(options):
     options.chats_db.update.assert_called_once_with(chat)
     assert chat.is_news_interested is False
     options.update.assert_called_once_with(
-        mocked_context, mocked_update.callback_query, chat)
+        mocked_context, mocked_update.callback_query, chat
+    )
 
     mocked_update.callback_query.answer.reset_mock()
     await options.button(mocked_update, mocked_context)
@@ -180,13 +184,14 @@ async def test_options_buttons_news(options):
     options.chats_db.update.assert_called_with(chat)
     assert chat.is_news_interested
     options.update.assert_called_with(
-        mocked_context, mocked_update.callback_query, chat)
+        mocked_context, mocked_update.callback_query, chat
+    )
 
 
 @pytest.mark.asyncio
-@patch('cs2posts.bot.options.create_options_message')
+@patch("cs2posts.bot.options.create_options_message")
 async def test_options_update(mocked_msg_factory, options):
-    mocked_msg_factory.return_value = ('text', 'reply_markup')
+    mocked_msg_factory.return_value = ("text", "reply_markup")
     mocked_context = AsyncMock()
     mocked_query = AsyncMock()
     mocked_query.message.message_id = 1337
@@ -196,14 +201,18 @@ async def test_options_update(mocked_msg_factory, options):
 
     mocked_context.bot.edit_message_text.assert_awaited_once()
     mocked_context.bot.edit_message_text.assert_called_once_with(
-        text='text', chat_id=42, message_id=1337,
-        reply_markup='reply_markup', parse_mode='HTML')
+        text="text",
+        chat_id=42,
+        message_id=1337,
+        reply_markup="reply_markup",
+        parse_mode="HTML",
+    )
 
 
 @pytest.mark.asyncio
-@patch('cs2posts.bot.options.create_options_message')
+@patch("cs2posts.bot.options.create_options_message")
 async def test_options_external_news(mocked_msg_factory, options):
-    mocked_msg_factory.return_value = ('text', 'reply_markup')
+    mocked_msg_factory.return_value = ("text", "reply_markup")
     mocked_context = AsyncMock()
     mocked_update = AsyncMock()
     mocked_update.callback_query.from_user.id = 42
@@ -220,7 +229,8 @@ async def test_options_external_news(mocked_msg_factory, options):
     options.chats_db.update.assert_called_once_with(chat)
     assert chat.is_external_news_interested is False
     options.update.assert_called_with(
-        mocked_context, mocked_update.callback_query, chat)
+        mocked_context, mocked_update.callback_query, chat
+    )
 
     mocked_update.callback_query.answer.reset_mock()
     await options.button(mocked_update, mocked_context)
@@ -229,7 +239,8 @@ async def test_options_external_news(mocked_msg_factory, options):
     options.chats_db.update.assert_called_with(chat)
     assert chat.is_external_news_interested
     options.update.assert_called_with(
-        mocked_context, mocked_update.callback_query, chat)
+        mocked_context, mocked_update.callback_query, chat
+    )
 
 
 @pytest.mark.asyncio
@@ -244,18 +255,22 @@ async def test_options_close(options):
     mocked_update.callback_query.answer.assert_called_once()
     mocked_context.bot.delete_message.assert_awaited_once()
     mocked_context.bot.delete_message.assert_called_once_with(
-        chat_id=42, message_id=1337)
+        chat_id=42, message_id=1337
+    )
 
 
 def test_icon_generator_get_enable_icon():
-    assert enabled_icon(True) == '✅'
-    assert enabled_icon(False) == '⛔️'
+    assert enabled_icon(True) == "✅"
+    assert enabled_icon(False) == "⛔️"
 
 
 def test_create_options_text_reflects_chat_state():
-    chat = Chat(42, is_update_interested=True,
-                is_news_interested=False,
-                is_external_news_interested=True)
+    chat = Chat(
+        42,
+        is_update_interested=True,
+        is_news_interested=False,
+        is_external_news_interested=True,
+    )
 
     text = create_options_text(chat)
 
@@ -265,9 +280,12 @@ def test_create_options_text_reflects_chat_state():
 
 
 def test_create_options_keyboard_labels_toggle_with_state():
-    chat = Chat(42, is_update_interested=True,
-                is_news_interested=False,
-                is_external_news_interested=False)
+    chat = Chat(
+        42,
+        is_update_interested=True,
+        is_news_interested=False,
+        is_external_news_interested=False,
+    )
 
     keyboard = create_options_keyboard(chat)
     labels = [button.text for row in keyboard for button in row]

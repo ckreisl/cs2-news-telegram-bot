@@ -9,8 +9,10 @@ import httpcore
 import httpx
 from telegram import InputMediaPhoto
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
+from telegram.error import ChatMigrated
+from telegram.error import Forbidden
 
-from .telegram import TelegramMessage
 from cs2posts.content import Carousel
 from cs2posts.content import ContentExtractor
 from cs2posts.content import Image
@@ -27,13 +29,12 @@ from cs2posts.parser.steam_news_table import SteamNewsTableParser
 from cs2posts.utils import extract_url
 from cs2posts.utils import get_redirected_url
 from cs2posts.utils import is_valid_url
-
+from .telegram import TelegramMessage
 
 logger = logging.getLogger(__name__)
 
 
 class CounterStrikeNewsMessage(TelegramMessage):
-
     def __init__(self, post: Post) -> None:
         self.post = post
         parser = self._create_parser(post)
@@ -49,34 +50,41 @@ class CounterStrikeNewsMessage(TelegramMessage):
         return parser
 
     def __add_header(self) -> None:
-        if (isinstance(self.content[0], Image) or  # noqa
-            isinstance(self.content[0], Video) or  # noqa
-            isinstance(self.content[0], Youtube) or  # noqa
-            isinstance(self.content[0], Carousel)):  # noqa
+        if isinstance(self.content[0], (Image, Video, Youtube, Carousel)):
             # Ignore header we set it as caption
             return
 
         header = self.get_header()
-        if isinstance(self.content[0], TextBlock):
-            if self.content[0].is_heading and header not in self.content[0].text:
-                self.content[0].text = self.get_header() + "\n\n" + \
-                    self.content[0].text
+        if (
+            isinstance(self.content[0], TextBlock)
+            and self.content[0].is_heading
+            and header not in self.content[0].text
+        ):
+            self.content[0].text = header + "\n\n" + self.content[0].text
 
     def __add_footer(self) -> None:
         url = get_redirected_url(self.post.url)
         footer = (
-            f"\n\n(Author: {html.escape(self.post.author)})\n\n"
+            f"(Author: {html.escape(self.post.author)})\n\n"
             f"Source: <a href='{html.escape(url, quote=True)}'>Link</a>"
         )
 
         if isinstance(self.content[-1], TextBlock):
-            self.content[-1].text += footer
+            # The extracted text keeps whatever trailing newlines the source
+            # markup had; strip them so the footer always sits exactly one
+            # blank line below the last line of content. A media-only post still
+            # ends in an empty TextBlock, which carries no content to sit below.
+            body = self.content[-1].text.rstrip()
+            self.content[-1].text = f"{body}\n\n{footer}" if body else footer
         else:
-            self.content.append(TextBlock(
-                text_pos_start=self.content[-1].text_pos_end + 1,
-                text_pos_end=len(footer),
-                is_heading=False,
-                text=footer))
+            self.content.append(
+                TextBlock(
+                    text_pos_start=self.content[-1].text_pos_end + 1,
+                    text_pos_end=len(footer),
+                    is_heading=False,
+                    text=footer,
+                )
+            )
 
     def get_header(self) -> str:
         return f"<b>{html.escape(self.post.title)}</b>\n({self.post.date_as_datetime})"
@@ -91,7 +99,8 @@ class CounterStrikeNewsMessage(TelegramMessage):
                 chat_id=chat_id,
                 text=text,
                 parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)
+                disable_web_page_preview=True,
+            )
             if i < len(chunks) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
@@ -99,16 +108,13 @@ class CounterStrikeNewsMessage(TelegramMessage):
         image_url = extract_url(image.url)
 
         if not await self._is_valid_media_url(image_url):
-            logger.error(
-                f"Not sending image due to invalid image URL {image_url=}")
+            logger.error(f"Not sending image due to invalid image URL {image_url=}")
             return
 
         caption = self.get_header() if image.is_heading else None
         await bot.send_photo(
-            chat_id=chat_id,
-            photo=image_url,
-            caption=caption,
-            parse_mode=ParseMode.HTML)
+            chat_id=chat_id, photo=image_url, caption=caption, parse_mode=ParseMode.HTML
+        )
 
     async def send_carousel(self, bot: Any, chat_id: int, carousel: Carousel) -> None:
         media = []
@@ -116,18 +122,18 @@ class CounterStrikeNewsMessage(TelegramMessage):
             image_url = extract_url(image.url)
 
             if image_url is None or not await self._is_valid_media_url(image_url):
-                logger.error(
-                    f"Not sending image due to invalid image URL {image_url=}")
+                logger.error(f"Not sending image due to invalid image URL {image_url=}")
                 continue
 
             media.append(InputMediaPhoto(media=image_url))
 
-        chunks = [media[i:i + MAX_MEDIA_GROUP_SIZE] for i in range(0, len(media), MAX_MEDIA_GROUP_SIZE)]
+        chunks = [
+            media[i : i + MAX_MEDIA_GROUP_SIZE]
+            for i in range(0, len(media), MAX_MEDIA_GROUP_SIZE)
+        ]
 
         for i, chunk in enumerate(chunks):
-            await bot.send_media_group(
-                chat_id=chat_id,
-                media=chunk)
+            await bot.send_media_group(chat_id=chat_id, media=chunk)
             if i < len(chunks) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)
 
@@ -138,33 +144,34 @@ class CounterStrikeNewsMessage(TelegramMessage):
         args = {
             "chat_id": chat_id,
             "supports_streaming": True,
-            "parse_mode": ParseMode.HTML
+            "parse_mode": ParseMode.HTML,
         }
 
         video_url = None
         if video.mp4:
             video_url = extract_url(video.mp4)
-            args['video'] = video_url
+            args["video"] = video_url
 
         if video.mp4 is None and video.webm:
             video_url = extract_url(video.webm)
-            args['video'] = video_url
+            args["video"] = video_url
 
         if video_url is None or not await self._is_valid_media_url(video_url):
-            logger.error(
-                f"Not sending video due to invalid video URL {video_url=}")
+            logger.error(f"Not sending video due to invalid video URL {video_url=}")
             return
 
         if video.poster:
             thumbnail_url = extract_url(video.poster)
-            args['thumbnail'] = thumbnail_url
+            args["thumbnail"] = thumbnail_url
 
         caption = self.get_header() if video.is_heading else None
-        args['caption'] = caption
+        args["caption"] = caption
 
         await bot.send_video(**args)
 
-    async def send_youtube_video(self, bot: Any, chat_id: int, youtube: Youtube) -> None:
+    async def send_youtube_video(
+        self, bot: Any, chat_id: int, youtube: Youtube
+    ) -> None:
         text: str = ""
         if youtube.is_heading:
             text = self.get_header() + "\n\n"
@@ -174,7 +181,8 @@ class CounterStrikeNewsMessage(TelegramMessage):
             chat_id=chat_id,
             text=text,
             parse_mode=ParseMode.HTML,
-            disable_web_page_preview=False)
+            disable_web_page_preview=False,
+        )
 
     async def send_content(self, bot: Any, chat_id: int, content: Content) -> None:
         if isinstance(content, TextBlock):
@@ -190,22 +198,41 @@ class CounterStrikeNewsMessage(TelegramMessage):
         else:
             raise TypeError(f"Unsupported content type: {type(content)!r}")
 
-    async def _send_with_retry(self, bot: Any, chat_id: int, content: Content, max_retries: int = 3) -> bool:
+    async def _send_with_retry(
+        self, bot: Any, chat_id: int, content: Content, max_retries: int = 3
+    ) -> bool:
         for attempt in range(max_retries + 1):
             try:
                 await self.send_content(bot, chat_id, content)
                 return True
             except (httpx.ReadTimeout, httpcore.ReadTimeout, httpx.ConnectError) as e:
                 if attempt >= max_retries:
-                    logger.exception(f"Giving up after retries for chat {chat_id=}, content={type(content).__name__}, reason={e}")
+                    logger.exception(
+                        f"Giving up after retries for chat {chat_id=}, content={type(content).__name__}, reason={e}"
+                    )
                     return False
-                delay = TELEGRAM_SEND_DELAY_SECONDS * (2 ** attempt)
+                delay = TELEGRAM_SEND_DELAY_SECONDS * (2**attempt)
                 logger.warning(
                     f"Transient error for chat {chat_id=}, content={type(content).__name__}, "
-                    f"attempt={attempt + 1}/{max_retries + 1}, retry_in={delay}s, reason={e}")
+                    f"attempt={attempt + 1}/{max_retries + 1}, retry_in={delay}s, reason={e}"
+                )
                 await asyncio.sleep(delay)
+            except (Forbidden, ChatMigrated):
+                # Chat-level failures: the whole post is undeliverable to this
+                # chat. Propagate so the bot can drop or migrate the chat
+                # instead of failing again on every future post.
+                raise
+            except BadRequest as e:
+                if e.message == "Chat not found":
+                    raise
+                logger.error(
+                    f"Could not send message to chat {chat_id=}, content={type(content).__name__}, reason={e}"
+                )
+                return False
             except Exception as e:
-                logger.exception(f"Could not send message to chat {chat_id=}, content={type(content).__name__}, reason={e}")
+                logger.exception(
+                    f"Could not send message to chat {chat_id=}, content={type(content).__name__}, reason={e}"
+                )
                 return False
 
         return False

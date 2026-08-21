@@ -7,7 +7,6 @@ from .content import Content
 
 
 class Extractor(abc.ABC):
-
     def __init__(self, text: str) -> None:
         self.__text: str = text
 

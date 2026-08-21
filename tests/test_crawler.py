@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from cs2posts.crawler import CounterStrike2Crawler
 from cs2posts.crawler import CRAWLER_REQUEST_TIMEOUT
+from cs2posts.crawler import CounterStrike2Crawler
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def crawler():
 
 @pytest_asyncio.fixture
 def mock_get():
-    with patch('requests.get') as mock_get:
+    with patch("requests.get") as mock_get:
         yield mock_get
 
 
@@ -33,7 +33,8 @@ async def test_crawler_input_args_valid(crawler, mock_get):
     mock_get.return_value.text = '{"foo": "bar"}'
     await crawler.crawl(count=expected_count)
     mock_get.assert_called_once_with(
-        crawler.url % expected_count, timeout=CRAWLER_REQUEST_TIMEOUT)
+        crawler.url % expected_count, timeout=CRAWLER_REQUEST_TIMEOUT
+    )
 
 
 @pytest.mark.asyncio
@@ -55,7 +56,7 @@ async def test_crawler_raises_exception_on_timeout(crawler, mock_get):
 async def test_crawler_raises_exception_on_bad_response(crawler, mock_get):
     mock_get.return_value.ok = False
     mock_get.return_value.status_code = 404
-    with pytest.raises(Exception):
+    with pytest.raises(RuntimeError, match="received response code=404"):
         await crawler.crawl()
 
 

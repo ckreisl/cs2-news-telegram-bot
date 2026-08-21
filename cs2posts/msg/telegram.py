@@ -9,12 +9,10 @@ from telegram.constants import ParseMode
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 
-
 logger = logging.getLogger(__name__)
 
 
 class TelegramMessage:
-
     def __init__(self, message: str) -> None:
         self.__message = message
         self.__messages = self.split(message)
@@ -33,10 +31,10 @@ class TelegramMessage:
             return [message]
 
         chunks: list[str] = []
-        chunk = ''
+        chunk = ""
 
-        for line in message.split('\n'):
-            candidate = f'{chunk}{line}\n'
+        for line in message.split("\n"):
+            candidate = f"{chunk}{line}\n"
             if len(candidate) <= TELEGRAM_MAX_MESSAGE_LENGTH:
                 chunk = candidate
                 continue
@@ -50,7 +48,7 @@ class TelegramMessage:
                 chunks.append(line[:TELEGRAM_MAX_MESSAGE_LENGTH])
                 line = line[TELEGRAM_MAX_MESSAGE_LENGTH:]
 
-            chunk = f'{line}\n'
+            chunk = f"{line}\n"
 
         if chunk:
             chunks.append(chunk)
@@ -68,6 +66,7 @@ class TelegramMessage:
                 chat_id=chat_id,
                 text=msg,
                 parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)
+                disable_web_page_preview=True,
+            )
             if i < len(self.messages) - 1:
                 await asyncio.sleep(TELEGRAM_SEND_DELAY_SECONDS)

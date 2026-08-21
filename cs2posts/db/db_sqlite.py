@@ -10,7 +10,6 @@ from .db import Database
 
 
 class SQLite(Database):
-
     def __init__(self, filepath: Path | None) -> None:
         if filepath is None:
             filepath = Path(__file__).parent.parent.parent / "database"
@@ -24,23 +23,29 @@ class SQLite(Database):
             await conn.execute(query, params)
             await conn.commit()
 
-    async def _fetch_all(self, query: str, params: Sequence[Any] = ()) -> list[aiosqlite.Row]:
+    async def _fetch_all(
+        self, query: str, params: Sequence[Any] = ()
+    ) -> list[aiosqlite.Row]:
         async with aiosqlite.connect(self.filepath) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(query, params) as cursor:
                 return list(await cursor.fetchall())
 
-    async def _fetch_one(self, query: str, params: Sequence[Any] = ()) -> aiosqlite.Row | None:
+    async def _fetch_one(
+        self, query: str, params: Sequence[Any] = ()
+    ) -> aiosqlite.Row | None:
         async with aiosqlite.connect(self.filepath) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(query, params) as cursor:
                 return await cursor.fetchone()
 
     async def _scalar(self, query: str, params: Sequence[Any] = ()) -> Any:
-        async with aiosqlite.connect(self.filepath) as conn:
-            async with conn.execute(query, params) as cursor:
-                row = await cursor.fetchone()
-                return row[0] if row is not None else None
+        async with (
+            aiosqlite.connect(self.filepath) as conn,
+            conn.execute(query, params) as cursor,
+        ):
+            row = await cursor.fetchone()
+            return row[0] if row is not None else None
 
     async def is_empty(self, table_name: str) -> bool:
         count = await self._scalar(f"SELECT COUNT(*) FROM {table_name}")
@@ -58,6 +63,8 @@ class SQLite(Database):
 
     async def backup(self, filepath: Path) -> None:
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        async with aiosqlite.connect(self.filepath) as conn:
-            async with aiosqlite.connect(filepath) as backup_conn:
-                await conn.backup(backup_conn)
+        async with (
+            aiosqlite.connect(self.filepath) as conn,
+            aiosqlite.connect(filepath) as backup_conn,
+        ):
+            await conn.backup(backup_conn)

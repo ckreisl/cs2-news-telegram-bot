@@ -4,9 +4,9 @@ import logging
 import re
 from collections.abc import Iterator
 
+from cs2posts.utils import resolve_steam_clan_image_url
 from .content import Image
 from .extractor import Extractor
-from cs2posts.utils import resolve_steam_clan_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,6 @@ def extract_images(text: str) -> Iterator:
 
 
 class ImageExtractor(Extractor):
-
     def extract(self) -> list[Image]:
         matches = extract_images(self.text)
         matches_deprecated = extract_images_deprecated(self.text)
@@ -37,7 +36,6 @@ class ImageExtractor(Extractor):
 
         images = []
         for result in all_matches:
-
             # Get the URL from the correct capture group
             src_url = result.group(1) or result.group(2)
             if not src_url:
@@ -53,10 +51,13 @@ class ImageExtractor(Extractor):
                 logger.warning("Image URL is empty in text!")
                 continue
 
-            images.append(Image(
-                text_pos_start=result.start(),
-                text_pos_end=result.end(),
-                is_heading=False,
-                url=url))
+            images.append(
+                Image(
+                    text_pos_start=result.start(),
+                    text_pos_end=result.end(),
+                    is_heading=False,
+                    url=url,
+                )
+            )
 
         return images

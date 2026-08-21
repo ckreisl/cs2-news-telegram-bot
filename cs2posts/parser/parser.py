@@ -4,7 +4,6 @@ import abc
 
 
 class Parser(abc.ABC):
-
     def __init__(self, text: str) -> None:
         self.__text = text
 

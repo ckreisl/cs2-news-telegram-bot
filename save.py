@@ -43,21 +43,26 @@ def main(args) -> int:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Utils helping debugging by crawling and saving buggy posts")
-    parser.add_argument("type",
-                        choices=["news", "external", "update"],
-                        help="Type of post to crawl")
-    parser.add_argument("--date",
-                        help="Date of the post to crawl",
-                        type=datetime.fromisoformat,
-                        required=True)
-    parser.add_argument("--count",
-                        help="Number of posts to crawl",
-                        type=int,
-                        default=100)
-    parser.add_argument("--save-dir",
-                        help="Save directory for the JSON files",
-                        default=f"{Path(__file__).parent}/tests/data",
-                        type=Path)
+    parser = argparse.ArgumentParser(
+        "Utils helping debugging by crawling and saving buggy posts"
+    )
+    parser.add_argument(
+        "type", choices=["news", "external", "update"], help="Type of post to crawl"
+    )
+    parser.add_argument(
+        "--date",
+        help="Date of the post to crawl",
+        type=datetime.fromisoformat,
+        required=True,
+    )
+    parser.add_argument(
+        "--count", help="Number of posts to crawl", type=int, default=100
+    )
+    parser.add_argument(
+        "--save-dir",
+        help="Save directory for the JSON files",
+        default=f"{Path(__file__).parent}/tests/data",
+        type=Path,
+    )
 
     raise SystemExit(main(parser.parse_args()))

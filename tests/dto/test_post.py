@@ -8,33 +8,37 @@ from cs2posts.dto.post import Post
 
 @pytest.fixture
 def post_fixture():
-    return Post(gid="1",
-                title="Test",
-                url="http://test.com",
-                is_external_url=True,
-                author="Test author",
-                contents="Test body",
-                date=1234567890,
-                feedlabel="Test label",
-                feedname="Test feed",
-                feed_type=0,
-                appid=730,
-                tags=["patchnotes"])
+    return Post(
+        gid="1",
+        title="Test",
+        url="http://test.com",
+        is_external_url=True,
+        author="Test author",
+        contents="Test body",
+        date=1234567890,
+        feedlabel="Test label",
+        feedname="Test feed",
+        feed_type=0,
+        appid=730,
+        tags=["patchnotes"],
+    )
 
 
 @pytest.fixture
 def post_fixture2():
-    return Post(gid="2",
-                title="Test2",
-                url="http://test2.com",
-                is_external_url=True,
-                author="Test author2",
-                contents="Test body2",
-                date=1234567891,
-                feedlabel="Test label",
-                feedname="Test feed",
-                feed_type=1,
-                appid=730)
+    return Post(
+        gid="2",
+        title="Test2",
+        url="http://test2.com",
+        is_external_url=True,
+        author="Test author2",
+        contents="Test body2",
+        date=1234567891,
+        feedlabel="Test label",
+        feedname="Test feed",
+        feed_type=1,
+        appid=730,
+    )
 
 
 def test_from_dict_ignores_unknown_keys():
@@ -92,7 +96,7 @@ def test_post_to_dict(post_fixture):
         "feedname": post_fixture.feedname,
         "feed_type": post_fixture.feed_type,
         "appid": post_fixture.appid,
-        "tags": post_fixture.tags
+        "tags": post_fixture.tags,
     }
     assert post_fixture.to_dict() == expected
 

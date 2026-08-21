@@ -15,14 +15,16 @@ from cs2posts.msg.cs_external_msg import extract_read_more_links
 from cs2posts.msg.cs_external_msg import remove_read_more_links
 
 
-def test_counter_strike_external_message_uses_read_more_link_and_strips_media(mocked_cs2_external_news):
+def test_counter_strike_external_message_uses_read_more_link_and_strips_media(
+    mocked_cs2_external_news,
+):
     mocked_cs2_external_news.contents = (
         "<p><img src='https://example.com/image.jpg'/>"
         "Lead paragraph<br/>"
         "<a href='https://example.com/story'>Read more</a></p>"
     )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
 
@@ -88,12 +90,17 @@ def test_build_message_formats_external_message(mocked_cs2_external_news):
     assert message.startswith("🔗 <b>External News</b>")
     assert "<b>Some News</b>" in message
     assert "Lead paragraph" in message
-    assert "Source: <a href='https://www.counter-strike.net/newsentry/1339'>Link</a>" in message
+    assert (
+        "Source: <a href='https://www.counter-strike.net/newsentry/1339'>Link</a>"
+        in message
+    )
 
 
 @pytest.mark.asyncio
-async def test_telegram_message_send_external_raises_on_chunk_failure(mocked_cs2_external_news):
-    with patch('requests.get') as mocked_get:
+async def test_telegram_message_send_external_raises_on_chunk_failure(
+    mocked_cs2_external_news,
+):
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
         msg = await create_message(mocked_cs2_external_news)

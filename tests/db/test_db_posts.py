@@ -24,9 +24,7 @@ def data_latest():
             "feedname": "steam_community_announcements",
             "feed_type": 1,
             "appid": 730,
-            "tags": [
-                "patchnotes"
-            ]
+            "tags": ["patchnotes"],
         },
         "news": {
             "gid": "5756237364302520223",
@@ -40,7 +38,7 @@ def data_latest():
             "feedname": "steam_community_announcements",
             "feed_type": 1,
             "appid": 730,
-            "tags": []
+            "tags": [],
         },
         "external": {
             "gid": "5759616966667952408",
@@ -48,14 +46,14 @@ def data_latest():
             "url": "https://steamstore-a.akamaihd.net/news/externalpost/GamingOnLinux/5759616966667952408",
             "is_external_url": True,
             "author": "",
-            "contents": "<p><p>All you Lefties out there can finally get properly represented, in Counter-Strike 2 that is, as there's now the ability to swap your weapons into the other hand.</p><p><img src=\"https://www.gamingonlinux.com/uploads/articles/tagline_images/350555862id24405gol.jpg\" alt /></p><p>Read the full article here: https://www.gamingonlinux.com/2024/04/lefties-unite-counter-strike-2-now-lets-you-swap-hands</p></p>",
+            "contents": '<p><p>All you Lefties out there can finally get properly represented, in Counter-Strike 2 that is, as there\'s now the ability to swap your weapons into the other hand.</p><p><img src="https://www.gamingonlinux.com/uploads/articles/tagline_images/350555862id24405gol.jpg" alt /></p><p>Read the full article here: https://www.gamingonlinux.com/2024/04/lefties-unite-counter-strike-2-now-lets-you-swap-hands</p></p>',
             "feedlabel": "GamingOnLinux",
             "date": 1714131032,
             "feedname": "GamingOnLinux",
             "feed_type": 0,
             "appid": 730,
-            "tags": []
-        }
+            "tags": [],
+        },
     }
 
 
@@ -180,7 +178,8 @@ async def test_post_database_get_post_by_gid_missing(post_empty_database):
 
 @pytest.mark.asyncio
 async def test_post_database_import_from_json_legacy_format(
-        post_empty_database, data_latest, tmp_path):
+    post_empty_database, data_latest, tmp_path
+):
     # Old on-disk format keyed by post type.
     json_file = tmp_path / "posts.json"
     json_file.write_text(json.dumps(data_latest), encoding="utf-8")

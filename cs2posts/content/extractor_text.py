@@ -12,25 +12,32 @@ from .extractor_youtube import YoutubeExtractor
 
 
 class TextBlockExtractor(Extractor):
-
-    def __init__(self, text: str,
-                 videos: Sequence[Content] | None = None,
-                 carousel: Sequence[Content] | None = None,
-                 images: Sequence[Content] | None = None,
-                 youtube: Sequence[Content] | None = None) -> None:
+    def __init__(
+        self,
+        text: str,
+        videos: Sequence[Content] | None = None,
+        carousel: Sequence[Content] | None = None,
+        images: Sequence[Content] | None = None,
+        youtube: Sequence[Content] | None = None,
+    ) -> None:
         super().__init__(text)
 
         videos = VideoExtractor(self.text).extract() if videos is None else videos
-        carousel = CarouselExtractor(self.text).extract() if carousel is None else carousel
+        carousel = (
+            CarouselExtractor(self.text).extract() if carousel is None else carousel
+        )
         images = ImageExtractor(self.text).extract() if images is None else images
         youtube = YoutubeExtractor(self.text).extract() if youtube is None else youtube
 
-        self.__content = sorted([
-            *videos,
-            *youtube,
-            *carousel,
-            *images,
-        ], key=lambda content: content.text_pos_start)
+        self.__content = sorted(
+            [
+                *videos,
+                *youtube,
+                *carousel,
+                *images,
+            ],
+            key=lambda content: content.text_pos_start,
+        )
 
     def _combine(self, text_blocks: list[TextBlock]) -> list[TextBlock]:
         if len(text_blocks) == 0:
@@ -50,12 +57,15 @@ class TextBlockExtractor(Extractor):
                 break
             right = text_blocks[idx_right]
 
-            if left.text.endswith('>') and right.text.startswith('</a>'):
-                blocks.append(TextBlock(
-                    text_pos_start=left.text_pos_start,
-                    text_pos_end=right.text_pos_end,
-                    is_heading=left.is_heading,
-                    text=left.text + "\nImage Link" + right.text))
+            if left.text.endswith(">") and right.text.startswith("</a>"):
+                blocks.append(
+                    TextBlock(
+                        text_pos_start=left.text_pos_start,
+                        text_pos_end=right.text_pos_end,
+                        is_heading=left.is_heading,
+                        text=left.text + "\nImage Link" + right.text,
+                    )
+                )
                 i += 2
                 continue
 
@@ -81,24 +91,30 @@ class TextBlockExtractor(Extractor):
                 text_pos = c.text_pos_end
                 continue
 
-            text = self.text[text_pos:c.text_pos_start].strip()
+            text = self.text[text_pos : c.text_pos_start].strip()
             if len(text) == 0:
                 text_pos = c.text_pos_end
                 continue
 
-            blocks.append(TextBlock(
-                text_pos_start=text_pos,
-                text_pos_end=c.text_pos_start,
-                is_heading=False,
-                text=text))
+            blocks.append(
+                TextBlock(
+                    text_pos_start=text_pos,
+                    text_pos_end=c.text_pos_start,
+                    is_heading=False,
+                    text=text,
+                )
+            )
 
             text_pos = c.text_pos_end
 
-        blocks.append(TextBlock(
-            text_pos_start=text_pos,
-            text_pos_end=len(self.text),
-            is_heading=False,
-            text=self.text[text_pos:len(self.text)].strip()))
+        blocks.append(
+            TextBlock(
+                text_pos_start=text_pos,
+                text_pos_end=len(self.text),
+                is_heading=False,
+                text=self.text[text_pos : len(self.text)].strip(),
+            )
+        )
 
         # New news post if image is clickable and the link contains an image
         # We end up with a </a> tag as own TextBlock

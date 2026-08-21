@@ -1,3 +1,23 @@
+FROM ghcr.io/astral-sh/uv:0.11.6 AS uv
+
+FROM python:3.12-slim AS builder
+
+COPY --from=uv /uv /usr/local/bin/uv
+
+# UV_PYTHON_DOWNLOADS=never pins the venv to the base image's interpreter, so it
+# stays valid when copied into the runtime stage.
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+WORKDIR /app
+
+# Only the lockfile is needed to build /app/.venv; keeping the source out of
+# this layer means dependencies are re-installed only when uv.lock changes.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
+
+
 FROM python:3.12-slim
 
 LABEL version="1.0" description="CS2 News Telegram Bot"
@@ -15,11 +35,9 @@ RUN chown dev:dev /app
 
 USER dev
 
-COPY --chown=dev:dev requirements.txt .
-
-ENV PATH="/home/dev/.local/bin:${PATH}"
-RUN pip install --upgrade pip \
-    && pip install --user --no-cache-dir -r requirements.txt
+# uv is a build-time tool only; the runtime image just runs the prebuilt venv.
+COPY --from=builder --chown=dev:dev /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:${PATH}"
 
 COPY --chown=dev:dev cs2posts/ cs2posts/
 COPY --chown=dev:dev main.py .

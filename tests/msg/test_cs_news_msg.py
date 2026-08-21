@@ -4,6 +4,9 @@ from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 import pytest
+from telegram.error import BadRequest
+from telegram.error import ChatMigrated
+from telegram.error import Forbidden
 
 from cs2posts.content.content import Carousel
 from cs2posts.content.content import Image
@@ -27,7 +30,8 @@ def mocked_news_post():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
 
 @pytest.fixture
@@ -43,7 +47,8 @@ def mocked_news_post_with_image():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
 
 @pytest.fixture
@@ -59,7 +64,8 @@ def mocked_news_post_with_video():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
 
 @pytest.fixture
@@ -70,12 +76,13 @@ def mocked_news_post_with_youtube():
         is_external_url=True,
         url="https://www.counter-strike.net/newsentry/1338",
         author="Valve",
-        contents='[previewyoutube=dQw4w9WgXcQ;full][/previewyoutube]\nThis is a test message.',
+        contents="[previewyoutube=dQw4w9WgXcQ;full][/previewyoutube]\nThis is a test message.",
         date=1234567890,
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
 
 @pytest.fixture
@@ -91,11 +98,12 @@ def mocked_news_post_with_carousel():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
 
 def test_counter_strike_news_message_init(mocked_news_post):
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(mocked_news_post)
@@ -104,7 +112,7 @@ def test_counter_strike_news_message_init(mocked_news_post):
 
 
 def test_counter_strike_news_message_get_header(mocked_news_post):
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(mocked_news_post)
@@ -116,7 +124,7 @@ def test_counter_strike_news_message_get_header(mocked_news_post):
 def test_counter_strike_news_message_escapes_html_in_title_and_author(mocked_news_post):
     mocked_news_post.title = "Dust2 & Mirage <Update>"
     mocked_news_post.author = "Valve & Co <team>"
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(mocked_news_post)
@@ -131,7 +139,7 @@ def test_counter_strike_news_message_escapes_html_in_title_and_author(mocked_new
 
 
 def test_counter_strike_news_message_add_header_text_block(mocked_news_post):
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(mocked_news_post)
@@ -141,7 +149,7 @@ def test_counter_strike_news_message_add_header_text_block(mocked_news_post):
 
 
 def test_counter_strike_news_message_add_footer(mocked_news_post):
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(mocked_news_post)
@@ -153,10 +161,12 @@ def test_counter_strike_news_message_add_footer(mocked_news_post):
 
 
 def test_counter_strike_news_message_with_image_heading(mocked_news_post_with_image):
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
-        with patch('cs2posts.content.extractor_image.resolve_steam_clan_image_url') as mock_resolve:
+        with patch(
+            "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+        ) as mock_resolve:
             mock_resolve.return_value = "https://example.com/image.jpg"
             msg = CounterStrikeNewsMessage(mocked_news_post_with_image)
             # Should have image as first content
@@ -176,9 +186,10 @@ async def test_counter_strike_news_message_send_message():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -202,9 +213,10 @@ async def test_counter_strike_news_message_send_message_long_text():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -229,9 +241,10 @@ async def test_counter_strike_news_message_send_image_valid_url():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -239,9 +252,12 @@ async def test_counter_strike_news_message_send_image_valid_url():
     mocked_bot = AsyncMock()
     image = Image(0, 50, False, "https://example.com/image.jpg")
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
+    with patch("cs2posts.msg.cs_news_msg.extract_url") as mock_extract:
         mock_extract.return_value = "https://example.com/image.jpg"
-        with patch('cs2posts.msg.cs_news_msg.asyncio.to_thread', new=AsyncMock(return_value=True)) as mock_to_thread:
+        with patch(
+            "cs2posts.msg.cs_news_msg.asyncio.to_thread",
+            new=AsyncMock(return_value=True),
+        ) as mock_to_thread:
             await msg.send_image(mocked_bot, 42, image)
             mocked_bot.send_photo.assert_called_once()
             mock_to_thread.assert_awaited_once()
@@ -260,9 +276,10 @@ async def test_counter_strike_news_message_send_image_invalid_url():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -270,9 +287,9 @@ async def test_counter_strike_news_message_send_image_invalid_url():
     mocked_bot = AsyncMock()
     image = Image(0, 50, False, "invalid-url")
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
+    with patch("cs2posts.msg.cs_news_msg.extract_url") as mock_extract:
         mock_extract.return_value = "invalid-url"
-        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
+        with patch("cs2posts.msg.cs_news_msg.is_valid_url") as mock_valid:
             mock_valid.return_value = False
             await msg.send_image(mocked_bot, 42, image)
             mocked_bot.send_photo.assert_not_called()
@@ -291,9 +308,10 @@ async def test_counter_strike_news_message_send_image_with_heading():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -301,13 +319,13 @@ async def test_counter_strike_news_message_send_image_with_heading():
     mocked_bot = AsyncMock()
     image = Image(0, 50, True, "https://example.com/image.jpg")
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
+    with patch("cs2posts.msg.cs_news_msg.extract_url") as mock_extract:
         mock_extract.return_value = "https://example.com/image.jpg"
-        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
+        with patch("cs2posts.msg.cs_news_msg.is_valid_url") as mock_valid:
             mock_valid.return_value = True
             await msg.send_image(mocked_bot, 42, image)
             call_kwargs = mocked_bot.send_photo.call_args[1]
-            assert call_kwargs['caption'] is not None
+            assert call_kwargs["caption"] is not None
 
 
 @pytest.mark.asyncio
@@ -323,9 +341,10 @@ async def test_counter_strike_news_message_send_carousel():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -337,9 +356,9 @@ async def test_counter_strike_news_message_send_carousel():
     ]
     carousel = Carousel(0, 100, False, images)
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
+    with patch("cs2posts.msg.cs_news_msg.extract_url") as mock_extract:
         mock_extract.side_effect = lambda x: x
-        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
+        with patch("cs2posts.msg.cs_news_msg.is_valid_url") as mock_valid:
             mock_valid.return_value = True
             await msg.send_carousel(mocked_bot, 42, carousel)
             mocked_bot.send_media_group.assert_called()
@@ -358,9 +377,10 @@ async def test_counter_strike_news_message_send_carousel_invalid_urls():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -372,9 +392,9 @@ async def test_counter_strike_news_message_send_carousel_invalid_urls():
     ]
     carousel = Carousel(0, 100, False, images)
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
+    with patch("cs2posts.msg.cs_news_msg.extract_url") as mock_extract:
         mock_extract.side_effect = lambda x: x
-        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
+        with patch("cs2posts.msg.cs_news_msg.is_valid_url") as mock_valid:
             mock_valid.return_value = False
             await msg.send_carousel(mocked_bot, 42, carousel)
             # Should not send if all images are invalid
@@ -394,19 +414,29 @@ async def test_counter_strike_news_message_send_video():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
 
     mocked_bot = AsyncMock()
-    video = Video(0, 50, False, webm="", mp4="https://example.com/video.mp4", poster="https://example.com/poster.jpg", autoplay=True, controls=True)
+    video = Video(
+        0,
+        50,
+        False,
+        webm="",
+        mp4="https://example.com/video.mp4",
+        poster="https://example.com/poster.jpg",
+        autoplay=True,
+        controls=True,
+    )
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
+    with patch("cs2posts.msg.cs_news_msg.extract_url") as mock_extract:
         mock_extract.side_effect = lambda x: x
-        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
+        with patch("cs2posts.msg.cs_news_msg.is_valid_url") as mock_valid:
             mock_valid.return_value = True
             await msg.send_video(mocked_bot, 42, video)
             mocked_bot.send_video.assert_called_once()
@@ -425,15 +455,18 @@ async def test_counter_strike_news_message_send_video_empty():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
 
     mocked_bot = AsyncMock()
-    video = Video(0, 50, False, webm="", mp4="", poster="", autoplay=False, controls=False)
+    video = Video(
+        0, 50, False, webm="", mp4="", poster="", autoplay=False, controls=False
+    )
 
     await msg.send_video(mocked_bot, 42, video)
     mocked_bot.send_video.assert_not_called()
@@ -452,19 +485,22 @@ async def test_counter_strike_news_message_send_video_invalid_url():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
 
     mocked_bot = AsyncMock()
-    video = Video(0, 50, False, webm="", mp4="invalid", poster="", autoplay=False, controls=False)
+    video = Video(
+        0, 50, False, webm="", mp4="invalid", poster="", autoplay=False, controls=False
+    )
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url') as mock_extract:
+    with patch("cs2posts.msg.cs_news_msg.extract_url") as mock_extract:
         mock_extract.return_value = "invalid"
-        with patch('cs2posts.msg.cs_news_msg.is_valid_url') as mock_valid:
+        with patch("cs2posts.msg.cs_news_msg.is_valid_url") as mock_valid:
             mock_valid.return_value = False
             await msg.send_video(mocked_bot, 42, video)
             mocked_bot.send_video.assert_not_called()
@@ -483,9 +519,10 @@ async def test_counter_strike_news_message_send_youtube_video():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -496,8 +533,8 @@ async def test_counter_strike_news_message_send_youtube_video():
     await msg.send_youtube_video(mocked_bot, 42, youtube)
     mocked_bot.send_message.assert_called_once()
     call_kwargs = mocked_bot.send_message.call_args[1]
-    assert "youtube.com" in call_kwargs['text']
-    assert call_kwargs['disable_web_page_preview'] is False
+    assert "youtube.com" in call_kwargs["text"]
+    assert call_kwargs["disable_web_page_preview"] is False
 
 
 @pytest.mark.asyncio
@@ -513,9 +550,10 @@ async def test_counter_strike_news_message_send_youtube_video_with_heading():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -525,7 +563,7 @@ async def test_counter_strike_news_message_send_youtube_video_with_heading():
 
     await msg.send_youtube_video(mocked_bot, 42, youtube)
     call_kwargs = mocked_bot.send_message.call_args[1]
-    assert "<b>Some News</b>" in call_kwargs['text']
+    assert "<b>Some News</b>" in call_kwargs["text"]
 
 
 @pytest.mark.asyncio
@@ -541,9 +579,10 @@ async def test_counter_strike_news_message_send():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -567,9 +606,10 @@ async def test_counter_strike_news_message_send_with_all_content_types():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -579,23 +619,36 @@ async def test_counter_strike_news_message_send_with_all_content_types():
         TextBlock(0, 10, True, "Header text"),
         Image(10, 20, False, "https://example.com/image.jpg"),
         Carousel(20, 30, False, [Image(20, 25, False, "https://example.com/img.jpg")]),
-        Video(30, 40, False, webm="", mp4="https://example.com/video.mp4", poster="", autoplay=False, controls=False),
+        Video(
+            30,
+            40,
+            False,
+            webm="",
+            mp4="https://example.com/video.mp4",
+            poster="",
+            autoplay=False,
+            controls=False,
+        ),
         Youtube(40, 50, False, "dQw4w9WgXcQ"),
         TextBlock(50, 60, False, "Footer text"),
     ]
 
     mocked_bot = AsyncMock()
-    with patch.object(msg, 'send_message', new_callable=AsyncMock) as mock_send_msg:
-        with patch.object(msg, 'send_image', new_callable=AsyncMock) as mock_send_img:
-            with patch.object(msg, 'send_carousel', new_callable=AsyncMock) as mock_send_carousel:
-                with patch.object(msg, 'send_video', new_callable=AsyncMock) as mock_send_video:
-                    with patch.object(msg, 'send_youtube_video', new_callable=AsyncMock) as mock_send_yt:
-                        await msg.send(mocked_bot, 42)
-                        assert mock_send_msg.call_count == 2
-                        mock_send_img.assert_called_once()
-                        mock_send_carousel.assert_called_once()
-                        mock_send_video.assert_called_once()
-                        mock_send_yt.assert_called_once()
+    with (
+        patch.object(msg, "send_message", new_callable=AsyncMock) as mock_send_msg,
+        patch.object(msg, "send_image", new_callable=AsyncMock) as mock_send_img,
+        patch.object(
+            msg, "send_carousel", new_callable=AsyncMock
+        ) as mock_send_carousel,
+        patch.object(msg, "send_video", new_callable=AsyncMock) as mock_send_video,
+        patch.object(msg, "send_youtube_video", new_callable=AsyncMock) as mock_send_yt,
+    ):
+        await msg.send(mocked_bot, 42)
+        assert mock_send_msg.call_count == 2
+        mock_send_img.assert_called_once()
+        mock_send_carousel.assert_called_once()
+        mock_send_video.assert_called_once()
+        mock_send_yt.assert_called_once()
 
 
 def test_counter_strike_news_message_add_footer_to_non_textblock():
@@ -610,17 +663,47 @@ def test_counter_strike_news_message_add_footer_to_non_textblock():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
-        with patch('cs2posts.content.extractor_image.resolve_steam_clan_image_url') as mock_resolve:
+        with patch(
+            "cs2posts.content.extractor_image.resolve_steam_clan_image_url"
+        ) as mock_resolve:
             mock_resolve.return_value = "https://example.com/image.jpg"
             msg = CounterStrikeNewsMessage(post)
             # Should append a TextBlock with footer
             assert isinstance(msg.content[-1], TextBlock)
             assert "(Author: Valve)" in msg.content[-1].text
+            # Standalone footer must not lead with blank lines
+            assert msg.content[-1].text.startswith("(Author: Valve)")
+
+
+def test_counter_strike_news_message_footer_follows_content_by_one_blank_line():
+    """Trailing newlines in the source must not push the footer down the message."""
+    post = Post(
+        gid="1338",
+        title="Some News",
+        is_external_url=True,
+        url="https://www.counter-strike.net/newsentry/1338",
+        author="tomd",
+        contents="[ GAMEPLAY ]\n\n• Fixed player speed against walls.\n\n\n\n",
+        date=1234567890,
+        feedlabel="feedlabel",
+        feedname="feedname",
+        feed_type=1,
+        appid=730,
+    )
+
+    with patch("requests.get") as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
+        msg = CounterStrikeNewsMessage(post)
+
+    text = msg.content[-1].text
+    assert "against walls.\n\n(Author: tomd)" in text
 
 
 @pytest.mark.asyncio
@@ -637,9 +720,10 @@ async def test_counter_strike_news_message_send_continues_after_block_failure():
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -654,8 +738,13 @@ async def test_counter_strike_news_message_send_continues_after_block_failure():
     # Image block will fail at the Telegram API level; text blocks must still send
     mocked_bot.send_photo.side_effect = RuntimeError("Telegram error")
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url', return_value="https://example.com/image.jpg"), \
-            patch('cs2posts.msg.cs_news_msg.is_valid_url', return_value=True):
+    with (
+        patch(
+            "cs2posts.msg.cs_news_msg.extract_url",
+            return_value="https://example.com/image.jpg",
+        ),
+        patch("cs2posts.msg.cs_news_msg.is_valid_url", return_value=True),
+    ):
         await msg.send(mocked_bot, 42)
 
     # Both TextBlock sends must have been attempted despite the image failure
@@ -677,9 +766,10 @@ async def test_counter_strike_news_message_send_all_blocks_attempted_on_multiple
         feedlabel="feedlabel",
         feedname="feedname",
         feed_type=1,
-        appid=730)
+        appid=730,
+    )
 
-    with patch('requests.get') as mocked_get:
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
         msg = CounterStrikeNewsMessage(post)
@@ -695,10 +785,80 @@ async def test_counter_strike_news_message_send_all_blocks_attempted_on_multiple
     # Image block fails; text and youtube blocks should still be attempted
     mocked_bot.send_photo.side_effect = RuntimeError("Telegram error")
 
-    with patch('cs2posts.msg.cs_news_msg.extract_url', return_value="https://example.com/img1.jpg"), \
-            patch('cs2posts.msg.cs_news_msg.is_valid_url', return_value=True):
+    with (
+        patch(
+            "cs2posts.msg.cs_news_msg.extract_url",
+            return_value="https://example.com/img1.jpg",
+        ),
+        patch("cs2posts.msg.cs_news_msg.is_valid_url", return_value=True),
+    ):
         await msg.send(mocked_bot, 42)
 
     # 2 TextBlocks + 1 Youtube each call bot.send_message → 3 total
     assert mocked_bot.send_message.call_count == 3
     mocked_bot.send_photo.assert_called_once()
+
+
+def _make_msg() -> CounterStrikeNewsMessage:
+    post = Post(
+        gid="1338",
+        title="Some News",
+        is_external_url=True,
+        url="https://www.counter-strike.net/newsentry/1338",
+        author="Valve",
+        contents="Test",
+        date=1234567890,
+        feedlabel="feedlabel",
+        feedname="feedname",
+        feed_type=1,
+        appid=730,
+    )
+
+    with patch("requests.get") as mocked_get:
+        mocked_get.return_value.ok = True
+        mocked_get.return_value.url = "https://www.counter-strike.net/newsentry/1338"
+        return CounterStrikeNewsMessage(post)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        Forbidden("Forbidden: bot was blocked by the user"),
+        ChatMigrated(1337),
+        BadRequest("Chat not found"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_counter_strike_news_message_send_propagates_chat_level_errors(error):
+    """Chat-level failures must reach the bot so it can drop/migrate the chat."""
+    msg = _make_msg()
+    msg.content = [
+        TextBlock(0, 10, False, "First block"),
+        TextBlock(10, 20, False, "Second block"),
+    ]
+
+    mocked_bot = AsyncMock()
+    mocked_bot.send_message.side_effect = error
+
+    with pytest.raises(type(error)):
+        await msg.send(mocked_bot, 42)
+
+    # Aborts immediately, no attempt on the remaining blocks
+    mocked_bot.send_message.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_counter_strike_news_message_send_swallows_content_level_bad_request():
+    """A BadRequest about the content itself must not kill the rest of the post."""
+    msg = _make_msg()
+    msg.content = [
+        TextBlock(0, 10, False, "First block"),
+        TextBlock(10, 20, False, "Second block"),
+    ]
+
+    mocked_bot = AsyncMock()
+    mocked_bot.send_message.side_effect = [BadRequest("Can't parse entities"), None]
+
+    await msg.send(mocked_bot, 42)
+
+    assert mocked_bot.send_message.call_count == 2

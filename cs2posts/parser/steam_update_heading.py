@@ -2,26 +2,25 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import ClassVar
 
 from cs2posts.parser.parser import Parser
-
 
 logger = logging.getLogger(__name__)
 
 
 class SteamUpdateHeadingParser(Parser):
-
     HEADING_REGEX = re.compile(r"(?P<escape>\\)?\[(?P<heading>[a-zA-Z0-9&/'\-\s]+)\]")
     # Will be completed if needed
-    HEADING_LIST_IGNORE = ["CT"]
+    HEADING_LIST_IGNORE: ClassVar[list[str]] = ["CT"]
     # bbcode tags (opening and closing, e.g. [img]...[/img]) that are
     # consumed by the content extractors and must survive this parser.
-    BBCODE_TAGS_IGNORE = ["IMG", "VIDEO", "CAROUSEL"]
+    BBCODE_TAGS_IGNORE: ClassVar[list[str]] = ["IMG", "VIDEO", "CAROUSEL"]
     MIN_HEADING_LENGTH = 2
 
     def is_heading_by_newlines(self, start: int, end: int) -> bool:
-        is_left_newline = start == 0 or self.text[start - 1] == '\n'
-        is_right_newline = end == len(self.text) or self.text[end] == '\n'
+        is_left_newline = start == 0 or self.text[start - 1] == "\n"
+        is_right_newline = end == len(self.text) or self.text[end] == "\n"
         return is_left_newline or is_right_newline
 
     def is_heading(self, start: int, end: int) -> bool:
@@ -30,7 +29,7 @@ class SteamUpdateHeadingParser(Parser):
     def count_leading_newlines(self, start: int) -> int:
         count = 0
         i = start - 1
-        while i >= 0 and self.text[i] == '\n':
+        while i >= 0 and self.text[i] == "\n":
             count += 1
             i -= 1
         return count
@@ -38,7 +37,7 @@ class SteamUpdateHeadingParser(Parser):
     def count_trailing_newlines(self, end: int) -> int:
         count = 0
         i = end
-        while i < len(self.text) and self.text[i] == '\n':
+        while i < len(self.text) and self.text[i] == "\n":
             count += 1
             i += 1
         return count

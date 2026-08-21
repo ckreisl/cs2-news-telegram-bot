@@ -8,8 +8,8 @@ import pytest
 from cs2posts.msg import CounterStrikeExternalMessage
 from cs2posts.msg import CounterStrikeNewsMessage
 from cs2posts.msg import CounterStrikeUpdateMessage
-from cs2posts.msg import create_message
 from cs2posts.msg import TelegramMessage
+from cs2posts.msg import create_message
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
 
@@ -33,13 +33,17 @@ def test_telegram_message_hard_splits_overlong_single_line():
     telegram_msg = TelegramMessage(long_line)
 
     assert len(telegram_msg.messages) == 3
-    assert all(len(chunk) <= TELEGRAM_MAX_MESSAGE_LENGTH for chunk in telegram_msg.messages)
+    assert all(
+        len(chunk) <= TELEGRAM_MAX_MESSAGE_LENGTH for chunk in telegram_msg.messages
+    )
     assert "".join(telegram_msg.messages).strip() == long_line
 
 
 @pytest.mark.asyncio
-async def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_post, mocked_cs2_external_news):
-    with patch('requests.get') as mocked_get:
+async def test_telegram_message_factory(
+    mocked_cs2_news_post, mocked_cs2_update_post, mocked_cs2_external_news
+):
+    with patch("requests.get") as mocked_get:
         mocked_get.return_value.ok = True
         mocked_get.return_value.url = "https://test.com"
         msg = await create_message(mocked_cs2_news_post)
@@ -53,18 +57,24 @@ async def test_telegram_message_factory(mocked_cs2_news_post, mocked_cs2_update_
 
 
 @pytest.mark.asyncio
-async def test_telegram_message_factory_raises_for_unknown_post_type(mocked_cs2_update_post):
-    with patch.object(mocked_cs2_update_post, 'is_news', return_value=False), \
-            patch.object(mocked_cs2_update_post, 'is_update', return_value=False), \
-            patch.object(mocked_cs2_update_post, 'is_external', return_value=False):
-        with pytest.raises(ValueError, match="Unknown post type"):
-            await create_message(mocked_cs2_update_post)
+async def test_telegram_message_factory_raises_for_unknown_post_type(
+    mocked_cs2_update_post,
+):
+    with (
+        patch.object(mocked_cs2_update_post, "is_news", return_value=False),
+        patch.object(mocked_cs2_update_post, "is_update", return_value=False),
+        patch.object(mocked_cs2_update_post, "is_external", return_value=False),
+        pytest.raises(ValueError, match="Unknown post type"),
+    ):
+        await create_message(mocked_cs2_update_post)
 
 
 @pytest.mark.asyncio
 async def test_telegram_message_send_news(mocked_cs2_news_post):
-    with patch('requests.get') as mocked_get, \
-            patch('cs2posts.msg.cs_news_msg.is_valid_url', return_value=True):
+    with (
+        patch("requests.get") as mocked_get,
+        patch("cs2posts.msg.cs_news_msg.is_valid_url", return_value=True),
+    ):
         mocked_get.return_value.ok = True
         msg = await create_message(mocked_cs2_news_post)
 
@@ -96,7 +106,7 @@ async def test_telegram_message_send_uses_configured_delay_between_chunks():
 
     bot = AsyncMock()
 
-    with patch('cs2posts.msg.telegram.asyncio.sleep', new=AsyncMock()) as mocked_sleep:
+    with patch("cs2posts.msg.telegram.asyncio.sleep", new=AsyncMock()) as mocked_sleep:
         await msg.send(bot=bot, chat_id=42)
 
     assert mocked_sleep.await_count == 2

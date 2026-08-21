@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .db_sqlite import SQLite
 from cs2posts.dto import Chat
+from .db_sqlite import SQLite
 
 
 class ChatDatabase(SQLite):
-
     def __init__(self, filepath: Path | None) -> None:
         super().__init__(filepath)
 
@@ -61,7 +60,8 @@ class ChatDatabase(SQLite):
         placeholders = ", ".join("?" * len(self.COLUMNS))
         await self._execute(
             f"{verb} INTO chats ({columns}) VALUES ({placeholders})",
-            self._row_values(chat))
+            self._row_values(chat),
+        )
 
     async def save(self, chat: Chat) -> None:
         if chat is None:
@@ -72,7 +72,9 @@ class ChatDatabase(SQLite):
         query = "SELECT * FROM chats"
         if where:
             query += f" WHERE {where}"
-        return [Chat.from_dict(dict(row)) for row in await self._fetch_all(query, params)]
+        return [
+            Chat.from_dict(dict(row)) for row in await self._fetch_all(query, params)
+        ]
 
     async def load(self) -> list[Chat]:
         return await self._query_chats()
@@ -81,8 +83,7 @@ class ChatDatabase(SQLite):
         return await super().is_empty("chats")
 
     async def get(self, chat_id: int) -> Chat | None:
-        row = await self._fetch_one(
-            "SELECT * FROM chats WHERE chat_id = ?", (chat_id,))
+        row = await self._fetch_one("SELECT * FROM chats WHERE chat_id = ?", (chat_id,))
         return Chat.from_dict(dict(row)) if row is not None else None
 
     async def add(self, chat: Chat) -> Chat:
@@ -90,31 +91,32 @@ class ChatDatabase(SQLite):
         return chat
 
     async def remove(self, chat: Chat) -> None:
-        await self._execute(
-            "DELETE FROM chats WHERE chat_id = ?", (chat.chat_id,))
+        await self._execute("DELETE FROM chats WHERE chat_id = ?", (chat.chat_id,))
 
     async def update(self, chat: Chat) -> None:
-        assignments = ", ".join(f"{col} = ?" for col in self.COLUMNS if col != "chat_id")
-        values = self._row_values(chat)[1:] + (chat.chat_id,)
-        await self._execute(
-            f"UPDATE chats SET {assignments} WHERE chat_id = ?", values)
+        assignments = ", ".join(
+            f"{col} = ?" for col in self.COLUMNS if col != "chat_id"
+        )
+        values = (*self._row_values(chat)[1:], chat.chat_id)
+        await self._execute(f"UPDATE chats SET {assignments} WHERE chat_id = ?", values)
 
     async def import_from_json(self, filepath: Path) -> None:
         await self.create_table()
 
-        with open(filepath, encoding='utf-8') as fs:
+        with open(filepath, encoding="utf-8") as fs:
             chats = json.load(fs)
 
         # Backwards compatibility from old .json format
-        if chats.get('chats') is not None:
-            chats = chats['chats']
+        if chats.get("chats") is not None:
+            chats = chats["chats"]
 
         for chat in chats:
             await self.add(Chat.from_dict(chat))
 
     async def exists(self, chat_id: int) -> bool:
         count = await self._scalar(
-            "SELECT COUNT(*) FROM chats WHERE chat_id = ?", (chat_id,))
+            "SELECT COUNT(*) FROM chats WHERE chat_id = ?", (chat_id,)
+        )
         return count == 1
 
     async def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
@@ -142,7 +144,9 @@ class ChatDatabase(SQLite):
         return await self._query_chats("is_running = 1 AND is_update_interested = 1")
 
     async def get_running_and_interested_in_external_news_chats(self) -> list[Chat]:
-        return await self._query_chats("is_running = 1 AND is_external_news_interested = 1")
+        return await self._query_chats(
+            "is_running = 1 AND is_external_news_interested = 1"
+        )
 
     async def contains(self, chat: Chat) -> bool:
         return await self.exists(chat.chat_id)

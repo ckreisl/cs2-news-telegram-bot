@@ -25,7 +25,7 @@ def crawler_data():
                     "date": 1693524157,
                     "feedname": "steam_community_announcements",
                     "feed_type": 1,
-                    "appid": 730
+                    "appid": 730,
                 },
                 {
                     "gid": "5124585319846885283",
@@ -39,11 +39,9 @@ def crawler_data():
                     "feedname": "steam_community_announcements",
                     "feed_type": 1,
                     "appid": 730,
-                    "tags": [
-                        "patchnotes"
-                    ]
-                }
-            ]
+                    "tags": ["patchnotes"],
+                },
+            ],
         }
     }
 
@@ -107,9 +105,9 @@ def crawler_data_steam_clan_image():
                     "date": 1693524157,
                     "feedname": "steam_community_announcements",
                     "feed_type": 1,
-                    "appid": 730
+                    "appid": 730,
                 }
-            ]
+            ],
         }
     }
 
@@ -152,10 +150,13 @@ def test_cs2_net_post_none():
     assert len(cs2_posts.posts) == 0
 
 
-@pytest.mark.parametrize("payload", [
-    {"not_appnews": "not_appnews"},
-    {"appnews": {}},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"not_appnews": "not_appnews"},
+        {"appnews": {}},
+    ],
+)
 def test_cs2_net_post_missing_expected_keys(payload):
     cs2_posts = CounterStrike2Posts(payload)
     assert len(cs2_posts.posts) == 0
@@ -188,7 +189,10 @@ def test_cs2_net_is_latest_post_external(cs2_posts_with_external):
 
 def test_cs2_net_ignores_unknown_feed_type(cs2_posts_with_unknown_feed_type):
     assert len(cs2_posts_with_unknown_feed_type.posts) == 2
-    assert all(post.gid != "7000000000000000000" for post in cs2_posts_with_unknown_feed_type.posts)
+    assert all(
+        post.gid != "7000000000000000000"
+        for post in cs2_posts_with_unknown_feed_type.posts
+    )
 
 
 def test_cs2_net_latest(cs2_posts):
@@ -235,31 +239,31 @@ def test_cs2_net_is_latest_post_update(cs2_posts):
 def test_cs2_net_posts_json(cs2_posts):
     assert cs2_posts.posts_json == [
         {
-            'gid': '5141476355659151610',
-            'title': 'Your Time is Now',
-            'url': 'https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5141476355659151610',
-            'is_external_url': True,
-            'author': 'Piggles ULTRAPRO',
-            'contents': 'Content News',
-            'feedlabel': 'Community Announcements',
-            'date': 1693524157,
-            'feedname': 'steam_community_announcements',
-            'feed_type': 1,
-            'appid': 730,
-            'tags': []
+            "gid": "5141476355659151610",
+            "title": "Your Time is Now",
+            "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5141476355659151610",
+            "is_external_url": True,
+            "author": "Piggles ULTRAPRO",
+            "contents": "Content News",
+            "feedlabel": "Community Announcements",
+            "date": 1693524157,
+            "feedname": "steam_community_announcements",
+            "feed_type": 1,
+            "appid": 730,
+            "tags": [],
         },
         {
-            'gid': '5124585319846885283',
-            'title': 'Release Notes for 8/2/2023',
-            'url': 'https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5124585319846885283',
-            'is_external_url': True,
-            'author': 'jo',
-            'contents': 'Content Update',
-            'feedlabel': 'Community Announcements',
-            'date': 1691013634,
-            'feedname': 'steam_community_announcements',
-            'feed_type': 1,
-            'appid': 730,
-            'tags': ['patchnotes']
-        }
+            "gid": "5124585319846885283",
+            "title": "Release Notes for 8/2/2023",
+            "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5124585319846885283",
+            "is_external_url": True,
+            "author": "jo",
+            "contents": "Content Update",
+            "feedlabel": "Community Announcements",
+            "date": 1691013634,
+            "feedname": "steam_community_announcements",
+            "feed_type": 1,
+            "appid": 730,
+            "tags": ["patchnotes"],
+        },
     ]

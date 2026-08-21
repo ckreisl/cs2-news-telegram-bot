@@ -23,5 +23,5 @@ class Chat:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Chat:
-        last_activity = datetime.fromisoformat(data.pop('last_activity'))
+        last_activity = datetime.fromisoformat(data.pop("last_activity"))
         return cls(**data, last_activity=last_activity)
