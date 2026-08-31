@@ -1,3 +1,5 @@
+"""Crawl one post and save it as JSON, for reproducing rendering bugs."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,51 +9,47 @@ from datetime import datetime
 from pathlib import Path
 
 from cs2posts.crawler import CounterStrike2Crawler
-from cs2posts.cs2posts import CounterStrike2Posts
 from cs2posts.dto.post import Post
+from cs2posts.dto.post import PostType
+from cs2posts.feed import PostFeed
 
 
 class PostNotFound(Exception):
     pass
 
 
-def get_post(posts: list[Post], date: datetime) -> Post:
+def find_post_on(posts: list[Post], date: datetime) -> Post:
     for post in posts:
         if post.date_as_datetime.date() == date.date():
             return post
-    raise PostNotFound(f"Post not found for {date=}")
+    raise PostNotFound(f"No post found for {date.date()}")
 
 
-def main(args) -> int:
-    crawler = CounterStrike2Crawler()
-    data = asyncio.run(crawler.crawl(count=args.count))
-    posts = CounterStrike2Posts(data)
+def main(args: argparse.Namespace) -> int:
+    payload = asyncio.run(CounterStrike2Crawler().crawl(count=args.count))
+    feed = PostFeed.from_api_response(payload)
 
-    if args.type == "news":
-        post = get_post(posts.news_posts, args.date)
-    elif args.type == "external":
-        post = get_post(posts.external_posts, args.date)
-    elif args.type == "update":
-        post = get_post(posts.update_posts, args.date)
-    else:
-        raise ValueError(f"Unknown post type {args.type=}")
+    post_type = PostType(args.type)
+    post = find_post_on(feed.of_type(post_type), args.date)
 
-    with open(args.save_dir / f"{args.type}_{args.date.date()}.json", "w") as fs:
-        json.dump(post.to_dict(), fs, indent=4)
+    args.save_dir.mkdir(parents=True, exist_ok=True)
+    filepath = args.save_dir / f"{post_type}_{args.date.date()}.json"
+    filepath.write_text(json.dumps(post.to_dict(), indent=4), encoding="utf-8")
+    print(f"Saved {filepath}")
 
     return 0
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        "Utils helping debugging by crawling and saving buggy posts"
-    )
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "type", choices=["news", "external", "update"], help="Type of post to crawl"
+        "type",
+        choices=[post_type.value for post_type in PostType],
+        help="Type of post to crawl",
     )
     parser.add_argument(
         "--date",
-        help="Date of the post to crawl",
+        help="Date of the post to crawl (ISO format)",
         type=datetime.fromisoformat,
         required=True,
     )
@@ -61,8 +59,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save-dir",
         help="Save directory for the JSON files",
-        default=f"{Path(__file__).parent}/tests/data",
+        default=Path(__file__).parent / "tests" / "data",
         type=Path,
     )
+    return parser.parse_args()
 
-    raise SystemExit(main(parser.parse_args()))
+
+if __name__ == "__main__":
+    raise SystemExit(main(parse_args()))

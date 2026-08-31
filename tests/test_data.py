@@ -13,10 +13,18 @@ from cs2posts.dto.post import Post
 from cs2posts.msg import create_message
 
 
-def load_data(type: str, date: str) -> Post:
-    with open(f"{Path(__file__).parent}/data/{type}_{date}.json") as fs:
-        data = json.load(fs)
-    return Post.from_dict(data)
+@pytest.fixture(autouse=True)
+def stub_http(http_response):
+    """These fixtures are real Steam payloads; their media URLs are not live."""
+    http_response(url="https://example.com/resolved")
+
+
+DATA_DIR = Path(__file__).parent / "data"
+
+
+def load_data(post_type: str, date: str) -> Post:
+    filepath = DATA_DIR / f"{post_type}_{date}.json"
+    return Post.from_dict(json.loads(filepath.read_text(encoding="utf-8")))
 
 
 def content_count(content: list[Content]) -> dict[str, int]:
@@ -67,6 +75,21 @@ async def test_news_2024_10_02():
     assert not msg.content[-1].text.startswith("</a>")
     assert actual_values[TextBlock.__name__] == expected_text_blocks
     assert actual_values[Image.__name__] == expected_image_blocks
+
+
+@pytest.mark.asyncio
+async def test_update_2026_07_15():
+    """A patch-notes post that is prose only: one block, no stray bbcode."""
+    post = load_data("update", "2026-07-15")
+    msg = await create_message(post)
+
+    assert content_count(msg.content) == {TextBlock.__name__: 1}
+
+    (block,) = msg.content
+    assert block.text.startswith(msg.header)
+    assert block.text.endswith(msg.footer)
+    for marker in ("[img]", "[/img]", "[list]", "[/list]", "[p]", "[/p]"):
+        assert marker not in block.text
 
 
 @pytest.mark.asyncio

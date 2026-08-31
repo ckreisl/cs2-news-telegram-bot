@@ -7,13 +7,14 @@ from .content import Content
 
 
 class Extractor(abc.ABC):
+    """Finds one kind of content inside a rendered post body."""
+
     def __init__(self, text: str) -> None:
-        self.__text: str = text
+        self._text = text
 
     @property
     def text(self) -> str:
-        return self.__text
+        return self._text
 
     @abc.abstractmethod
-    def extract(self) -> Sequence[Content]:
-        pass
+    def extract(self) -> Sequence[Content]: ...

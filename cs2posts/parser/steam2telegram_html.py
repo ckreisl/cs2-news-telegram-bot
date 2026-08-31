@@ -1,109 +1,92 @@
 from __future__ import annotations
 
 import re
-import sys
+from dataclasses import dataclass
+from dataclasses import field
 
 import bbcode
 
 from cs2posts.parser.parser import Parser
 
-NEWLINE_FORMAT = {
-    "br": {
-        "pattern": "<br />",
-        "replace": "\n",
-    },
-    "hr": {
-        "pattern": "<hr />",
-        "replace": "\n",
-    },
-}
 
-PatternSubRule = dict[str, re.Pattern[str] | str]
+@dataclass(frozen=True)
+class SubstitutionRule:
+    """One regex substitution applied to the whole document."""
 
-# Patterns that must be resolved before sub-parsers run (e.g. before
-# SteamUpdateHeadingParser, which would otherwise match [/p] as a heading).
-PRE_PARSER_FORMAT: dict[str, PatternSubRule] = {
-    "strike": {
-        "pattern": re.compile(r"\[strike\](.*?)\[/strike\]", re.IGNORECASE | re.DOTALL),
-        "replace": r"\1",
-    },
-    "p_empty": {
-        "pattern": re.compile(r"\[p\]\[/p\]", re.IGNORECASE),
-        "replace": "\n",
-    },
-    "p": {
-        "pattern": re.compile(r"\[p\](.*?)\[/p\]", re.IGNORECASE | re.DOTALL),
-        "replace": r"\1",
-    },
-}
+    pattern: re.Pattern[str]
+    replacement: str
 
-STEAM_FORMAT = {
-    "h2": {
-        "pattern": r"\[h2\](.*?)\[/h2\]",
-        "replace": r"\n\n<b>\1</b>\n\n",
-    },
-    "h3": {
-        "pattern": r"\[h3\](.*?)\[/h3\]",
-        "replace": r"\n\n<b>\1</b>\n\n",
-    },
-    "h4": {
-        "pattern": r"\[h4\](.*?)\[/h4\]",
-        "replace": r"\n\n<b>\1</b>\n\n",
-    },
-    "h5": {
-        "pattern": r"\[h5\](.*?)\[/h5\]",
-        "replace": r"\n\n<b>\1</b>\n\n",
-    },
-    "dash": {
-        "pattern": r"&ndash;",
-        "replace": r"—",
-    },
-}
+    def apply(self, text: str) -> str:
+        return self.pattern.sub(self.replacement, text)
 
 
-class Steam2TelegramHTML(Parser):
-    def __init__(self, text: str):
-        super().__init__(text)
-        self.__parser: list[tuple[type[Parser], int]] = []
+def _rule(pattern: str, replacement: str, flags: int = 0) -> SubstitutionRule:
+    return SubstitutionRule(re.compile(pattern, flags), replacement)
 
-    def add_parser(self, parser: type[Parser], priority: int = sys.maxsize) -> None:
-        self.__parser.append((parser, priority))
 
-    def parse(self) -> str:
-        self.text = bbcode.render_html(self.text)
+DOTALL_I = re.IGNORECASE | re.DOTALL
 
-        # TODO: Must be placed here now before parsers due to HeadingParser
-        for value in NEWLINE_FORMAT.values():
-            plain_pattern = value["pattern"]
-            replace = value["replace"]
-            self.text = self.text.replace(plain_pattern, replace)
+# Steam emits <br /> and <hr /> where Telegram wants plain newlines. Applied
+# before the sub-parsers, which reason about line boundaries.
+NEWLINE_RULES = (
+    _rule(r"<br />", "\n"),
+    _rule(r"<hr />", "\n"),
+)
 
-        for pre_value in PRE_PARSER_FORMAT.values():
-            pattern = pre_value["pattern"]
-            if not isinstance(pattern, re.Pattern):
-                continue
-            pre_replace = pre_value["replace"]
-            if not isinstance(pre_replace, str):
-                continue
-            self.text = pattern.sub(pre_replace, self.text)
+# Resolved before sub-parsers run, so that SteamUpdateHeadingParser does not
+# mistake a leftover [/p] for a section heading.
+PRE_PARSER_RULES = (
+    _rule(r"\[strike\](.*?)\[/strike\]", r"\1", DOTALL_I),
+    _rule(r"\[p\]\[/p\]", "\n", re.IGNORECASE),
+    _rule(r"\[p\](.*?)\[/p\]", r"\1", DOTALL_I),
+)
 
-        # Replace non-breaking spaces with regular spaces so that
-        # headings like "[ SOUND\xa0]" normalise to "[ SOUND ]".
-        self.text = self.text.replace("\xa0", " ")
+HEADING_RULES = tuple(
+    _rule(rf"\[{tag}\](.*?)\[/{tag}\]", r"\n\n<b>\1</b>\n\n", DOTALL_I)
+    for tag in ("h2", "h3", "h4", "h5")
+)
 
-        parser_by_priority = sorted(self.__parser, key=lambda x: x[1])
-        for parser, _ in parser_by_priority:
-            self.text = parser(self.text).parse()
+ENTITY_RULES = (_rule(r"&ndash;", "—", re.IGNORECASE),)
 
-        for value in STEAM_FORMAT.values():
-            pattern = value["pattern"]
-            replace = value["replace"]
-            self.text = re.sub(
-                pattern, replace, self.text, flags=re.IGNORECASE | re.DOTALL
-            )
+# Strip trailing whitespace on each line, then collapse runs of blank lines.
+WHITESPACE_RULES = (
+    _rule(r"[^\S\n]+\n", "\n"),
+    _rule(r"\n{3,}", "\n\n"),
+)
 
-        # Strip trailing whitespace on each line and collapse 3+ newlines.
-        self.text = re.sub(r"[^\S\n]+\n", "\n", self.text)
-        self.text = re.sub(r"\n{3,}", "\n\n", self.text)
+# Non-breaking spaces would keep headings like "[ SOUND\xa0]" from matching.
+NBSP = "\xa0"
 
-        return self.text
+
+@dataclass
+class Steam2TelegramHTML:
+    """Converts Steam's bbcode/HTML post bodies into Telegram-flavoured HTML.
+
+    Sub-parsers are supplied as instances and run in priority order between
+    the pre- and post-processing rule sets.
+    """
+
+    sub_parsers: list[tuple[Parser, int]] = field(default_factory=list)
+
+    def add_parser(self, parser: Parser, priority: int) -> Steam2TelegramHTML:
+        self.sub_parsers.append((parser, priority))
+        return self
+
+    def parse(self, text: str) -> str:
+        text = bbcode.render_html(text)
+
+        for rule in NEWLINE_RULES:
+            text = rule.apply(text)
+
+        for rule in PRE_PARSER_RULES:
+            text = rule.apply(text)
+
+        text = text.replace(NBSP, " ")
+
+        for parser, _ in sorted(self.sub_parsers, key=lambda item: item[1]):
+            text = parser.parse(text)
+
+        for rule in (*HEADING_RULES, *ENTITY_RULES, *WHITESPACE_RULES):
+            text = rule.apply(text)
+
+        return text

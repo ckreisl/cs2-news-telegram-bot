@@ -10,7 +10,7 @@ from cs2posts.content.extractor_text import TextBlockExtractor
 
 def test_textblock_extractor_extract_plain_text():
     text = "This is plain text without any special content"
-    extractor = TextBlockExtractor(text)
+    extractor = TextBlockExtractor.from_text(text)
     blocks = extractor.extract()
     assert len(blocks) == 1
     assert blocks[0].text == text
@@ -18,7 +18,7 @@ def test_textblock_extractor_extract_plain_text():
 
 def test_textblock_extractor_extract_empty_string():
     text = ""
-    extractor = TextBlockExtractor(text)
+    extractor = TextBlockExtractor.from_text(text)
     blocks = extractor.extract()
     assert len(blocks) == 1
     assert blocks[0].text == ""
@@ -34,7 +34,7 @@ def test_textblock_extractor_extract_with_provided_images():
             url="https://example.com/image.png",
         )
     ]
-    extractor = TextBlockExtractor(text, images=images)
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     assert len(blocks) == 2
 
@@ -53,7 +53,7 @@ def test_textblock_extractor_extract_with_provided_videos():
             controls=False,
         )
     ]
-    extractor = TextBlockExtractor(text, videos=videos)
+    extractor = TextBlockExtractor(text, videos)
     blocks = extractor.extract()
     assert len(blocks) == 2
 
@@ -63,7 +63,7 @@ def test_textblock_extractor_extract_with_provided_carousel():
     carousel = [
         Carousel(text_pos_start=7, text_pos_end=15, is_heading=False, images=[])
     ]
-    extractor = TextBlockExtractor(text, carousel=carousel)
+    extractor = TextBlockExtractor(text, carousel)
     blocks = extractor.extract()
     assert len(blocks) == 2
 
@@ -73,7 +73,7 @@ def test_textblock_extractor_extract_with_provided_youtube():
     youtube = [
         Youtube(text_pos_start=7, text_pos_end=14, is_heading=False, url="dQw4w9WgXcQ")
     ]
-    extractor = TextBlockExtractor(text, youtube=youtube)
+    extractor = TextBlockExtractor(text, youtube)
     blocks = extractor.extract()
     assert len(blocks) == 2
 
@@ -88,9 +88,7 @@ def test_textblock_extractor_extract_text_before_content():
             url="https://example.com/image.png",
         )
     ]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     assert len(blocks) == 2
     assert blocks[0].text == "text before"
@@ -106,9 +104,7 @@ def test_textblock_extractor_extract_text_after_content():
             url="https://example.com/image.png",
         )
     ]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     assert len(blocks) == 1
     assert blocks[0].text == "text after"
@@ -120,9 +116,7 @@ def test_textblock_extractor_extract_text_between_content():
         Image(text_pos_start=0, text_pos_end=15, is_heading=False, url="url1"),
         Image(text_pos_start=29, text_pos_end=44, is_heading=False, url="url2"),
     ]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     assert len(blocks) == 2
     assert blocks[0].text == "text between"
@@ -130,7 +124,7 @@ def test_textblock_extractor_extract_text_between_content():
 
 def test_textblock_extractor_extract_is_heading_false():
     text = "plain text"
-    extractor = TextBlockExtractor(text)
+    extractor = TextBlockExtractor.from_text(text)
     blocks = extractor.extract()
     assert blocks[0].is_heading is False
 
@@ -140,9 +134,7 @@ def test_textblock_extractor_extract_strips_whitespace():
     # Full text without content is returned as-is
     text = "[img]url[/img]   trimmed text   "
     images = [Image(text_pos_start=0, text_pos_end=14, is_heading=False, url="url")]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     assert blocks[0].text == "trimmed text"
 
@@ -153,9 +145,7 @@ def test_textblock_extractor_extract_skips_empty_blocks():
         Image(text_pos_start=0, text_pos_end=14, is_heading=False, url="url"),
         Image(text_pos_start=18, text_pos_end=33, is_heading=False, url="url2"),
     ]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     # Should not include empty blocks between images
     assert all(len(b.text.strip()) > 0 or b == blocks[-1] for b in blocks)
@@ -164,9 +154,7 @@ def test_textblock_extractor_extract_skips_empty_blocks():
 def test_textblock_extractor_extract_positions():
     text = "text before [img]url[/img] text after"
     images = [Image(text_pos_start=12, text_pos_end=26, is_heading=False, url="url")]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     assert blocks[0].text_pos_start == 0
     assert blocks[0].text_pos_end == 12
@@ -174,44 +162,42 @@ def test_textblock_extractor_extract_positions():
 
 def test_textblock_extractor_combine_empty_list():
     text = ""
-    extractor = TextBlockExtractor(text)
-    result = extractor._combine([])
+    extractor = TextBlockExtractor.from_text(text)
+    result = extractor._merge_split_anchors([])
     assert result == []
 
 
 def test_textblock_extractor_combine_single_block():
     text = ""
-    extractor = TextBlockExtractor(text)
+    extractor = TextBlockExtractor.from_text(text)
     block = TextBlock(0, 10, False, "text")
-    result = extractor._combine([block])
+    result = extractor._merge_split_anchors([block])
     assert len(result) == 1
     assert result[0] == block
 
 
 def test_textblock_extractor_combine_link_blocks():
     text = ""
-    extractor = TextBlockExtractor(text)
+    extractor = TextBlockExtractor.from_text(text)
     left = TextBlock(0, 10, False, "text>")
     right = TextBlock(10, 20, False, "</a> more")
-    result = extractor._combine([left, right])
+    result = extractor._merge_split_anchors([left, right])
     assert len(result) == 1
     assert "Image Link" in result[0].text
 
 
 def test_textblock_extractor_combine_no_link_blocks():
     text = ""
-    extractor = TextBlockExtractor(text)
+    extractor = TextBlockExtractor.from_text(text)
     left = TextBlock(0, 10, False, "text")
     right = TextBlock(10, 20, False, "more")
-    result = extractor._combine([left, right])
+    result = extractor._merge_split_anchors([left, right])
     assert len(result) == 2
 
 
 def test_textblock_extractor_with_all_none_content():
     text = "plain text"
-    extractor = TextBlockExtractor(
-        text, videos=None, carousel=None, images=None, youtube=None
-    )
+    extractor = TextBlockExtractor(text, [])
     blocks = extractor.extract()
     assert len(blocks) >= 1
 
@@ -219,9 +205,7 @@ def test_textblock_extractor_with_all_none_content():
 def test_textblock_extractor_content_at_start():
     text = "[img]url[/img] after"
     images = [Image(text_pos_start=0, text_pos_end=14, is_heading=False, url="url")]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     # Should handle content at position 0
     assert any(b.text == "after" for b in blocks)
@@ -233,28 +217,26 @@ def test_textblock_extractor_consecutive_content():
         Image(text_pos_start=0, text_pos_end=15, is_heading=False, url="url1"),
         Image(text_pos_start=15, text_pos_end=30, is_heading=False, url="url2"),
     ]
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=[], images=images, youtube=[]
-    )
+    extractor = TextBlockExtractor(text, images)
     blocks = extractor.extract()
     assert any(b.text == "after" for b in blocks)
 
 
-def test_textblock_extractor_empty_list_not_treated_as_none():
+def test_no_media_means_the_whole_body_is_one_block():
     # An explicitly passed empty list [] must be respected as "no items",
     # not silently replaced by a fresh extractor run (the `x or Extractor()`
     # pattern would treat [] as falsy and re-extract, causing position bugs).
     text = "[img]https://example.com/image.png[/img] after"
     # Pass images=[] explicitly — no images should be registered as content,
     # so the whole text (including the raw [img] tag) becomes one TextBlock.
-    extractor = TextBlockExtractor(text, videos=[], carousel=[], images=[], youtube=[])
+    extractor = TextBlockExtractor(text, [])
     blocks = extractor.extract()
     # With images=[] respected, __content is empty → single block covering full text.
     assert len(blocks) == 1
     assert blocks[0].text == text.strip()
 
 
-def test_textblock_extractor_empty_images_with_carousel_no_stray_closing_tag():
+def test_carousel_markup_never_leaks_into_a_text_block():
     # Regression test: when ContentExtractor deduplicates images inside a
     # carousel to an empty list and passes images=[] to TextBlockExtractor,
     # the text between two carousels must NOT start with [/carousel].
@@ -280,9 +262,7 @@ def test_textblock_extractor_empty_images_with_carousel_no_stray_closing_tag():
         ),
     ]
 
-    extractor = TextBlockExtractor(
-        text, videos=[], carousel=carousel, images=[], youtube=[]
-    )
+    extractor = TextBlockExtractor(text, carousel)
     blocks = extractor.extract()
 
     for block in blocks:

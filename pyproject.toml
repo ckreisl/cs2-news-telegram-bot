@@ -6,12 +6,12 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "requests==2.33",
     "python-telegram-bot[job-queue]==21.10",
     "bbcode==1.1.0",
     "beautifulsoup4==4.14.3",
     "python-dotenv==1.2.2",
     "aiosqlite==0.22.1",
+    "httpx==0.28.1",
 ]
 
 [dependency-groups]
@@ -22,7 +22,6 @@ dev = [
     "pytest-cov==6.0.0",
     "ruff==0.16.4",
     "mypy==1.20.0",
-    "types-requests==2.33.0.20260402",
     "pre-commit",
 ]
 
@@ -35,7 +34,24 @@ package = false
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "SIM", "UP", "RUF"]
+select = [
+    "E", "F", "W",      # pycodestyle + pyflakes
+    "I",                # import sorting
+    "B",                # bugbear
+    "SIM",              # simplifications
+    "UP",               # pyupgrade
+    "RUF",              # ruff-specific
+    "C4",               # comprehensions
+    "G",                # no f-strings in logging calls
+    "LOG",              # logging misuse
+    "PT",               # pytest style
+    "RET",              # return-statement hygiene
+    "PTH",              # pathlib over os.path
+    "TID",              # tidy imports
+]
+# ARG (unused arguments) is deliberately not enabled: python-telegram-bot
+# fixes handler signatures as (update, context) and pytest injects fixtures
+# by name, so it would fire ~40 times on code that cannot change.
 # Line length is left to the formatter; it is not enforced as a lint error.
 ignore = ["E501"]
 
@@ -51,6 +67,9 @@ no-lines-before = ["local-folder"]
 asyncio_mode = "strict"
 testpaths = ["tests"]
 addopts = "-q"
+# caplog captures WARNING and above by default; several behaviours the bot is
+# expected to log (skipped crawls, recovered strikes) are INFO.
+log_level = "INFO"
 # cs2posts is imported from the source tree rather than installed, so the
 # project root has to be on sys.path no matter how pytest is invoked.
 pythonpath = ["."]
@@ -59,7 +78,13 @@ pythonpath = ["."]
 python_version = "3.12"
 ignore_missing_imports = true
 disallow_incomplete_defs = true
-files = ["cs2posts"]
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+# The entry points are where every concrete type first meets its interface,
+# so they are the highest-value files to check -- not the ones to exclude.
+files = ["cs2posts", "main.py", "save.py", "tests/fakes.py"]
 
 [tool.coverage.run]
 source = ["cs2posts"]

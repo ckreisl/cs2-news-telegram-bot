@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-from unittest.mock import patch
-
 import pytest
 
 from cs2posts.msg import CounterStrikeExternalMessage
 from cs2posts.msg import CounterStrikeNewsMessage
 from cs2posts.msg import CounterStrikeUpdateMessage
+from cs2posts.msg import Sendable
 from cs2posts.msg import TelegramMessage
 from cs2posts.msg import create_message
+from cs2posts.msg import split_text
 from cs2posts.msg.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 from cs2posts.msg.constants import TELEGRAM_SEND_DELAY_SECONDS
+from tests.fakes import FakeBot
 
 
 def test_telegram_message_msg_not_split():
@@ -40,74 +40,102 @@ def test_telegram_message_hard_splits_overlong_single_line():
 
 
 @pytest.mark.asyncio
-async def test_telegram_message_factory(
-    mocked_cs2_news_post, mocked_cs2_update_post, mocked_cs2_external_news
+@pytest.mark.parametrize(
+    ("fixture_name", "expected"),
+    [
+        ("mocked_cs2_news_post", CounterStrikeNewsMessage),
+        ("mocked_cs2_update_post", CounterStrikeUpdateMessage),
+        ("mocked_cs2_external_news", CounterStrikeExternalMessage),
+    ],
+)
+async def test_the_factory_picks_a_renderer_per_post_type(
+    request, fixture_name, expected
 ):
-    with patch("requests.get") as mocked_get:
-        mocked_get.return_value.ok = True
-        mocked_get.return_value.url = "https://test.com"
-        msg = await create_message(mocked_cs2_news_post)
-        assert isinstance(msg, CounterStrikeNewsMessage)
+    post = request.getfixturevalue(fixture_name)
 
-        msg = await create_message(mocked_cs2_update_post)
-        assert isinstance(msg, CounterStrikeUpdateMessage)
-
-        msg = await create_message(mocked_cs2_external_news)
-        assert isinstance(msg, CounterStrikeExternalMessage)
+    assert isinstance(await create_message(post), expected)
 
 
 @pytest.mark.asyncio
-async def test_telegram_message_factory_raises_for_unknown_post_type(
-    mocked_cs2_update_post,
+async def test_every_post_type_has_a_renderer():
+    from cs2posts.dto.post import PostType
+    from cs2posts.msg.factory import MESSAGE_BY_POST_TYPE
+
+    assert set(MESSAGE_BY_POST_TYPE) == set(PostType)
+
+
+@pytest.mark.asyncio
+async def test_a_news_post_sends_its_media_and_its_prose(
+    mocked_cs2_news_post, fast_sleep
 ):
-    with (
-        patch.object(mocked_cs2_update_post, "is_news", return_value=False),
-        patch.object(mocked_cs2_update_post, "is_update", return_value=False),
-        patch.object(mocked_cs2_update_post, "is_external", return_value=False),
-        pytest.raises(ValueError, match="Unknown post type"),
-    ):
-        await create_message(mocked_cs2_update_post)
+    message = await create_message(mocked_cs2_news_post)
+    bot = FakeBot()
+
+    await message.send(bot, chat_id=1337)
+
+    assert bot.photos
+    assert bot.messages
 
 
 @pytest.mark.asyncio
-async def test_telegram_message_send_news(mocked_cs2_news_post):
-    with (
-        patch("requests.get") as mocked_get,
-        patch("cs2posts.msg.cs_news_msg.is_valid_url", return_value=True),
-    ):
-        mocked_get.return_value.ok = True
-        msg = await create_message(mocked_cs2_news_post)
+async def test_a_failing_chunk_stops_a_plain_text_message(fast_sleep):
+    message = TelegramMessage("chunk1\nchunk2")
+    bot = FakeBot()
+    sent = []
 
-        mocked_bot = AsyncMock()
-        await msg.send(bot=mocked_bot, chat_id=1337)
+    async def failing(**kwargs):
+        sent.append(kwargs)
+        raise RuntimeError("network error")
 
-        assert mocked_bot.send_photo.called
-        assert mocked_bot.send_message.called
-
-
-@pytest.mark.asyncio
-async def test_telegram_message_send_raises_on_chunk_failure():
-    msg = TelegramMessage("hello")
-    msg._TelegramMessage__messages = ["chunk1", "chunk2", "chunk3"]
-
-    bot = AsyncMock()
-    bot.send_message.side_effect = [None, RuntimeError("network error"), None]
+    bot.send_message = failing
 
     with pytest.raises(RuntimeError, match="network error"):
-        await msg.send(bot=bot, chat_id=42)
+        await message.send(bot, chat_id=42)
 
-    assert bot.send_message.call_count == 2
+    assert len(sent) == 1
 
 
 @pytest.mark.asyncio
-async def test_telegram_message_send_uses_configured_delay_between_chunks():
-    msg = TelegramMessage("hello")
-    msg._TelegramMessage__messages = ["chunk1", "chunk2", "chunk3"]
+async def test_chunks_are_paced_but_the_last_one_is_not(monkeypatch):
+    import asyncio
 
-    bot = AsyncMock()
+    delays = []
 
-    with patch("cs2posts.msg.telegram.asyncio.sleep", new=AsyncMock()) as mocked_sleep:
-        await msg.send(bot=bot, chat_id=42)
+    async def record(delay):
+        delays.append(delay)
 
-    assert mocked_sleep.await_count == 2
-    mocked_sleep.assert_any_await(TELEGRAM_SEND_DELAY_SECONDS)
+    monkeypatch.setattr(asyncio, "sleep", record)
+
+    message = TelegramMessage("x")
+    message._messages = ["chunk1", "chunk2", "chunk3"]
+
+    await message.send(FakeBot(), chat_id=42)
+
+    assert delays == [TELEGRAM_SEND_DELAY_SECONDS, TELEGRAM_SEND_DELAY_SECONDS]
+
+
+def test_split_text_is_available_on_its_own():
+    assert split_text("short") == ["short"]
+    assert len(split_text("line\n" * 2000)) > 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "fixture_name",
+    ["mocked_cs2_news_post", "mocked_cs2_update_post", "mocked_cs2_external_news"],
+)
+async def test_every_message_type_honours_the_sendable_contract(
+    request, fixture_name, fast_sleep
+):
+    """Regression: CounterStrikeNewsMessage inherited from TelegramMessage but
+    never called ``super().__init__``, so ``message``/``messages`` raised
+    AttributeError on every news and update post."""
+    post = request.getfixturevalue(fixture_name)
+    message = await create_message(post)
+
+    assert isinstance(message, Sendable)
+
+    bot = FakeBot()
+    await message.send(bot, chat_id=1337)
+
+    assert bot.messages or bot.photos or bot.videos or bot.media_groups

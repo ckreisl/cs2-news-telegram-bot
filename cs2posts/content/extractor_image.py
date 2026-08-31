@@ -10,51 +10,40 @@ from .extractor import Extractor
 
 logger = logging.getLogger(__name__)
 
+HTML_QUOT = "&quot;"
 
-def extract_images_deprecated(text: str) -> Iterator:
-    pattern = r"\[img\](.*?)\[/img\]"
-    matches = re.finditer(pattern, text)
-    return matches
+# Current Steam markup: [img src="..."] or [img src=&quot;...&quot;].
+# Group 1 is the entity-quoted URL, group 2 the plainly quoted one.
+IMAGE_RE = re.compile(
+    r'\[img src=(?:&quot;(.*?)&quot;|"([^"]*)")(?:[^\]]*)\]\[\/img\]', re.I | re.S
+)
+# Legacy Steam markup, still present in older posts: [img]...[/img].
+LEGACY_IMAGE_RE = re.compile(r"\[img\](.*?)\[/img\]")
 
 
-def extract_images(text: str) -> Iterator:
-    # Handle both standard quotes and html-encoded quotes (&quot;)
-    # Group 1: Content inside &quot;...&quot; (can contain quotes)
-    # Group 2: Content inside "..." (standard)
-    pattern = r'\[img src=(?:&quot;(.*?)&quot;|"([^"]*)")(?:[^\]]*)\]\[\/img\]'
-    matches = re.finditer(pattern, text, re.I | re.S)
-    return matches
+def _matches(text: str) -> Iterator[re.Match[str]]:
+    yield from IMAGE_RE.finditer(text)
+    yield from LEGACY_IMAGE_RE.finditer(text)
 
 
 class ImageExtractor(Extractor):
     def extract(self) -> list[Image]:
-        matches = extract_images(self.text)
-        matches_deprecated = extract_images_deprecated(self.text)
-
-        # Merge both iterators
-        all_matches = list(matches) + list(matches_deprecated)
-
         images = []
-        for result in all_matches:
-            # Get the URL from the correct capture group
-            src_url = result.group(1) or result.group(2)
+
+        for match in _matches(self.text):
+            src_url = match.group(1) or match.group(2)
             if not src_url:
                 continue
 
-            html_encoded_quot = "&quot;"
-            if html_encoded_quot in src_url:
-                src_url = src_url.replace(html_encoded_quot, "")
-
-            url = resolve_steam_clan_image_url(src_url)
-
-            if url == "":
+            url = resolve_steam_clan_image_url(src_url.replace(HTML_QUOT, ""))
+            if not url:
                 logger.warning("Image URL is empty in text!")
                 continue
 
             images.append(
                 Image(
-                    text_pos_start=result.start(),
-                    text_pos_end=result.end(),
+                    text_pos_start=match.start(),
+                    text_pos_end=match.end(),
                     is_heading=False,
                     url=url,
                 )

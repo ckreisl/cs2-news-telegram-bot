@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import abc
+from typing import Protocol
 
 
-class Parser(abc.ABC):
-    def __init__(self, text: str) -> None:
-        self.__text = text
+class Parser(Protocol):
+    """A pure text transformation.
 
-    @property
-    def text(self) -> str:
-        return self.__text
+    Parsers are stateless: they take the text to transform as an argument and
+    return a new string. An earlier version stored the text on the instance
+    and wrote results back onto it, which made ``parse()`` non-idempotent --
+    calling it twice re-escaped HTML the first call had produced.
+    """
 
-    @text.setter
-    def text(self, text: str) -> None:
-        self.__text = text
-
-    @abc.abstractmethod
-    def parse(self) -> str:
-        pass
+    def parse(self, text: str) -> str: ...

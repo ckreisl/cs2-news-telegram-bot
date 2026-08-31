@@ -9,27 +9,38 @@ from __future__ import annotations
 
 import logging
 import time
-from pathlib import Path
 
-from cs2posts.bot import settings
+from cs2posts.exceptions import ConfigurationError
+from cs2posts.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 
-def main() -> int:
-    path = Path(settings.HEARTBEAT_FILEPATH)
+def check(settings: Settings) -> int:
+    """Exit status for the given configuration. Separated from ``main`` so the
+    probe can be tested without touching the process environment."""
+    path = settings.heartbeat_filepath
     if not path.exists():
-        logger.error(f"heartbeat file missing: {path}")
+        logger.error("heartbeat file missing: %s", path)
         return 1
 
     age = time.time() - path.stat().st_mtime
-    # Tolerate one fully missed crawl cycle before declaring the bot dead.
-    max_age = settings.CS2_UPDATE_CHECK_INTERVAL * 2 + 60
+    max_age = settings.max_heartbeat_age_seconds
     if age > max_age:
-        logger.error(f"heartbeat stale: {age:.0f}s old (max {max_age}s)")
+        logger.error("heartbeat stale: %.0fs old (max %ss)", age, max_age)
         return 1
 
     return 0
+
+
+def main() -> int:
+    try:
+        settings = Settings.from_env()
+    except ConfigurationError as exc:
+        logger.error("misconfigured: %s", exc)
+        return 1
+
+    return check(settings)
 
 
 if __name__ == "__main__":

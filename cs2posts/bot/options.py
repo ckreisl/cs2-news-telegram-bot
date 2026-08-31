@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-from enum import Enum
-from typing import cast
+from typing import ClassVar
 
 from telegram import CallbackQuery
 from telegram import InlineKeyboardButton
@@ -14,49 +13,48 @@ from telegram.ext import CallbackQueryHandler
 from telegram.ext import CommandHandler
 from telegram.ext import ContextTypes
 
-from cs2posts.db import ChatDatabase
+from cs2posts.db import ChatRepository
 from cs2posts.dto.chats import Chat
+from cs2posts.dto.post import PostType
 
 logger = logging.getLogger(__name__)
 
+CLOSE = "close"
 
-class ButtonData(Enum):
-    UPDATE = "UPDATE"
-    NEWS = "NEWS"
-    EXTERNAL_NEWS = "EXTERNAL_NEWS"
-    CLOSE = "CLOSE"
+# One row per line; the labels and the toggles are both derived from PostType
+# so a new post type needs no new button, branch, or sentence here.
+POST_TYPE_LABELS: dict[PostType, str] = {
+    PostType.UPDATE: "Updates",
+    PostType.NEWS: "News",
+    PostType.EXTERNAL: "External News",
+}
+KEYBOARD_ROWS: tuple[tuple[PostType, ...], ...] = (
+    (PostType.UPDATE, PostType.NEWS),
+    (PostType.EXTERNAL,),
+)
+
+ENABLED_ICON = "✅"
+DISABLED_ICON = "⛔️"
 
 
 def enabled_icon(enabled: bool) -> str:
-    return "✅" if enabled else "⛔️"
-
-
-def create_options_message(chat: Chat) -> tuple[str, InlineKeyboardMarkup]:
-    return create_options_text(chat), create_options_reply_markup(chat)
+    return ENABLED_ICON if enabled else DISABLED_ICON
 
 
 def create_options_keyboard(chat: Chat) -> list[list[InlineKeyboardButton]]:
-    btn_updates_text = "Disable" if chat.is_update_interested else "Enable"
-    btn_news_text = "Disable" if chat.is_news_interested else "Enable"
-    btn_external_news_text = "Disable" if chat.is_external_news_interested else "Enable"
-
-    return [
+    rows = [
         [
             InlineKeyboardButton(
-                f"{btn_updates_text} Updates", callback_data=ButtonData.UPDATE.value
-            ),
-            InlineKeyboardButton(
-                f"{btn_news_text} News", callback_data=ButtonData.NEWS.value
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                f"{btn_external_news_text} External News",
-                callback_data=ButtonData.EXTERNAL_NEWS.value,
-            ),
-        ],
-        [InlineKeyboardButton("Close", callback_data=ButtonData.CLOSE.value)],
+                f"{'Disable' if chat.is_interested_in(post_type) else 'Enable'}"
+                f" {POST_TYPE_LABELS[post_type]}",
+                callback_data=post_type.value,
+            )
+            for post_type in row
+        ]
+        for row in KEYBOARD_ROWS
     ]
+    rows.append([InlineKeyboardButton("Close", callback_data=CLOSE)])
+    return rows
 
 
 def create_options_reply_markup(chat: Chat) -> InlineKeyboardMarkup:
@@ -64,108 +62,89 @@ def create_options_reply_markup(chat: Chat) -> InlineKeyboardMarkup:
 
 
 def create_options_text(chat: Chat) -> str:
-    icon_is_update_interested = enabled_icon(chat.is_update_interested)
-    icon_is_news_interested = enabled_icon(chat.is_news_interested)
-    icon_is_external_news_interested = enabled_icon(chat.is_external_news_interested)
-
-    text_enabled_update = "enabled" if chat.is_update_interested else "disabled"
-    text_enabled_news = "enabled" if chat.is_news_interested else "disabled"
-    text_enabled_external_news = (
-        "enabled" if chat.is_external_news_interested else "disabled"
+    lines = "\n".join(
+        f"{enabled_icon(chat.is_interested_in(post_type))} - Send"
+        f" {POST_TYPE_LABELS[post_type]} Posts"
+        f" ({'enabled' if chat.is_interested_in(post_type) else 'disabled'})"
+        for post_type in POST_TYPE_LABELS
     )
-
     return (
-        f"<b>Options</b>\n\n"
+        "<b>Options</b>\n\n"
         "Handle the automatically send Counter-Strike post notifications.\n\n"
-        f"{icon_is_update_interested} - Send Update Posts ("
-        f"{text_enabled_update})\n"
-        f"{icon_is_news_interested} - Send News Posts ("
-        f"{text_enabled_news})\n"
-        f"{icon_is_external_news_interested} - Send External News Posts ("
-        f"{text_enabled_external_news})\n\n"
-        f"Select an option to change, or press 'Close' to keep everything as it is."
+        f"{lines}\n\n"
+        "Select an option to change, or press 'Close' to keep everything as it is."
     )
+
+
+def create_options_message(chat: Chat) -> tuple[str, InlineKeyboardMarkup]:
+    return create_options_text(chat), create_options_reply_markup(chat)
 
 
 class Options:
-    def __init__(self, app: Application) -> None:
-        self.__chats_db: ChatDatabase | None = None
+    """The ``/options`` command and its inline keyboard.
 
-        app.add_handler(CommandHandler("options", self.options))
+    Both dependencies arrive through the constructor; the previous two-phase
+    ``set_chat_db`` existed only because the wiring order was inverted, and it
+    left every instance briefly unusable.
+    """
+
+    COMMAND: ClassVar[str] = "options"
+
+    def __init__(self, app: Application, chat_db: ChatRepository) -> None:
+        self._chat_db = chat_db
+        app.add_handler(CommandHandler(self.COMMAND, self.options))
         app.add_handler(CallbackQueryHandler(self.button))
 
-    @property
-    def chats_db(self) -> ChatDatabase:
-        if self.__chats_db is None:
-            raise RuntimeError("Chat database was not configured")
-        return self.__chats_db
-
-    def set_chat_db(self, db: ChatDatabase) -> None:
-        self.__chats_db = db
+    async def _admin_chat(self, chat_id: int, user_id: int) -> Chat | None:
+        chat = await self._chat_db.get(chat_id)
+        if chat is None or chat.chat_id_admin != user_id:
+            return None
+        return chat
 
     async def options(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update.message is None or update.message.from_user is None:
+        message = update.message
+        if message is None or message.from_user is None:
             return
 
-        message = update.message
-        from_user = message.from_user
-        assert from_user is not None
-
-        chat = await self.chats_db.get(message.chat_id)
+        chat = await self._admin_chat(message.chat_id, message.from_user.id)
         if chat is None:
             return
 
-        if chat.chat_id_admin != from_user.id:
-            return
-
+        logger.info("Sending options message to chat_id=%s ...", message.chat_id)
         text, reply_markup = create_options_message(chat)
-
-        logger.info(f"Sending options message to chat_id={message.chat_id} ...")
-
         await message.reply_text(
             text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
         )
 
     async def button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
-        if query is None or query.message is None or query.from_user is None:
+        if query is None or query.message is None or query.data is None:
             return
-        from_user = query.from_user
         if not hasattr(query.message, "chat_id"):
             return
 
         await query.answer()
 
-        chat = await self.chats_db.get(cast(int, query.message.chat_id))
+        chat = await self._admin_chat(query.message.chat_id, query.from_user.id)
         if chat is None:
             return
 
-        if chat.chat_id_admin != from_user.id:
+        if query.data == CLOSE:
+            await self.close(context, query)
             return
 
-        if query.data is None:
+        try:
+            post_type = PostType(query.data)
+        except ValueError:
+            # A button from a message rendered by an older version.
+            logger.warning("Ignoring unknown option %r", query.data)
             return
 
-        btn = ButtonData(query.data)
-        if btn is ButtonData.CLOSE:
-            await self.close(update, context)
-            return
+        chat.toggle_interest(post_type)
+        await self._chat_db.update(chat)
+        await self.refresh(context, query, chat)
 
-        if btn is ButtonData.UPDATE:
-            chat.is_update_interested = not chat.is_update_interested
-            await self.chats_db.update(chat)
-
-        if btn is ButtonData.NEWS:
-            chat.is_news_interested = not chat.is_news_interested
-            await self.chats_db.update(chat)
-
-        if btn is ButtonData.EXTERNAL_NEWS:
-            chat.is_external_news_interested = not chat.is_external_news_interested
-            await self.chats_db.update(chat)
-
-        await self.update(context, query, chat)
-
-    async def update(
+    async def refresh(
         self, context: ContextTypes.DEFAULT_TYPE, query: CallbackQuery, chat: Chat
     ) -> None:
         if query.message is None or not hasattr(query.message, "message_id"):
@@ -175,22 +154,24 @@ class Options:
         await context.bot.edit_message_text(
             text=text,
             chat_id=chat.chat_id,
-            message_id=cast(int, query.message.message_id),
+            message_id=query.message.message_id,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML,
         )
 
-    async def close(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        query = update.callback_query
-        if query is None or query.message is None:
+    async def close(
+        self, context: ContextTypes.DEFAULT_TYPE, query: CallbackQuery
+    ) -> None:
+        if query.message is None:
             return
         if not hasattr(query.message, "chat_id") or not hasattr(
             query.message, "message_id"
         ):
             return
 
-        await query.answer()
+        # The hasattr guards above narrow away InaccessibleMessage, which
+        # carries no chat_id.
         await context.bot.delete_message(
-            chat_id=cast(int, query.message.chat_id),
-            message_id=cast(int, query.message.message_id),
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
         )

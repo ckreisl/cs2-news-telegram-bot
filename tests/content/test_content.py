@@ -176,11 +176,11 @@ def test_youtube_get_url():
     youtube = Youtube(
         text_pos_start=0, text_pos_end=50, is_heading=False, url="dQw4w9WgXcQ"
     )
-    assert youtube.get_url() == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    assert youtube.watch_url == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 def test_youtube_get_url_with_different_id():
     youtube = Youtube(
         text_pos_start=0, text_pos_end=50, is_heading=False, url="abc123XYZ"
     )
-    assert youtube.get_url() == "https://www.youtube.com/watch?v=abc123XYZ"
+    assert youtube.watch_url == "https://www.youtube.com/watch?v=abc123XYZ"

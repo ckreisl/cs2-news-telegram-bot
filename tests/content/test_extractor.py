@@ -36,12 +36,12 @@ def test_extractor_text_with_special_characters():
     assert extractor.text == text
 
 
-def test_extractor_text_is_private():
+def test_extractor_keeps_its_text_internal():
     extractor = ConcreteExtractor("test")
     # The text should be accessible through the property but stored privately
     assert extractor.text == "test"
     # Verify that the private attribute exists
-    assert hasattr(extractor, "_Extractor__text")
+    assert hasattr(extractor, "_text")
 
 
 def test_extractor_abstract_method():

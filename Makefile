@@ -1,5 +1,7 @@
 UV ?= uv
 DOCKER_IMAGE ?= cs2-news-bot
+# The entry points are checked too: they are where the concrete types meet.
+SOURCES := cs2posts tests main.py save.py
 
 .DEFAULT_GOAL := help
 
@@ -23,15 +25,15 @@ upgrade: ## Upgrade locked dependencies to their latest allowed versions
 	$(UV) lock --upgrade
 
 lint: ## Run ruff lint checks and verify formatting
-	$(UV) run ruff check cs2posts tests
-	$(UV) run ruff format --check cs2posts tests
+	$(UV) run ruff check $(SOURCES)
+	$(UV) run ruff format --check $(SOURCES)
 
 format: ## Apply ruff fixes and formatting
-	$(UV) run ruff check --fix cs2posts tests
-	$(UV) run ruff format cs2posts tests
+	$(UV) run ruff check --fix $(SOURCES)
+	$(UV) run ruff format $(SOURCES)
 
 typecheck: ## Run mypy type checks
-	$(UV) run mypy cs2posts
+	$(UV) run mypy
 
 test: ## Run test suite
 	$(UV) run pytest -v tests/

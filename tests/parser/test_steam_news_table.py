@@ -12,7 +12,7 @@ def test_steam_news_table_parser_extracts_table_to_pre() -> None:
         "[/table]"
     )
 
-    result = SteamNewsTableParser(text).parse()
+    result = SteamNewsTableParser().parse(text)
 
     expected = (
         "<pre>Position             | Royalty\n"
@@ -26,7 +26,7 @@ def test_steam_news_table_parser_extracts_table_to_pre() -> None:
 def test_steam_news_table_parser_leaves_non_table_text_untouched() -> None:
     text = "Intro text\n[table]\n[tr][td]A[/td][td]B[/td][/tr]\n[/table]\nOutro text"
 
-    result = SteamNewsTableParser(text).parse()
+    result = SteamNewsTableParser().parse(text)
 
     expected = "Intro text\n<pre>A | B</pre>\nOutro text"
 

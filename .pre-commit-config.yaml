@@ -21,6 +21,8 @@ repos:
     rev: v1.20.0
     hooks:
     -   id: mypy
-        args: ['--ignore-missing-imports', '--disallow-incomplete-defs']
-        files: '^cs2posts/'
-        additional_dependencies: ['types-requests']
+        # Settings live in pyproject.toml so the hook and `make typecheck`
+        # cannot drift apart.
+        args: ['--config-file', 'pyproject.toml']
+        files: '^(cs2posts/|main\.py|save\.py)'
+        additional_dependencies: ['httpx', 'python-telegram-bot', 'aiosqlite']

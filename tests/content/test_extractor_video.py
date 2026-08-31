@@ -19,7 +19,7 @@ def test_video_extractor_extract_video_with_webm():
     videos = extractor.extract()
     assert len(videos) == 1
     assert videos[0].webm == "https://example.com/video.webm"
-    assert videos[0].mp4 == ""
+    assert videos[0].mp4 is None
 
 
 def test_video_extractor_extract_video_with_mp4():
@@ -28,7 +28,7 @@ def test_video_extractor_extract_video_with_mp4():
     videos = extractor.extract()
     assert len(videos) == 1
     assert videos[0].mp4 == "https://example.com/video.mp4"
-    assert videos[0].webm == ""
+    assert videos[0].webm is None
 
 
 def test_video_extractor_extract_video_with_poster():
@@ -193,13 +193,13 @@ def test_video_extractor_to_bool_invalid():
 
 def test_video_extractor_extract_url_no_match():
     extractor = VideoExtractor("")
-    assert extractor._extract_url("no url here") is None
+    assert extractor._to_url("no url here") is None
 
 
 def test_video_extractor_extract_url_direct():
     extractor = VideoExtractor("")
     assert (
-        extractor._extract_url("https://example.com/video.mp4")
+        extractor._to_url("https://example.com/video.mp4")
         == "https://example.com/video.mp4"
     )
 

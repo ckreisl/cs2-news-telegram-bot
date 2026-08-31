@@ -10,112 +10,99 @@ from .extractor_image import ImageExtractor
 from .extractor_video import VideoExtractor
 from .extractor_youtube import YoutubeExtractor
 
+IMAGE_LINK_LABEL = "Image Link"
+
 
 class TextBlockExtractor(Extractor):
-    def __init__(
-        self,
-        text: str,
-        videos: Sequence[Content] | None = None,
-        carousel: Sequence[Content] | None = None,
-        images: Sequence[Content] | None = None,
-        youtube: Sequence[Content] | None = None,
-    ) -> None:
+    """The prose between the media blocks of a post.
+
+    ``media`` is required rather than optional-and-recomputed: the only
+    caller already has the extracted media, and taking it as an argument
+    leaves this class with a single, testable code path.
+    """
+
+    def __init__(self, text: str, media: Sequence[Content]) -> None:
         super().__init__(text)
+        self._media = sorted(media, key=lambda content: content.text_pos_start)
 
-        videos = VideoExtractor(self.text).extract() if videos is None else videos
-        carousel = (
-            CarouselExtractor(self.text).extract() if carousel is None else carousel
-        )
-        images = ImageExtractor(self.text).extract() if images is None else images
-        youtube = YoutubeExtractor(self.text).extract() if youtube is None else youtube
-
-        self.__content = sorted(
-            [
-                *videos,
-                *youtube,
-                *carousel,
-                *images,
-            ],
-            key=lambda content: content.text_pos_start,
-        )
-
-    def _combine(self, text_blocks: list[TextBlock]) -> list[TextBlock]:
-        if len(text_blocks) == 0:
-            return text_blocks
-
-        if len(text_blocks) == 1:
-            return text_blocks
-
-        blocks = []
-
-        i = 0
-        while i < len(text_blocks):
-            left = text_blocks[i]
-            idx_right = i + 1
-            if idx_right >= len(text_blocks):
-                blocks.append(left)
-                break
-            right = text_blocks[idx_right]
-
-            if left.text.endswith(">") and right.text.startswith("</a>"):
-                blocks.append(
-                    TextBlock(
-                        text_pos_start=left.text_pos_start,
-                        text_pos_end=right.text_pos_end,
-                        is_heading=left.is_heading,
-                        text=left.text + "\nImage Link" + right.text,
-                    )
-                )
-                i += 2
-                continue
-
-            blocks.append(left)
-            i += 1
-
-        return blocks
+    @classmethod
+    def from_text(cls, text: str) -> TextBlockExtractor:
+        """Extract the media blocks first, then the text between them."""
+        media: list[Content] = [
+            *VideoExtractor(text).extract(),
+            *YoutubeExtractor(text).extract(),
+            *CarouselExtractor(text).extract(),
+            *ImageExtractor(text).extract(),
+        ]
+        return cls(text, media)
 
     def extract(self) -> list[TextBlock]:
-
-        if len(self.__content) == 0:
+        if not self._media:
             return [TextBlock(0, len(self.text), False, self.text)]
 
-        blocks = []
+        blocks: list[TextBlock] = []
         text_pos = 0
 
-        for c in self.__content:
-            if c.text_pos_start == 0:
-                text_pos = c.text_pos_end
+        for media in self._media:
+            if media.text_pos_start <= text_pos:
+                text_pos = media.text_pos_end
                 continue
 
-            if text_pos == c.text_pos_start:
-                text_pos = c.text_pos_end
-                continue
-
-            text = self.text[text_pos : c.text_pos_start].strip()
-            if len(text) == 0:
-                text_pos = c.text_pos_end
-                continue
-
-            blocks.append(
-                TextBlock(
-                    text_pos_start=text_pos,
-                    text_pos_end=c.text_pos_start,
-                    is_heading=False,
-                    text=text,
+            text = self.text[text_pos : media.text_pos_start].strip()
+            if text:
+                blocks.append(
+                    TextBlock(
+                        text_pos_start=text_pos,
+                        text_pos_end=media.text_pos_start,
+                        is_heading=False,
+                        text=text,
+                    )
                 )
-            )
 
-            text_pos = c.text_pos_end
+            text_pos = media.text_pos_end
 
         blocks.append(
             TextBlock(
                 text_pos_start=text_pos,
                 text_pos_end=len(self.text),
                 is_heading=False,
-                text=self.text[text_pos : len(self.text)].strip(),
+                text=self.text[text_pos:].strip(),
             )
         )
 
-        # New news post if image is clickable and the link contains an image
-        # We end up with a </a> tag as own TextBlock
-        return self._combine(blocks)
+        return self._merge_split_anchors(blocks)
+
+    def _merge_split_anchors(self, blocks: list[TextBlock]) -> list[TextBlock]:
+        """Rejoin an anchor that an inline image split in two.
+
+        A clickable image renders as ``<a href=...>[img]...[/img]</a>``; the
+        image is extracted from the middle, leaving a dangling ``</a>`` as its
+        own block.
+        """
+        merged: list[TextBlock] = []
+        i = 0
+
+        while i < len(blocks):
+            left = blocks[i]
+            right = blocks[i + 1] if i + 1 < len(blocks) else None
+
+            if (
+                right is not None
+                and left.text.endswith(">")
+                and right.text.startswith("</a>")
+            ):
+                merged.append(
+                    TextBlock(
+                        text_pos_start=left.text_pos_start,
+                        text_pos_end=right.text_pos_end,
+                        is_heading=left.is_heading,
+                        text=f"{left.text}\n{IMAGE_LINK_LABEL}{right.text}",
+                    )
+                )
+                i += 2
+                continue
+
+            merged.append(left)
+            i += 1
+
+        return merged
