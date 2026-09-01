@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Telegram bot that posts the latest Counter-Strike 2 news and updates"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "python-telegram-bot[job-queue]==21.10",
     "bbcode==1.1.0",
@@ -31,7 +31,7 @@ dev = [
 package = false
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
@@ -75,7 +75,7 @@ log_level = "INFO"
 pythonpath = ["."]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 ignore_missing_imports = true
 disallow_incomplete_defs = true
 disallow_untyped_defs = true

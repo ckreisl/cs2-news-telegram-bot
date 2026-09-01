@@ -245,7 +245,7 @@ class CounterStrikeNewsMessage:
                     exc,
                 )
                 await asyncio.sleep(delay)
-            except (Forbidden, ChatMigrated):
+            except Forbidden, ChatMigrated:
                 # Chat-level failures: the whole post is undeliverable to this
                 # chat. Propagate so the bot can drop or migrate the chat
                 # instead of failing again on every future post.
