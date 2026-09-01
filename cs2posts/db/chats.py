@@ -113,7 +113,10 @@ class SqliteChatRepository:
         return chat
 
     async def remove(self, chat: Chat) -> None:
-        await self._db.execute("DELETE FROM chats WHERE chat_id = ?", (chat.chat_id,))
+        await self.remove_by_id(chat.chat_id)
+
+    async def remove_by_id(self, chat_id: int) -> None:
+        await self._db.execute("DELETE FROM chats WHERE chat_id = ?", (chat_id,))
 
     async def update(self, chat: Chat) -> None:
         assignments = ", ".join(
@@ -125,9 +128,22 @@ class SqliteChatRepository:
         )
 
     async def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
-        await self.remove(chat)
+        """Move ``chat`` to ``new_chat_id``.
+
+        Telegram reports one migration twice -- as a service message and as a
+        ``ChatMigrated`` error on the next send -- so this has to be safe to
+        run again. The new row is written before the old one is dropped: the
+        previous delete-then-INSERT lost the chat entirely whenever a row
+        already sat at ``new_chat_id``, because the insert then failed with
+        the old row already gone.
+        """
+        old_chat_id = chat.chat_id
         chat.chat_id = new_chat_id
-        await self.add(chat)
+
+        await self.save(chat)
+        if old_chat_id != new_chat_id:
+            await self.remove_by_id(old_chat_id)
+
         return chat
 
     async def exists(self, chat_id: int) -> bool:
@@ -157,5 +173,13 @@ class SqliteChatRepository:
         if isinstance(chats, dict) and chats.get("chats") is not None:
             chats = chats["chats"]
 
+        if not isinstance(chats, list):
+            raise ValueError(
+                f"Expected a list of chats in {filepath}, got {type(chats).__name__}"
+            )
+
+        # ``save`` rather than ``add``: re-importing a snapshot over a
+        # populated database must refresh those chats, not abort on the first
+        # one that already exists.
         for chat in chats:
-            await self.add(Chat.from_dict(chat))
+            await self.save(Chat.from_dict(chat))

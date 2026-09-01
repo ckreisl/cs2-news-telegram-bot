@@ -3,16 +3,18 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+from datetime import timedelta
 from functools import singledispatchmethod
 from typing import Any
 
-import httpcore
-import httpx
 from telegram import InputMediaPhoto
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.error import ChatMigrated
 from telegram.error import Forbidden
+from telegram.error import NetworkError
+from telegram.error import RetryAfter
+from telegram.error import TimedOut
 
 from cs2posts.content import Carousel
 from cs2posts.content import Content
@@ -36,9 +38,26 @@ from cs2posts.utils import is_valid_url
 
 logger = logging.getLogger(__name__)
 
-# Errors that are worth another attempt: the network hiccupped.
-TRANSIENT_ERRORS = (httpx.ReadTimeout, httpcore.ReadTimeout, httpx.ConnectError)
+# Errors worth another attempt: the network hiccupped, or Telegram asked us
+# to slow down. These have to be the python-telegram-bot types, not the raw
+# httpx ones: HTTPXRequest wraps every httpx failure before it reaches us
+# (``httpx.TimeoutException`` -> ``TimedOut``, ``httpx.HTTPError`` ->
+# ``NetworkError``), so catching httpx here would never match anything.
+TRANSIENT_ERRORS = (TimedOut, NetworkError, RetryAfter)
 CHAT_NOT_FOUND = "Chat not found"
+
+
+def retry_after_seconds(error: RetryAfter) -> float:
+    """How long Telegram's flood control wants us to wait.
+
+    ``retry_after`` is an ``int`` today, but python-telegram-bot is migrating
+    it to a ``timedelta`` (opt in early with ``PTB_TIMEDELTA=true``), so read
+    both rather than break on the version that flips the default.
+    """
+    retry_after = error.retry_after
+    if isinstance(retry_after, timedelta):
+        return retry_after.total_seconds()
+    return float(retry_after)
 
 
 class CounterStrikeNewsMessage:
@@ -159,13 +178,24 @@ class CounterStrikeNewsMessage:
 
     @send_content.register
     async def _(self, content: Carousel, bot: Any, chat_id: int) -> None:
-        media = []
+        # ``_add_header`` deliberately skips prepending the header when media
+        # leads the post, on the understanding that the caption carries it.
+        # Telegram takes a media group's caption from its first item.
+        caption = self._caption(content)
+
+        media: list[InputMediaPhoto] = []
         for image in content.images:
             image_url = extract_url(image.url)
             if image_url is None or not await self._is_valid_media_url(image_url):
                 logger.error("Not sending image, invalid URL: %s", image_url)
                 continue
-            media.append(InputMediaPhoto(media=image_url))
+            media.append(
+                InputMediaPhoto(
+                    media=image_url,
+                    caption=caption if not media else None,
+                    parse_mode=ParseMode.HTML,
+                )
+            )
 
         groups = [
             media[start : start + MAX_MEDIA_GROUP_SIZE]
@@ -223,6 +253,21 @@ class CounterStrikeNewsMessage:
             try:
                 await self.send_content(content, bot, chat_id)
                 return True
+            except Forbidden, ChatMigrated:
+                # Chat-level failures: the whole post is undeliverable to this
+                # chat. Propagate so the bot can drop or migrate the chat
+                # instead of failing again on every future post.
+                raise
+            except BadRequest as exc:
+                # Must precede the transient branch: BadRequest subclasses
+                # NetworkError, so handling it later would retry malformed
+                # sends and swallow the "Chat not found" signal below.
+                if exc.message == CHAT_NOT_FOUND:
+                    raise
+                logger.error(
+                    "Could not send to chat_id=%s content=%s: %s", chat_id, kind, exc
+                )
+                return False
             except TRANSIENT_ERRORS as exc:
                 if attempt >= max_retries:
                     logger.exception(
@@ -233,7 +278,13 @@ class CounterStrikeNewsMessage:
                         exc,
                     )
                     return False
-                delay = TELEGRAM_SEND_DELAY_SECONDS * (2**attempt)
+                # Flood control names its own wait; back off exponentially for
+                # everything else.
+                delay = (
+                    retry_after_seconds(exc)
+                    if isinstance(exc, RetryAfter)
+                    else TELEGRAM_SEND_DELAY_SECONDS * (2**attempt)
+                )
                 logger.warning(
                     "Transient error for chat_id=%s content=%s attempt=%s/%s"
                     " retry_in=%ss: %s",
@@ -245,18 +296,6 @@ class CounterStrikeNewsMessage:
                     exc,
                 )
                 await asyncio.sleep(delay)
-            except Forbidden, ChatMigrated:
-                # Chat-level failures: the whole post is undeliverable to this
-                # chat. Propagate so the bot can drop or migrate the chat
-                # instead of failing again on every future post.
-                raise
-            except BadRequest as exc:
-                if exc.message == CHAT_NOT_FOUND:
-                    raise
-                logger.error(
-                    "Could not send to chat_id=%s content=%s: %s", chat_id, kind, exc
-                )
-                return False
             except Exception as exc:
                 logger.exception(
                     "Could not send to chat_id=%s content=%s: %s", chat_id, kind, exc

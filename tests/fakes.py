@@ -32,8 +32,16 @@ class InMemoryChatRepository:
         return self.chats.get(chat_id)
 
     async def add(self, chat: Chat) -> Chat:
+        if chat.chat_id in self.chats:
+            # Mirrors the bare INSERT the sqlite repository issues, so a test
+            # that adds over an existing chat fails here rather than passing
+            # against a double that is more forgiving than production.
+            raise ValueError(f"chat {chat.chat_id} already exists")
         self.chats[chat.chat_id] = chat
         return chat
+
+    async def save(self, chat: Chat) -> None:
+        self.chats[chat.chat_id] = chat
 
     async def update(self, chat: Chat) -> None:
         self.chats[chat.chat_id] = chat
@@ -42,9 +50,11 @@ class InMemoryChatRepository:
         self.chats.pop(chat.chat_id, None)
 
     async def migrate(self, chat: Chat, new_chat_id: int) -> Chat:
-        self.chats.pop(chat.chat_id, None)
+        old_chat_id = chat.chat_id
         chat.chat_id = new_chat_id
         self.chats[new_chat_id] = chat
+        if old_chat_id != new_chat_id:
+            self.chats.pop(old_chat_id, None)
         return chat
 
     async def running_chats_interested_in(self, post_type: PostType) -> list[Chat]:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import httpx
 import pytest
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.error import ChatMigrated
 from telegram.error import Forbidden
+from telegram.error import NetworkError
+from telegram.error import RetryAfter
+from telegram.error import TimedOut
 
 from cs2posts.content import Carousel
 from cs2posts.content import Image
@@ -314,7 +316,7 @@ async def test_a_transient_error_is_retried(message, bot, fast_sleep):
     async def flaky(**kwargs):
         attempts["n"] += 1
         if attempts["n"] < 3:
-            raise httpx.ReadTimeout("slow")
+            raise TimedOut
         await original(**kwargs)
 
     bot.send_message = flaky
@@ -330,7 +332,7 @@ async def test_retries_eventually_give_up(message, bot, fast_sleep, caplog):
     message.content = [TextBlock(0, 1, False, "hello")]
 
     async def always_times_out(**kwargs):
-        raise httpx.ReadTimeout("slow")
+        raise TimedOut
 
     bot.send_message = always_times_out
 
@@ -387,3 +389,143 @@ async def test_an_unexpected_error_is_swallowed(message, bot, caplog):
     await message.send(bot, CHAT_ID)
 
     assert "Could not send" in caplog.text
+
+
+# --- regressions -------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [TimedOut(), NetworkError("down")])
+async def test_the_errors_ptb_actually_raises_are_retried(
+    message, bot, fast_sleep, error
+):
+    """Regression: TRANSIENT_ERRORS listed the raw httpx exceptions, but
+    HTTPXRequest wraps every one of them before it reaches us, so the retry
+    loop never fired for a real timeout."""
+    message.content = [TextBlock(0, 1, False, "hello")]
+    attempts = {"n": 0}
+    original = bot.send_message
+
+    async def flaky(**kwargs):
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            raise error
+        await original(**kwargs)
+
+    bot.send_message = flaky
+
+    await message.send(bot, CHAT_ID)
+
+    assert bot.texts == ["hello"]
+    assert attempts["n"] == 3
+
+
+@pytest.mark.asyncio
+async def test_flood_control_waits_for_the_interval_telegram_asks_for(
+    message, bot, monkeypatch
+):
+    import asyncio
+
+    delays = []
+
+    async def record(delay):
+        delays.append(delay)
+
+    monkeypatch.setattr(asyncio, "sleep", record)
+
+    message.content = [TextBlock(0, 1, False, "hello")]
+    attempts = {"n": 0}
+    original = bot.send_message
+
+    async def flaky(**kwargs):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise RetryAfter(17)
+        await original(**kwargs)
+
+    bot.send_message = flaky
+
+    await message.send(bot, CHAT_ID)
+
+    assert bot.texts == ["hello"]
+    assert 17.0 in delays
+
+
+@pytest.mark.asyncio
+async def test_a_bad_request_is_not_retried(message, bot, fast_sleep):
+    """BadRequest subclasses NetworkError, so ordering the except clauses
+    wrongly would retry a permanently malformed send."""
+    message.content = [TextBlock(0, 1, False, "hello")]
+    attempts = {"n": 0}
+
+    async def always_bad(**kwargs):
+        attempts["n"] += 1
+        raise BadRequest("Message is too long")
+
+    bot.send_message = always_bad
+
+    await message.send(bot, CHAT_ID)
+
+    assert attempts["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_chat_not_found_still_propagates(message, bot, fast_sleep):
+    """The messenger relies on this to drop a chat that no longer exists; it
+    must not be absorbed by the transient branch."""
+    message.content = [TextBlock(0, 1, False, "hello")]
+
+    async def gone(**kwargs):
+        raise BadRequest("Chat not found")
+
+    bot.send_message = gone
+
+    with pytest.raises(BadRequest):
+        await message.send(bot, CHAT_ID)
+
+
+@pytest.mark.asyncio
+async def test_a_leading_carousel_captions_the_media_group(message, bot):
+    """Regression: _add_header skips media-led posts because the caption is
+    meant to carry the header, but the carousel sender never set one, so the
+    title and date were dropped from the post entirely."""
+    carousel = Carousel(0, 1, True, [image("https://example.com/1.png"), image()])
+
+    await message.send_content(carousel, bot, CHAT_ID)
+
+    (group,) = bot.media_groups
+    first, second = group["media"]
+    assert first.caption == message.header
+    # Telegram takes the group's caption from its first item only.
+    assert second.caption is None
+
+
+@pytest.mark.asyncio
+async def test_a_non_heading_carousel_has_no_caption(message, bot):
+    await message.send_content(Carousel(0, 1, False, [image()]), bot, CHAT_ID)
+
+    (group,) = bot.media_groups
+    assert group["media"][0].caption is None
+
+
+@pytest.mark.asyncio
+async def test_the_caption_rides_the_first_reachable_image(message, bot, monkeypatch):
+    """The header must not be lost just because the first image 404s."""
+
+    async def only_the_second_is_valid(url):
+        return url == "https://example.com/2.png"
+
+    monkeypatch.setattr(message, "_is_valid_media_url", only_the_second_is_valid)
+
+    carousel = Carousel(
+        0,
+        1,
+        True,
+        [image("https://example.com/1.png"), image("https://example.com/2.png")],
+    )
+
+    await message.send_content(carousel, bot, CHAT_ID)
+
+    (group,) = bot.media_groups
+    (only,) = group["media"]
+    assert only.caption == message.header

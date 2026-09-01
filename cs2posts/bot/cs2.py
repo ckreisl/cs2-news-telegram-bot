@@ -337,7 +337,11 @@ class CounterStrike2UpdateBot:
                 chat = Chat(update.message.chat_id)
 
             chat.chat_id_admin = update.message.from_user.id
-            await self.chat_db.add(chat)
+            # ``save`` rather than ``add``: the row can outlive the bot's
+            # departure (removed while the process was down, or this join
+            # update redelivered after a crash), and a bare INSERT would fail
+            # on the primary key instead of re-registering the chat.
+            await self.chat_db.save(chat)
 
     async def left_chat_member(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE

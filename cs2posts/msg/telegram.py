@@ -27,11 +27,16 @@ def split_text(message: str, limit: int = TELEGRAM_MAX_MESSAGE_LENGTH) -> list[s
 
         # A single line can itself exceed the limit; hard-split it so we
         # never hand Telegram an over-long message that it would reject.
-        while len(line) > limit:
+        # The bound is ``>=`` rather than ``>`` because the remainder is
+        # re-seeded with a trailing newline below: a remainder of exactly
+        # ``limit`` would become ``limit + 1`` and be rejected.
+        while len(line) >= limit:
             chunks.append(line[:limit])
             line = line[limit:]
 
-        chunk = f"{line}\n"
+        # An exhausted line leaves nothing to seed; seeding "\n" would emit a
+        # whitespace-only chunk, which Telegram also rejects.
+        chunk = f"{line}\n" if line else ""
 
     if chunk:
         chunks.append(chunk)

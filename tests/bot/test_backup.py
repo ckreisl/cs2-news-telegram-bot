@@ -113,3 +113,22 @@ async def test_backup_calls_database_with_timestamped_filepath(tmp_path):
 
     mocked_db.backup.assert_called_once_with(tmp_path / "backup_20260403_120000.db")
     assert backup_filepath == tmp_path / "backup_20260403_120000.db"
+
+
+def test_backup_names_are_timestamped_in_utc(tmp_path):
+    """Regression: naive local timestamps sort out of chronological order
+    across a DST rollback, so rotation could prune the newest backup."""
+    from datetime import datetime
+
+    from cs2posts.clock import UTC
+
+    manager = ChatDatabaseBackupManager(
+        chat_db=AsyncMock(), backup_filepath=tmp_path / "backup.db", max_backups=5
+    )
+
+    before = datetime.now(tz=UTC)
+    stamp = manager.create_timestamped_backup_filepath().stem.removeprefix("backup_")
+    after = datetime.now(tz=UTC)
+
+    parsed = datetime.strptime(stamp, "%Y%m%d_%H%M%S").replace(tzinfo=UTC)
+    assert before.replace(microsecond=0) <= parsed <= after

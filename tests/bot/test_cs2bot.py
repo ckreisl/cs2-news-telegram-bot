@@ -517,3 +517,24 @@ async def test_the_backup_job_writes_a_timestamped_file(
     assert written.parent == tmp_path
     assert written.name.startswith("backup_")
     assert written.suffix == ".db"
+
+
+@pytest.mark.asyncio
+async def test_being_re_added_to_a_known_chat_updates_it(bot, context, chat_db):
+    """Regression: the handler issued a bare INSERT even when the row already
+    existed, so a redelivered join update -- or a re-add after the bot was
+    removed while offline -- failed on the primary key."""
+    bot.username = "cs2bot"
+    await chat_db.add(Chat(CHAT_ID, chat_id_admin=1, is_running=True))
+    update = make_update()
+    member = Mock()
+    member.username = "cs2bot"
+    update.message.new_chat_members = [member]
+
+    await bot.new_chat_member(update, context)
+
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert chat.chat_id_admin == USER_ID
+    # The rest of the chat's state survives re-registration.
+    assert chat.is_running

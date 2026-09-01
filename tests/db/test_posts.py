@@ -142,3 +142,15 @@ async def test_import_from_json_ignores_absent_keys(repository, tmp_path, news):
     await repository.import_from_json(json_file)
 
     assert len(await repository.load()) == 1
+
+
+@pytest.mark.asyncio
+async def test_import_from_json_rejects_a_non_object_payload(repository, tmp_path):
+    """Regression: a list-shaped snapshot raised AttributeError from ``.get``,
+    which bootstrap does not catch, so it took the whole bot down instead of
+    being logged and skipped."""
+    json_file = tmp_path / "posts.json"
+    json_file.write_text(json.dumps([{"gid": "1"}]), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Expected a JSON object"):
+        await repository.import_from_json(json_file)

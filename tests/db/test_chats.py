@@ -191,3 +191,56 @@ async def test_import_from_json_accepts_a_bare_list(repository, tmp_path):
     await repository.import_from_json(json_file)
 
     assert {chat.chat_id for chat in await repository.load()} == {7}
+
+
+@pytest.mark.asyncio
+async def test_migrate_onto_an_existing_id_keeps_the_chat(repository):
+    """Regression: migrate deleted the old row and then failed to insert the
+    new one, so a migration Telegram reported twice lost the chat entirely."""
+    await repository.add(Chat(1337, chat_id_admin=7))
+    await repository.add(Chat(42, chat_id_admin=99))
+
+    migrated = await repository.migrate(await repository.get(1337), 42)
+
+    assert await repository.get(1337) is None
+    stored = await repository.get(42)
+    assert stored is not None
+    assert stored.chat_id_admin == 7
+    assert migrated.chat_id == 42
+
+
+@pytest.mark.asyncio
+async def test_migrating_a_chat_to_its_own_id_is_a_no_op(repository):
+    await repository.add(Chat(1337, chat_id_admin=7))
+
+    await repository.migrate(await repository.get(1337), 1337)
+
+    stored = await repository.get(1337)
+    assert stored is not None
+    assert stored.chat_id_admin == 7
+
+
+@pytest.mark.asyncio
+async def test_import_from_json_can_run_over_a_populated_database(repository, tmp_path):
+    """Regression: the import used a bare INSERT, so re-importing a snapshot
+    aborted on the first chat that already existed."""
+    await repository.add(Chat(1337, chat_id_admin=7))
+    json_file = tmp_path / "chats.json"
+    json_file.write_text(
+        json.dumps([_as_json_dict(Chat(1337, chat_id_admin=1234))]), encoding="utf-8"
+    )
+
+    await repository.import_from_json(json_file)
+
+    stored = await repository.get(1337)
+    assert stored is not None
+    assert stored.chat_id_admin == 1234
+
+
+@pytest.mark.asyncio
+async def test_import_from_json_rejects_a_non_list_payload(repository, tmp_path):
+    json_file = tmp_path / "chats.json"
+    json_file.write_text(json.dumps({"nope": 1}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Expected a list of chats"):
+        await repository.import_from_json(json_file)

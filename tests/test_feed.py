@@ -151,3 +151,28 @@ def test_a_feed_can_be_built_from_posts_directly(make_post):
 
 def test_deep_copying_a_payload_does_not_change_parsing(feed, news_item):
     assert PostFeed.from_api_response(deepcopy(payload(news_item))).latest() is not None
+
+
+def test_latest_without_a_type_also_excludes_the_csgo_back_catalogue(news_item):
+    """Regression: only the typed branch applied the CS2 cutoff, so an untyped
+    ``latest()`` could return a pre-CS2 post that ``latest(post.type)`` hid."""
+    csgo_era = newsitem(gid="csgo", date=CS2_ANNOUNCEMENT_EPOCH + 10)
+    cs2_era = newsitem(gid="cs2", date=CS2_ANNOUNCEMENT_EPOCH + 5)
+    ancient = newsitem(gid="ancient", date=CS2_ANNOUNCEMENT_EPOCH - 1)
+
+    feed = PostFeed.from_api_response(payload(csgo_era, cs2_era, ancient))
+
+    latest = feed.latest()
+    assert latest is not None
+    assert latest.gid == "csgo"
+    assert feed.latest().date >= CS2_ANNOUNCEMENT_EPOCH
+
+
+def test_latest_is_none_when_every_post_predates_the_announcement():
+    old = newsitem(gid="old", date=CS2_ANNOUNCEMENT_EPOCH - 1)
+
+    feed = PostFeed.from_api_response(payload(old))
+
+    assert feed.latest() is None
+    # The raw feed still carries it; only the queries filter.
+    assert len(feed) == 1

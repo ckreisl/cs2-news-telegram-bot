@@ -131,7 +131,16 @@ class SqlitePostRepository:
 
         posts = json.loads(filepath.read_text(encoding="utf-8"))
 
-        # Backwards compatibility with the old .json format.
+        # Backwards compatibility with the old .json format: a mapping of post
+        # type to post. Raise ValueError rather than letting ``.get`` blow up
+        # with AttributeError, which bootstrap does not catch and which would
+        # therefore take the whole bot down over an unreadable snapshot.
+        if not isinstance(posts, dict):
+            raise ValueError(
+                f"Expected a JSON object in {filepath}, got {type(posts).__name__}"
+            )
+
         for key in ("news", "update", "external"):
-            if posts.get(key) is not None:
-                await self.save(Post.from_dict(posts[key]))
+            post = posts.get(key)
+            if post is not None:
+                await self.save(Post.from_dict(post))

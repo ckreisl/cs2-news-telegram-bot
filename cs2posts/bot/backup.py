@@ -5,6 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
+from cs2posts.clock import UTC
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_BACKUP_FILEPATH = Path(__file__).parent.parent.parent / "backups" / "backup.db"
@@ -37,7 +39,10 @@ class ChatDatabaseBackupManager:
         return self._max_backups
 
     def create_timestamped_backup_filepath(self) -> Path:
-        timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
+        # UTC, not local time: ``rotate_backups`` orders backups by sorting
+        # these names, and a DST rollback would make local timestamps sort
+        # out of chronological order and prune the wrong file.
+        timestamp = datetime.now(tz=UTC).strftime(TIMESTAMP_FORMAT)
         filepath = self.backup_filepath
         return filepath.with_stem(f"{filepath.stem}_{timestamp}")
 

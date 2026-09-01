@@ -65,21 +65,27 @@ class PostFeed:
     def posts(self) -> list[Post]:
         return list(self._posts)
 
+    def _since_announcement(self) -> list[Post]:
+        """Posts newest first, excluding the CS:GO back catalogue."""
+        return [post for post in self._posts if post.date >= CS2_ANNOUNCEMENT_EPOCH]
+
     def of_type(self, post_type: PostType) -> list[Post]:
         """Posts of one kind, newest first, excluding the CS:GO back catalogue."""
-        return [
-            post
-            for post in self._posts
-            if post.date >= CS2_ANNOUNCEMENT_EPOCH and post.type is post_type
-        ]
+        return [post for post in self._since_announcement() if post.type is post_type]
 
     def latest(self, post_type: PostType | None = None) -> Post | None:
         """The newest post, optionally of one kind.
 
         Replaces the eight ``latest_*``/``oldest_*`` properties this class
         used to expose, one per post type.
+
+        The CS:GO cutoff applies whether or not a type is given; filtering
+        only the typed branch made ``latest()`` able to return a pre-CS2 post
+        that ``latest(post.type)`` would have excluded.
         """
-        candidates = self._posts if post_type is None else self.of_type(post_type)
+        candidates = (
+            self._since_announcement() if post_type is None else self.of_type(post_type)
+        )
         return candidates[0] if candidates else None
 
     def is_empty(self) -> bool:

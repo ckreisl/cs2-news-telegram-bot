@@ -139,3 +139,40 @@ async def test_every_message_type_honours_the_sendable_contract(
     await message.send(bot, chat_id=1337)
 
     assert bot.messages or bot.photos or bot.videos or bot.media_groups
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        # A line of exactly ``limit`` used to be re-seeded as ``line + "\n"``.
+        "A" * 100 + "\nB" * 5,
+        # An exact multiple hard-split cleanly, leaving "\n" as the last chunk.
+        "C" * 200,
+        "D" * 201,
+        "E" * 99 + "\n" + "F" * 100 + "\n" + "G" * 101,
+    ],
+)
+def test_split_text_never_exceeds_the_limit(message):
+    """Regression: the hard-split remainder was re-seeded with a trailing
+    newline, so a line of exactly ``limit`` produced a ``limit + 1`` chunk
+    that Telegram rejects as too long."""
+    chunks = split_text(message, limit=100)
+
+    assert chunks, "a non-empty message must produce at least one chunk"
+    assert [len(chunk) for chunk in chunks if len(chunk) > 100] == []
+
+
+@pytest.mark.parametrize("message", ["C" * 200, "C" * 300, "X" * 100])
+def test_split_text_emits_no_whitespace_only_chunks(message):
+    """Telegram rejects a message that is only a newline."""
+    assert [
+        chunk for chunk in split_text(message, limit=100) if not chunk.strip()
+    ] == []
+
+
+def test_split_text_preserves_the_whole_message():
+    message = "A" * 100 + "\n" + "B" * 250 + "\nshort tail"
+
+    assert "".join(split_text(message, limit=100)).replace("\n", "") == message.replace(
+        "\n", ""
+    )
