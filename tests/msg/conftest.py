@@ -5,6 +5,12 @@ import pytest
 from cs2posts.dto.post import Post
 
 
+@pytest.fixture(autouse=True)
+def stub_http(http_response):
+    """Rendering a message resolves the post's source URL and probes media URLs."""
+    http_response(url="https://example.com/resolved")
+
+
 @pytest.fixture
 def mocked_cs2_update_post() -> Post:
     return Post(

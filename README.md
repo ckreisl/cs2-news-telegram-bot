@@ -64,14 +64,27 @@ TELEGRAM_TOKEN=<your_token>
 ```
 
 Possible environment variables:
-* `TELEGRAM_TOKEN`
-* `CS2_UPDATE_CHECK_INTERVAL` (default: 900)
-* `CHAT_SPAM_INTERVAL_MS` (default: 750)
-* `CHAT_BAN_TIMEOUT_SECONDS` (default: 600)
-* `CHAT_MAX_STRIKES` (default: 3)
-* `CHAT_STRIKE_RECOVERY_MINUTES` (default: 60)
 
-For detailed information, see `cs2posts/bot/settings.py`.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TELEGRAM_TOKEN` | *required* | Bot token from @BotFather |
+| `CS2_UPDATE_CHECK_INTERVAL` | `900` | Seconds between crawls |
+| `CHAT_SPAM_INTERVAL_MS` | `750` | Minimum gap between commands |
+| `CHAT_BAN_TIMEOUT_SECONDS` | `600` | Ban length after the last strike |
+| `CHAT_MAX_STRIKES` | `3` | Strikes before a ban |
+| `CHAT_STRIKE_RECOVERY_MINUTES` | `60` | Inactivity that clears one strike |
+| `CHAT_DB_FILEPATH` | `database/sqlite.db` | Chat storage |
+| `POST_DB_FILEPATH` | `database/sqlite.db` | Post storage |
+| `CHAT_DB_BACKUP_FILEPATH` | `backups/backup.db` | Backup target |
+| `CHAT_DB_BACKUP_INTERVAL` | `86400` | Seconds between backups |
+| `CHAT_DB_BACKUP_COUNT` | `5` | Timestamped backups to keep |
+| `HEARTBEAT_FILEPATH` | `/app/bot.heartbeat` | Liveness file for the healthcheck |
+| `IMPORT_CHATS_FROM_JSON` | *unset* | One-off import from the legacy format |
+| `IMPORT_POSTS_FROM_JSON` | *unset* | One-off import from the legacy format |
+
+Values are read, validated and frozen once at startup in `cs2posts/settings.py`;
+a missing token or a non-numeric interval fails immediately with a clear message
+rather than part-way through the first crawl.
 
 
 Create a Docker image and run the bot. From the project root, execute:
@@ -106,6 +119,40 @@ make run         # run the bot locally
 ```
 
 Anything else can be run through `uv run <command>`. To change dependencies, edit `[project.dependencies]` or the `dev` group in `pyproject.toml`, then run `make lock` (or `make upgrade` to move locked versions forward).
+
+
+### Layout
+
+```
+cs2posts/
+  settings.py     Validated configuration, built once at startup
+  clock.py        Clock protocol, so time-dependent code stays testable
+  exceptions.py   Error hierarchy; callers catch these, not bare Exception
+  crawler.py      Steam Web API client
+  feed.py         One crawl response, as PostFeed
+  http.py         Shared pooled HTTP client and timeout
+  utils.py        URL validation and resolution
+  bot/
+    cs2.py        Telegram wiring and command handlers
+    notifier.py   Crawl -> diff -> broadcast
+    messenger.py  Delivery, and the chat lifecycle a failure implies
+    bootstrap.py  Startup: storage, legacy imports, seeding
+    options.py    /options and its inline keyboard
+    spam.py       Per-chat rate limiting
+    backup.py     Timestamped chat-database backups
+  db/
+    repository.py ChatRepository / PostRepository protocols
+    sqlite.py     The sqlite file and shared query helpers
+    chats.py      SqliteChatRepository
+    posts.py      SqlitePostRepository
+  dto/            Post and Chat
+  parser/         Steam bbcode/HTML -> Telegram HTML (stateless)
+  content/        Splitting a post body into text, images, video, carousels
+  msg/            Rendering and sending a post
+```
+
+The bot depends on the repository *protocols*, not on sqlite, so the suite
+substitutes in-memory doubles (`tests/fakes.py`) rather than mocks.
 
 
 ## Contributing

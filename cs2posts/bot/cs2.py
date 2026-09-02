@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+import functools
 import logging
-from pathlib import Path
+from collections.abc import Callable
+from collections.abc import Coroutine
 from typing import Any
 
 from telegram import Update
 from telegram.constants import ChatType
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
-from telegram.error import ChatMigrated
-from telegram.error import Forbidden
 from telegram.ext import Application
 from telegram.ext import CallbackContext
 from telegram.ext import CommandHandler
@@ -18,92 +17,145 @@ from telegram.ext import MessageHandler
 from telegram.ext import filters
 from telegram.request import HTTPXRequest
 
-import cs2posts.bot.constants as const
-from cs2posts.bot import settings
+from cs2posts.bot import constants as const
 from cs2posts.bot.backup import ChatDatabaseBackupManager
+from cs2posts.bot.bootstrap import bootstrap
 from cs2posts.bot.heartbeat import write_heartbeat
+from cs2posts.bot.messenger import ChatMessenger
+from cs2posts.bot.notifier import PostNotifier
 from cs2posts.bot.options import Options
 from cs2posts.bot.spam import SpamProtector
 from cs2posts.crawler import CounterStrike2Crawler
-from cs2posts.cs2posts import CounterStrike2Posts
-from cs2posts.db import ChatDatabase
-from cs2posts.db import PostDatabase
+from cs2posts.db import ChatRepository
+from cs2posts.db import PostRepository
 from cs2posts.dto.chats import Chat
-from cs2posts.dto.post import Post
-from cs2posts.msg import TelegramMessage
+from cs2posts.dto.post import PostType
 from cs2posts.msg import create_message
+from cs2posts.settings import Settings
 
 logger = logging.getLogger(__name__)
 
+Handler = Callable[
+    ["CounterStrike2UpdateBot", Update, CallbackContext], Coroutine[Any, Any, None]
+]
 
-def spam_protected(func: Any) -> Any:
-    async def wrapper(self: Any, update: Update, context: CallbackContext) -> Any:
+READ_TIMEOUT = 30
+WRITE_TIMEOUT = 30
+CONNECT_TIMEOUT = 15
+POOL_TIMEOUT = 15
+
+GROUP_CHAT_TYPES = (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL)
+
+HELP_MESSAGE = (
+    "/start - Starts the bot\n"
+    "/stop - Stops the bot for this chat\n"
+    "/latest - Sends the latest post\n"
+    "/news - Sends the latest news post\n"
+    "/update - Sends the latest update post\n"
+    "/external - Sends the latest external post\n"
+    "/help - Prints this help message\n"
+    "/options - Configure Options <b>(only admins)</b>"
+)
+STOPPED_MESSAGE = (
+    "Bot has been stopped for this chat. You can start it again with /start"
+)
+ALREADY_RUNNING_MESSAGE = "Bot is already running for your chat!"
+
+
+def spam_protected(func: Handler) -> Handler:
+    """Run the spam check before ``func``, and drop the update if banned."""
+
+    @functools.wraps(func)
+    async def wrapper(
+        self: CounterStrike2UpdateBot, update: Update, context: CallbackContext
+    ) -> None:
         if update.message is None:
-            return None
+            return
 
         chat = await self.chat_db.get(update.message.chat_id)
         await self.spam_protector.check(context.bot, chat)
+
         if chat is not None:
             # Persist any state mutated by the spam check (strikes, ban,
             # last activity) before deciding whether to drop the message.
             await self.chat_db.update(chat)
-        if chat is not None and chat.is_banned:
-            return None
-        return await func(self, update, context)
+            if chat.is_banned:
+                return
+
+        await func(self, update, context)
 
     return wrapper
 
 
 class CounterStrike2UpdateBot:
+    """Wires the Telegram application to the chat and post services.
+
+    Crawl-and-dispatch lives in :class:`PostNotifier`, chat lifecycle in
+    :class:`ChatMessenger`, and startup in :func:`bootstrap`; what remains
+    here is handler registration and the command handlers themselves.
+    """
+
     def __init__(
         self,
         *,
-        token: str,
+        settings: Settings,
         crawler: CounterStrike2Crawler,
         spam_protector: SpamProtector,
-        post_db: PostDatabase,
-        chat_db: ChatDatabase,
+        post_db: PostRepository,
+        chat_db: ChatRepository,
+        application: Application | None = None,
     ) -> None:
-        request = HTTPXRequest(
-            read_timeout=30,
-            write_timeout=30,
-            connect_timeout=15,
-            pool_timeout=15,
-        )
-        self.app = (
-            Application.builder()
-            .post_init(self.post_init)
-            .post_shutdown(self.post_shutdown)
-            .token(token)
-            .request(request)
-            .build()
-        )
-
+        self.settings = settings
         self.crawler = crawler
         self.spam_protector = spam_protector
         self.post_db = post_db
         self.chat_db = chat_db
 
-        # Populated later: username in post_init, the cached latest posts in
-        # async_init / _load_latest_posts. Declared here so the attributes
-        # always exist (e.g. for the getattr/setattr in _post_checker).
+        self.app = application if application is not None else self._build_app()
+
+        self.messenger = ChatMessenger(chat_db)
+        self.notifier = PostNotifier(
+            crawler=crawler,
+            post_db=post_db,
+            chat_db=chat_db,
+            messenger=self.messenger,
+        )
+
         self.username: str | None = None
-        self.latest_post: Post | None = None
-        self.latest_news_post: Post | None = None
-        self.latest_update_post: Post | None = None
-        self.latest_external_post: Post | None = None
+        self.options = Options(app=self.app, chat_db=chat_db)
+        self._register_handlers()
 
-        self.options = Options(app=self.app)
+    def _build_app(self) -> Application:
+        request = HTTPXRequest(
+            read_timeout=READ_TIMEOUT,
+            write_timeout=WRITE_TIMEOUT,
+            connect_timeout=CONNECT_TIMEOUT,
+            pool_timeout=POOL_TIMEOUT,
+        )
+        return (
+            Application.builder()
+            .post_init(self.post_init)
+            .post_shutdown(self.post_shutdown)
+            .token(self.settings.telegram_token)
+            .request(request)
+            .build()
+        )
 
+    def _register_handlers(self) -> None:
         self.app.add_handlers(
             [
                 CommandHandler("start", self.start),
                 CommandHandler("stop", self.stop),
                 CommandHandler("help", self.help),
-                CommandHandler("news", self.news),
-                CommandHandler("update", self.update),
-                CommandHandler("external", self.external),
-                CommandHandler("latest", self.latest),
+                CommandHandler("latest", self.send_latest(None)),
+                *(
+                    CommandHandler(command, self.send_latest(post_type))
+                    for command, post_type in (
+                        ("news", PostType.NEWS),
+                        ("update", PostType.UPDATE),
+                        ("external", PostType.EXTERNAL),
+                    )
+                ),
                 MessageHandler(
                     filters.StatusUpdate.NEW_CHAT_MEMBERS, self.new_chat_member
                 ),
@@ -114,83 +166,33 @@ class CounterStrike2UpdateBot:
             ]
         )
 
-        # self.app.add_error_handler(self.error)
-
-    async def _ensure_databases_exist(self) -> None:
-        if not self.post_db.filepath.exists():
-            logger.info("Post database not found. Creating new one...")
-            await self.post_db.create()
-        await self.post_db.create_table()
-
-        if not self.chat_db.filepath.exists():
-            logger.info("Chat database not found. Creating new one...")
-            await self.chat_db.create()
-        await self.chat_db.create_table()
-
-    async def _try_import_json(
-        self,
-        filepath: str | None,
-        import_callback: Any,
-        label: str,
-    ) -> None:
-        if filepath is None:
-            return
-
-        try:
-            await import_callback(Path(filepath))
-        except Exception as e:
-            logger.error(f"Could not import {label} from json: {e}")
-
-    async def _seed_posts_if_empty(self) -> None:
-        if not await self.post_db.is_empty():
-            return
-
-        # TODO: Maybe ensure that there is a latest update and news post
-        # As of now we just fetch 100 items.
-        logger.info("No post data found. Fetching latest posts...")
-        # TODO: What happens here if crawler fails?
-        data = await self.crawler.crawl()
-        posts = CounterStrike2Posts(data)
-
-        if posts.latest_update_post is not None:
-            await self.post_db.save(posts.latest_update_post)
-        if posts.latest_news_post is not None:
-            await self.post_db.save(posts.latest_news_post)
-        if posts.latest_external_post is not None:
-            await self.post_db.save(posts.latest_external_post)
-
-    async def _load_latest_posts(self) -> None:
-        self.latest_post = await self.post_db.get_latest_post()
-        self.latest_news_post = await self.post_db.get_latest_news_post()
-        self.latest_update_post = await self.post_db.get_latest_update_post()
-        self.latest_external_post = await self.post_db.get_latest_external_post()
-
     async def async_init(self) -> None:
-        await self._ensure_databases_exist()
-        await self._try_import_json(
-            settings.IMPORT_CHATS_FROM_JSON,
-            self.chat_db.import_from_json,
-            "chats",
+        await bootstrap(
+            chat_db=self.chat_db,
+            post_db=self.post_db,
+            notifier=self.notifier,
+            import_chats_from=self.settings.import_chats_from_json,
+            import_posts_from=self.settings.import_posts_from_json,
         )
-        await self._try_import_json(
-            settings.IMPORT_POSTS_FROM_JSON,
-            self.post_db.import_from_json,
-            "posts",
-        )
-        await self._seed_posts_if_empty()
-        await self._load_latest_posts()
-
-        self.options.set_chat_db(self.chat_db)
 
     async def post_init(self, application: Application) -> None:
+        """Prepare storage and schedule the jobs, inside the loop PTB owns.
+
+        Startup is async, but ``run_polling`` is not: it creates and manages
+        the event loop itself. Doing the async setup here rather than in a
+        loop of our own is what python-telegram-bot's post_init hook is for,
+        and it keeps ``main`` free of event-loop bookkeeping.
+        """
         logger.info("Post init bot...")
-        # Bot username is only available after initialization
+        await self.async_init()
+
+        # Bot username is only available after initialization.
         self.username = application.bot.username
-        logger.info(f"Bot username: {self.username}. Bot is ready.")
+        logger.info("Bot username: %s. Bot is ready.", self.username)
 
         # Seed the heartbeat immediately so the healthcheck passes before the
-        # first crawl cycle (which only runs after CS2_UPDATE_CHECK_INTERVAL).
-        write_heartbeat(settings.HEARTBEAT_FILEPATH)
+        # first crawl cycle (which only runs after the crawl interval).
+        write_heartbeat(self.settings.heartbeat_filepath)
 
         # Schedule the recurring jobs up-front so crawling and backups run
         # regardless of whether any chat has issued /start yet.
@@ -199,38 +201,135 @@ class CounterStrike2UpdateBot:
             return
 
         application.job_queue.run_repeating(
-            callback=self.post_checker, interval=settings.CS2_UPDATE_CHECK_INTERVAL
+            callback=self.post_checker, interval=self.settings.crawl_interval_seconds
         )
         application.job_queue.run_repeating(
-            callback=self.backup_chats_db, interval=settings.CHAT_DB_BACKUP_INTERVAL
+            callback=self.backup_chats_db,
+            interval=self.settings.chat_db_backup_interval_seconds,
         )
 
     async def post_shutdown(self, application: Application) -> None:
         logger.info("Shutting down bot...")
-        # saving chats is not required anymore
-        # since we directly operate on the database
-        # Keep function for future use
-        if self.latest_news_post is not None:
-            await self.post_db.save(self.latest_news_post)
-        if self.latest_update_post is not None:
-            await self.post_db.save(self.latest_update_post)
-        if self.latest_external_post is not None:
-            await self.post_db.save(self.latest_external_post)
+
+    async def post_checker(self, context: CallbackContext) -> None:
+        # Refresh liveness before crawling so a flaky crawl still proves the
+        # job queue is alive; the healthcheck only cares that this loop runs.
+        write_heartbeat(self.settings.heartbeat_filepath)
+        await self.notifier.check(context.bot)
+
+    async def backup_chats_db(self, context: CallbackContext) -> None:
+        logger.info("Backing up chat database ...")
+        await ChatDatabaseBackupManager(
+            chat_db=self.chat_db,
+            backup_filepath=self.settings.chat_db_backup_filepath,
+            max_backups=self.settings.chat_db_backup_count,
+        ).run()
+
+    def send_latest(
+        self, post_type: PostType | None
+    ) -> Callable[[Update, CallbackContext], Coroutine[Any, Any, None]]:
+        """Build the handler for ``/latest``, ``/news``, ``/update``, ``/external``.
+
+        One parameterised factory replaces four handlers that differed only in
+        which cached post they read.
+        """
+
+        @spam_protected
+        async def handler(
+            bot: CounterStrike2UpdateBot, update: Update, context: CallbackContext
+        ) -> None:
+            if update.message is None:
+                return
+
+            post = bot.notifier.latest(post_type)
+            if post is None:
+                logger.info("No latest %s post available.", post_type or "")
+                return
+
+            logger.info("Sending latest %s post to chat ...", post_type or "")
+            chat = await bot.chat_db.get(update.message.chat_id)
+            message = await create_message(post)
+            await bot.messenger.send(context.bot, message, chat)
+
+        return functools.partial(handler, self)
+
+    @spam_protected
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None or update.message.from_user is None:
+            return
+
+        chat_id = update.message.chat_id
+        logger.info("Starting bot for chat_id=%s ...", chat_id)
+
+        chat = await self.chat_db.get(chat_id)
+        if chat is None:
+            chat = Chat(chat_id)
+            chat.chat_id_admin = update.message.from_user.id
+            self.spam_protector.update_chat_activity(chat)
+            await self.chat_db.add(chat)
+
+        if chat.is_running:
+            await update.message.reply_text(ALREADY_RUNNING_MESSAGE)
+        else:
+            chat.is_running = True
+            await update.message.reply_text(
+                text=const.WELCOME_MESSAGE_ENGLISH, parse_mode=ParseMode.HTML
+            )
+            await self.chat_db.update(chat)
+
+        if chat.is_removed_while_banned:
+            chat.is_removed_while_banned = False
+            await self.chat_db.update(chat)
+
+    @spam_protected
+    async def stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
+        logger.info("Stopping bot for chat_id=%s ...", update.message.chat_id)
+
+        chat = await self.chat_db.get(update.message.chat_id)
+        if chat is None:
+            logger.info("Chat not found. Nothing to do.")
+            return
+
+        chat_type = update.message.chat.type
+        if chat_type in GROUP_CHAT_TYPES:
+            # Keep the chat: it is only removed once the bot leaves the group.
+            chat.is_running = False
+            await self.chat_db.update(chat)
+            await update.message.reply_text(STOPPED_MESSAGE)
+        elif chat_type == ChatType.PRIVATE:
+            await update.message.reply_text(STOPPED_MESSAGE)
+            await self.chat_db.remove(chat)
+        else:
+            logger.error("Unknown chat type %s for chat_id=%s", chat_type, chat.chat_id)
+
+    @spam_protected
+    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message is None:
+            return
+
+        logger.info("Sending help message to chat_id=%s ...", update.message.chat_id)
+
+        chat = await self.chat_db.get(update.message.chat_id)
+        if chat is None:
+            logger.error("Chat not found. Not sending help message.")
+            return
+
+        await update.message.reply_text(text=HELP_MESSAGE, parse_mode=ParseMode.HTML)
 
     async def new_chat_member(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        if update is None or update.message is None or update.message.from_user is None:
+        if update.message is None or update.message.from_user is None:
             return
-
-        logger.info(f"New chat member {update.message.new_chat_members} ...")
-        logger.info(f"Username: {update.message.from_user.username}")
 
         for member in update.message.new_chat_members:
             if member.username != self.username:
                 continue
 
-            logger.info(f"Bot joined chat {update.message.chat_id} ...")
+            logger.info("Bot joined chat %s ...", update.message.chat_id)
 
             chat = await self.chat_db.get(update.message.chat_id)
             if chat is None:
@@ -238,22 +337,22 @@ class CounterStrike2UpdateBot:
                 chat = Chat(update.message.chat_id)
 
             chat.chat_id_admin = update.message.from_user.id
-            await self.chat_db.add(chat)
+            # ``save`` rather than ``add``: the row can outlive the bot's
+            # departure (removed while the process was down, or this join
+            # update redelivered after a crash), and a bare INSERT would fail
+            # on the primary key instead of re-registering the chat.
+            await self.chat_db.save(chat)
 
     async def left_chat_member(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        if update is None or update.message is None:
+        if update.message is None or update.message.left_chat_member is None:
             return
-        if update.message.left_chat_member is None:
-            return
-
-        logger.info(f"Left chat member {update.message.left_chat_member} ...")
 
         if update.message.left_chat_member.username != self.username:
             return
 
-        logger.info(f"Bot left chat {update.message.chat_id} ...")
+        logger.info("Bot left chat %s ...", update.message.chat_id)
 
         chat = await self.chat_db.get(update.message.chat_id)
         if chat is None:
@@ -269,276 +368,22 @@ class CounterStrike2UpdateBot:
             return
 
         if update.message.migrate_from_chat_id is None:
-            # Someone two events are fired for the same chat migration
-            # ignore the second event where migrate_from_chat_id is None
+            # Two events fire for one migration; the second carries no origin.
             return
 
         logger.info(
-            f"Migrating chat from {update.message.migrate_from_chat_id} to {update.message.chat_id} ..."
+            "Migrating chat from %s to %s ...",
+            update.message.migrate_from_chat_id,
+            update.message.chat_id,
         )
 
         chat = await self.chat_db.get(update.message.migrate_from_chat_id)
         if chat is None:
-            if await self.chat_db.get(update.message.chat_id) is not None:
-                logger.info("Chat already migrated. Nothing to do.")
-                return
+            logger.info("Chat already migrated or unknown. Nothing to do.")
             return
 
-        logger.info(f"Chat migrated to {update.message.chat_id} ...")
         await self.chat_db.migrate(chat, update.message.chat_id)
         logger.info("Chat migrated successfully.")
-
-    @spam_protected
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update.message is None or update.message.from_user is None:
-            return
-
-        logger.info(f"Starting bot for chat_id={update.message.chat_id} ...")
-
-        chat_id = update.message.chat_id
-        chat = await self.chat_db.get(chat_id=chat_id)
-
-        if chat is None:
-            chat = Chat(chat_id)
-            chat.chat_id_admin = update.message.from_user.id
-            self.spam_protector.update_chat_activity(chat)
-            await self.chat_db.add(chat)
-
-        if not chat.is_running:
-            chat.is_running = True
-            await update.message.reply_text(
-                text=const.WELCOME_MESSAGE_ENGLISH, parse_mode=ParseMode.HTML
-            )
-            await self.chat_db.update(chat)
-        else:
-            await update.message.reply_text("Bot is already running for your chat!")
-
-        if chat.is_removed_while_banned:
-            chat.is_removed_while_banned = False
-            await self.chat_db.update(chat)
-
-    @spam_protected
-    async def stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update.message is None:
-            return
-
-        logger.info(f"Stopping bot for chat_id={update.message.chat_id} ...")
-
-        chat = await self.chat_db.get(update.message.chat_id)
-        if chat is None:
-            logger.info("Chat not found. Nothing to do.")
-            return
-
-        chat_type = update.message.chat.type
-        if chat_type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-            chat.is_running = False
-            await self.chat_db.update(chat)
-            await update.message.reply_text(
-                "Bot has been stopped for this chat. You can start it again with /start"
-            )
-            # We do not remove the chat here, because we want to keep the chat
-            # and only remove it if the bot is removed from the group chat.
-        elif chat_type == ChatType.PRIVATE:
-            await update.message.reply_text(
-                "Bot has been stopped for this chat. You can start it again with /start"
-            )
-            await self.chat_db.remove(chat)
-        else:
-            logger.error(f"Unknown chat type {chat_type} for chat_id={chat.chat_id}")
-
-    @spam_protected
-    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update.message is None:
-            return
-
-        logger.info(f"Sending help message to chat_id={update.message.chat_id} ...")
-
-        chat = await self.chat_db.get(update.message.chat_id)
-        if chat is None:
-            logger.error("Chat not found. Not sending help message.")
-            return
-
-        msg = (
-            "/start - Starts the bot\n"
-            "/stop - Stops the bot for this chat\n"
-            "/latest - Sends the latest post\n"
-            "/news - Sends the latest news post\n"
-            "/update - Sends the latest update post\n"
-            "/external - Sends the latest external post\n"
-            "/help - Prints this help message\n"
-            "/options - Configure Options <b>(only admins)</b>"
-        )
-
-        await update.message.reply_text(text=msg, parse_mode=ParseMode.HTML)
-
-    @spam_protected
-    async def latest(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update.message is None:
-            return
-
-        if self.latest_post is None:
-            logger.info("No latest post available.")
-            return
-
-        logger.info("Sending latest saved post to chat ...")
-        chat = await self.chat_db.get(update.message.chat_id)
-        msg = await create_message(self.latest_post)
-        await self.send_message(context=context, msg=msg, chat=chat)
-
-    @spam_protected
-    async def news(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update.message is None:
-            return
-
-        if self.latest_news_post is None:
-            logger.info("No latest news post available.")
-            return
-
-        logger.info("Sending latest news post to chat ...")
-        chat = await self.chat_db.get(update.message.chat_id)
-        msg = await create_message(self.latest_news_post)
-        await self.send_message(context=context, msg=msg, chat=chat)
-
-    @spam_protected
-    async def update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if update.message is None:
-            return
-
-        if self.latest_update_post is None:
-            logger.info("No latest update post available.")
-            return
-
-        logger.info("Sending latest update post to chats ...")
-        chat = await self.chat_db.get(update.message.chat_id)
-        msg = await create_message(self.latest_update_post)
-        await self.send_message(context=context, msg=msg, chat=chat)
-
-    @spam_protected
-    async def external(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
-        if update.message is None:
-            return
-
-        if self.latest_external_post is None:
-            logger.info("No latest external post available.")
-            return
-
-        logger.info("Sending latest external post to chat ...")
-        chat = await self.chat_db.get(update.message.chat_id)
-        msg = await create_message(self.latest_external_post)
-        await self.send_message(context=context, msg=msg, chat=chat)
-
-    async def _post_checker(self, context: CallbackContext, post: Post | None) -> None:
-        if post is None:
-            return
-
-        post_type = str(post.get_type())
-        latest_post = getattr(self, f"latest_{post_type}_post")
-        if not post.is_newer_than(latest_post):
-            logger.info(
-                f"No new {post_type} post found latest_{post_type}_post=[{post.title}]"
-            )
-            return
-
-        logger.info(
-            f"New {post_type} post found latest_{post_type}_post=[{post.title}]"
-        )
-
-        setattr(self, f"latest_{post_type}_post", post)
-        await self.send_post_to_chats(context, post=post)
-        await self.post_db.save(post)
-
-    async def post_checker(self, context: CallbackContext) -> None:
-        # Refresh liveness before crawling so a flaky crawl still proves the
-        # job queue is alive; the healthcheck only cares that this loop runs.
-        write_heartbeat(settings.HEARTBEAT_FILEPATH)
-
-        logger.info("Crawling latest posts ...")
-        try:
-            data = await self.crawler.crawl(count=10)
-        except Exception as e:
-            logger.error(f"Could not fetch latest posts: {e}")
-            return
-
-        cs2posts = CounterStrike2Posts.create(data)
-        cs2posts.validate()
-
-        if cs2posts.is_empty():
-            logger.info("No post(s) found in latest crawl.")
-            return
-
-        await self._post_checker(context, cs2posts.latest_news_post)
-        await self._post_checker(context, cs2posts.latest_update_post)
-        await self._post_checker(context, cs2posts.latest_external_post)
-
-        self.latest_post = await self.post_db.get_latest_post()
-
-    async def send_post_to_chats(self, context: CallbackContext, post: Post) -> None:
-        logger.info("Sending post to chats ...")
-
-        # Send to all chats that are interested in the post type
-        if post.is_news():
-            chats = await self.chat_db.get_running_and_interested_in_news_chats()
-        elif post.is_update():
-            chats = await self.chat_db.get_running_and_interested_in_updates_chats()
-        elif post.is_external():
-            chats = (
-                await self.chat_db.get_running_and_interested_in_external_news_chats()
-            )
-        else:
-            logger.error(
-                f"Unknown post type {post.to_dict()}. Not sending any message."
-            )
-            return
-
-        msg = await create_message(post=post)
-
-        for chat in chats:
-            await self.send_message(context=context, msg=msg, chat=chat)
-
-    async def send_message(
-        self, context: CallbackContext, msg: TelegramMessage, chat: Chat | None
-    ) -> None:
-
-        if chat is None:
-            logger.error("Chat is None. Not sending any message.")
-            return
-
-        try:
-            await msg.send(context.bot, chat_id=chat.chat_id)
-        except BadRequest as e:
-            logger.error(f"Bad request for {chat.chat_id=}")
-            if e.message == "Chat not found":
-                logger.error(f"Chat not found we delete the chat {chat.chat_id=}")
-                await self.chat_db.remove(chat)
-            logger.error(f"Reason: {e}")
-        except Forbidden as e:
-            logger.error(f"Bot is blocked by user we delete the chat {chat.chat_id=}")
-            logger.error(f"Reason: {e}")
-            await self.chat_db.remove(chat)
-        except ChatMigrated as e:
-            logger.error(f"Chat migrated we update the chat {chat.chat_id=}")
-            logger.error(f"Reason: {e}")
-            chat = await self.chat_db.migrate(chat, e.new_chat_id)
-            await self.send_message(context, msg, chat)
-
-    async def backup_chats_db(self, context: CallbackContext) -> None:
-        logger.info("Backing up chat database ...")
-
-        backup_manager = ChatDatabaseBackupManager(
-            chat_db=self.chat_db,
-            backup_filepath=settings.CHAT_DB_BACKUP_FILEPATH,
-            max_backups=settings.CHAT_DB_BACKUP_COUNT,
-        )
-
-        backup_filepath = await backup_manager.backup()
-        logger.info(f"Created backup: {backup_filepath}")
-        backup_manager.rotate_backups()
-
-    async def error(self, update: Update, context: CallbackContext) -> None:
-        logger.error(f"Update {update} caused error {context.error}")
-        # TODO: Implement clean error handling
 
     def run(self) -> None:
         self.app.run_polling(allowed_updates=Update.ALL_TYPES)

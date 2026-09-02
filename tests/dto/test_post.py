@@ -78,9 +78,9 @@ def test_post_is_news(post_fixture2):
     assert post_fixture2.is_news()
 
 
-def test_get_feed_type(post_fixture, post_fixture2):
-    assert post_fixture.get_feed_type() == FeedType.EXTERN
-    assert post_fixture2.get_feed_type() == FeedType.INTERN
+def test_feed_type_enum(post_fixture, post_fixture2):
+    assert post_fixture.feed_type_enum is FeedType.EXTERN
+    assert post_fixture2.feed_type_enum is FeedType.INTERN
 
 
 def test_post_to_dict(post_fixture):
@@ -101,21 +101,6 @@ def test_post_to_dict(post_fixture):
     assert post_fixture.to_dict() == expected
 
 
-def test_post_get_item(post_fixture):
-    assert post_fixture["gid"] == post_fixture.gid
-    assert post_fixture["title"] == post_fixture.title
-    assert post_fixture["url"] == post_fixture.url
-    assert post_fixture["is_external_url"] == post_fixture.is_external_url
-    assert post_fixture["author"] == post_fixture.author
-    assert post_fixture["contents"] == post_fixture.contents
-    assert post_fixture["date"] == post_fixture.date
-    assert post_fixture["feedlabel"] == post_fixture.feedlabel
-    assert post_fixture["feedname"] == post_fixture.feedname
-    assert post_fixture["feed_type"] == post_fixture.feed_type
-    assert post_fixture["appid"] == post_fixture.appid
-    assert post_fixture["tags"] == post_fixture.tags
-
-
 def test_post_equals(post_fixture):
     assert post_fixture == post_fixture
     assert post_fixture != {}
@@ -126,12 +111,6 @@ def test_post_not_equals(post_fixture, post_fixture2):
 
 
 def test_post_is_newer_than(post_fixture, post_fixture2):
-    assert not post_fixture.is_newer_than(None)
     assert not post_fixture.is_newer_than(post_fixture2)
     post_fixture2.date = 123456789
     assert post_fixture.is_newer_than(post_fixture2)
-
-
-def test_post_is_older_eq_than(post_fixture, post_fixture2):
-    assert not post_fixture.is_older_eq_than(None)
-    assert post_fixture.is_older_eq_than(post_fixture2)

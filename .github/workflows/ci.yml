@@ -89,7 +89,8 @@ jobs:
         docker run --rm -i cs2-news-bot python - <<'PY'
         import sys
         import apscheduler, cs2posts, telegram.ext  # noqa: F401
-        import aiosqlite, bbcode, bs4, dotenv, requests  # noqa: F401
+        import aiosqlite, bbcode, bs4, dotenv, httpx  # noqa: F401
+        import cs2posts.healthcheck  # noqa: F401
         assert sys.prefix == "/app/.venv", sys.prefix
         print("image OK:", sys.version.split()[0])
         PY

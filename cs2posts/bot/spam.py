@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from datetime import timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from telegram.constants import ParseMode
 
-from cs2posts.bot import settings
+from cs2posts.clock import Clock
+from cs2posts.clock import SystemClock
 from cs2posts.dto.chats import Chat
+from cs2posts.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,22 +20,44 @@ def spam_warning_message(chat: Chat, max_strikes: int) -> str:
     )
 
 
-def spam_banned_message(chat: Chat, timout: int, max_strikes: int) -> str:
-    return f"<b>Strike ({chat.strikes}/{max_strikes})</b> Chat is now <b>banned</b> for spamming (Timeout: {int(timout / 60)} mins)."
+def spam_banned_message(chat: Chat, timeout_seconds: int, max_strikes: int) -> str:
+    minutes = timeout_seconds // 60
+    return (
+        f"<b>Strike ({chat.strikes}/{max_strikes})</b> Chat is now"
+        f" <b>banned</b> for spamming (Timeout: {minutes} mins)."
+    )
 
 
 class SpamProtector:
-    MAX_STRIKES = settings.CHAT_MAX_STRIKES
-    BAN_TIMEOUT = settings.CHAT_BAN_TIMEOUT_SECONDS
+    """Rate-limits a chat's commands, escalating to a temporary ban.
+
+    Settings and the clock are injected rather than read from module globals,
+    so the thresholds have one lifetime and tests can drive time directly.
+    """
+
+    def __init__(self, settings: Settings, clock: Clock | None = None) -> None:
+        self._settings = settings
+        self._clock = clock if clock is not None else SystemClock()
+
+    @property
+    def max_strikes(self) -> int:
+        return self._settings.max_strikes
+
+    @property
+    def ban_timeout_seconds(self) -> int:
+        return self._settings.ban_timeout_seconds
+
+    def _since_last_activity(self, chat: Chat) -> timedelta:
+        return self._clock.now() - chat.last_activity
 
     async def check(self, bot: Any, chat: Chat | None) -> None:
         if chat is None:
             return
 
-        logger.info(f"Checking chat {chat.chat_id}")
+        logger.info("Checking chat %s", chat.chat_id)
 
-        if self.is_banned(chat) and self.is_timeouted(chat):
-            logger.info(f"Chat {chat.chat_id} is timeouted")
+        if chat.is_banned and self.is_timeouted(chat):
+            logger.info("Chat %s is timeouted", chat.chat_id)
             return
 
         if chat.is_banned:
@@ -44,80 +66,69 @@ class SpamProtector:
         if self.is_spamming(chat):
             await self.strike(bot, chat)
         else:
-            logger.info(f"Chat {chat.chat_id} is not spamming")
+            logger.info("Chat %s is not spamming", chat.chat_id)
             self.recover_strikes(chat)
 
         self.update_chat_activity(chat)
 
-    def _get_utc_now(self) -> datetime:
-        return datetime.now(tz=ZoneInfo("UTC")).replace(tzinfo=None)
-
     def update_chat_activity(self, chat: Chat) -> None:
-        logger.info(f"Updated chat activity for {chat.chat_id}")
-        chat.last_activity = self._get_utc_now()
+        logger.info("Updated chat activity for %s", chat.chat_id)
+        chat.last_activity = self._clock.now()
+
+    def is_spamming(self, chat: Chat) -> bool:
+        limit = timedelta(milliseconds=self._settings.spam_interval_ms)
+        return self._since_last_activity(chat) <= limit
+
+    def is_timeouted(self, chat: Chat) -> bool:
+        elapsed = self._since_last_activity(chat).total_seconds()
+        return 0 <= elapsed < self.ban_timeout_seconds
 
     def reduce_strike_level(self, chat: Chat) -> None:
-        logger.info(f"Reduce strike level for {chat.chat_id}")
+        logger.info("Reduce strike level for %s", chat.chat_id)
         if chat.strikes > 0:
             chat.strikes -= 1
 
+    def increase_strike_level(self, chat: Chat) -> None:
+        logger.info("Increase strike level for %s", chat.chat_id)
+        if chat.strikes < self.max_strikes:
+            chat.strikes += 1
+
     def recover_strikes(self, chat: Chat) -> None:
-        time_diff = self._get_utc_now() - chat.last_activity
-        recovery_interval = timedelta(minutes=settings.CHAT_STRIKE_RECOVERY_MINUTES)
-        if time_diff >= recovery_interval and chat.strikes > 0:
+        recovery = timedelta(minutes=self._settings.strike_recovery_minutes)
+        if self._since_last_activity(chat) >= recovery and chat.strikes > 0:
             logger.info(
-                f"Chat {chat.chat_id} recovered from inactivity, reducing strikes"
+                "Chat %s recovered from inactivity, reducing strikes", chat.chat_id
             )
             self.reduce_strike_level(chat)
 
-    def increase_strike_level(self, chat: Chat) -> None:
-        logger.info(f"Increase strike level for {chat.chat_id}")
-        if chat.strikes < self.MAX_STRIKES:
-            chat.strikes += 1
-
-    def is_spamming(self, chat: Chat) -> bool:
-        time_diff = self._get_utc_now() - chat.last_activity
-        limit = timedelta(milliseconds=settings.CHAT_SPAM_INTERVAL_MS)
-        return time_diff <= limit
-
     def ban(self, chat: Chat) -> None:
-        logger.info(f"Ban chat {chat.chat_id}")
+        logger.info("Ban chat %s", chat.chat_id)
         chat.is_banned = True
 
     def unban(self, chat: Chat) -> None:
-        logger.info(f"Unban chat {chat.chat_id}")
+        logger.info("Unban chat %s", chat.chat_id)
         chat.is_banned = False
         # Serving the ban timeout earns a clean slate; otherwise strikes stay
-        # at MAX_STRIKES and the next fast message would immediately re-ban.
+        # at max_strikes and the next fast message would immediately re-ban.
         chat.strikes = 0
 
     def is_banned(self, chat: Chat) -> bool:
         return chat.is_banned
 
-    def is_timeouted(self, chat: Chat) -> bool:
-        time_diff = self._get_utc_now() - chat.last_activity
-        return 0 <= time_diff.total_seconds() < self.BAN_TIMEOUT
-
     async def strike(self, bot: Any, chat: Chat) -> None:
         if chat.is_banned:
-            logger.info(f"Chat {chat.chat_id} is already banned")
+            logger.info("Chat %s is already banned", chat.chat_id)
             return
 
-        logger.info(f"Strike for {chat.chat_id}")
-
+        logger.info("Strike for %s", chat.chat_id)
         self.increase_strike_level(chat)
 
-        if chat.strikes == self.MAX_STRIKES:
+        if chat.strikes == self.max_strikes:
             self.ban(chat)
-            await bot.send_message(
-                chat_id=chat.chat_id,
-                text=spam_banned_message(chat, self.BAN_TIMEOUT, self.MAX_STRIKES),
-                parse_mode=ParseMode.HTML,
-            )
-            return
+            text = spam_banned_message(chat, self.ban_timeout_seconds, self.max_strikes)
+        else:
+            text = spam_warning_message(chat, self.max_strikes)
 
         await bot.send_message(
-            chat_id=chat.chat_id,
-            text=spam_warning_message(chat, self.MAX_STRIKES),
-            parse_mode=ParseMode.HTML,
+            chat_id=chat.chat_id, text=text, parse_mode=ParseMode.HTML
         )

@@ -6,7 +6,7 @@ Telegram bot that delivers Counter-Strike 2 news, updates, and external announce
 
 ## Code Style
 
-- Python 3.12 (runtime & Docker), target 3.12+ syntax (`pyupgrade --py312-plus`)
+- Python 3.14 (runtime & Docker), target 3.14+ syntax (`pyupgrade --py314-plus`)
 - Always include `from __future__ import annotations` as the first import
 - Import order enforced by `reorder-python-imports` (stdlib → third-party → local)
 - Formatting via `autopep8`; line length is not enforced (`flake8 --ignore=E501`)
@@ -65,4 +65,4 @@ python main.py
 - Configuration loaded from environment variables via `python-dotenv` in `cs2posts/bot/settings.py`.
 - Tests live in `tests/` using `pytest` + `pytest-asyncio`. Async tests use `@pytest.mark.asyncio`. Mock external dependencies with `unittest.mock.patch`.
 - Use `@pytest.fixture` (and `@pytest_asyncio.fixture` for async) for reusable test data. Use `autouse=True` fixtures to reset shared state (e.g., LRU caches) between tests.
-- CI runs on GitHub Actions (Python 3.12, Ubuntu) — see `.github/workflows/ci.yml`.
+- CI runs on GitHub Actions (Python 3.14, Ubuntu) — see `.github/workflows/ci.yml`.

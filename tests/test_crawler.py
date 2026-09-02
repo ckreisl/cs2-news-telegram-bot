@@ -1,69 +1,98 @@
 from __future__ import annotations
 
-import json
-from unittest.mock import patch
-
+import httpx
 import pytest
-import pytest_asyncio
 
-from cs2posts.crawler import CRAWLER_REQUEST_TIMEOUT
+from cs2posts.crawler import COUNTER_STRIKE_APP_ID
 from cs2posts.crawler import CounterStrike2Crawler
+from cs2posts.exceptions import InvalidSteamResponse
+from cs2posts.exceptions import SteamApiUnavailable
+
+PAYLOAD = {"appnews": {"newsitems": []}}
 
 
 @pytest.fixture
-def crawler():
-    return CounterStrike2Crawler()
+def requests() -> list[httpx.Request]:
+    return []
 
 
-@pytest_asyncio.fixture
-def mock_get():
-    with patch("requests.get") as mock_get:
-        yield mock_get
+@pytest.fixture
+def crawler(monkeypatch, requests):
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=PAYLOAD)
+
+    return _install(monkeypatch, handler)
 
 
-def test_crawler_input_args_not_valid(crawler):
-    with pytest.raises(ValueError):
-        crawler._validate_args(count=-1)
-
-
-@pytest.mark.asyncio
-async def test_crawler_input_args_valid(crawler, mock_get):
-    expected_count = 100
-    mock_get.return_value.ok = True
-    mock_get.return_value.text = '{"foo": "bar"}'
-    await crawler.crawl(count=expected_count)
-    mock_get.assert_called_once_with(
-        crawler.url % expected_count, timeout=CRAWLER_REQUEST_TIMEOUT
+def _install(monkeypatch, handler) -> CounterStrike2Crawler:
+    transport = httpx.MockTransport(handler)
+    return CounterStrike2Crawler(
+        client_factory=lambda: httpx.AsyncClient(transport=transport)
     )
 
 
 @pytest.mark.asyncio
-async def test_crawler_receives_data(crawler, mock_get):
-    mock_get.return_value.ok = True
-    mock_get.return_value.text = '{"foo": "bar"}'
-    result = await crawler.crawl()
-    assert result == {"foo": "bar"}
+async def test_crawl_rejects_negative_count(crawler):
+    with pytest.raises(ValueError, match="greater than or equal to 0"):
+        await crawler.crawl(count=-1)
 
 
 @pytest.mark.asyncio
-async def test_crawler_raises_exception_on_timeout(crawler, mock_get):
-    mock_get.side_effect = TimeoutError
-    with pytest.raises(TimeoutError):
+async def test_crawl_returns_the_parsed_payload(crawler):
+    assert await crawler.crawl() == PAYLOAD
+
+
+@pytest.mark.asyncio
+async def test_crawl_asks_steam_for_the_requested_app_and_count(crawler, requests):
+    await crawler.crawl(count=7)
+
+    (request,) = requests
+    assert request.url.params["appid"] == str(COUNTER_STRIKE_APP_ID)
+    assert request.url.params["count"] == "7"
+    assert request.url.params["maxlength"] == "0"
+
+
+@pytest.mark.asyncio
+async def test_crawl_reports_an_error_status_as_unavailable(monkeypatch):
+    crawler = _install(monkeypatch, lambda request: httpx.Response(404))
+
+    with pytest.raises(SteamApiUnavailable, match="404"):
         await crawler.crawl()
 
 
 @pytest.mark.asyncio
-async def test_crawler_raises_exception_on_bad_response(crawler, mock_get):
-    mock_get.return_value.ok = False
-    mock_get.return_value.status_code = 404
-    with pytest.raises(RuntimeError, match="received response code=404"):
+async def test_crawl_reports_a_transport_failure_as_unavailable(monkeypatch):
+    def boom(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+    crawler = _install(monkeypatch, boom)
+
+    with pytest.raises(SteamApiUnavailable):
         await crawler.crawl()
 
 
 @pytest.mark.asyncio
-async def test_crawler_raises_exception_on_invalid_json(crawler, mock_get):
-    mock_get.return_value.ok = True
-    mock_get.return_value.text = "not valid json"
+async def test_crawl_rejects_a_non_json_body(monkeypatch):
+    crawler = _install(monkeypatch, lambda r: httpx.Response(200, text="not json"))
 
-    with pytest.raises(json.JSONDecodeError):
+    with pytest.raises(InvalidSteamResponse):
+        await crawler.crawl()
+
+
+@pytest.mark.asyncio
+async def test_crawl_rejects_a_json_array(monkeypatch):
+    crawler = _install(monkeypatch, lambda r: httpx.Response(200, json=[1, 2]))
+
+    with pytest.raises(InvalidSteamResponse, match="Expected a JSON object"):
+        await crawler.crawl()
+
+
+@pytest.mark.asyncio
+async def test_crawler_errors_share_a_base_class(monkeypatch):
+    from cs2posts.exceptions import CrawlerError
+
+    crawler = _install(monkeypatch, lambda request: httpx.Response(500))
+
+    with pytest.raises(CrawlerError):
         await crawler.crawl()

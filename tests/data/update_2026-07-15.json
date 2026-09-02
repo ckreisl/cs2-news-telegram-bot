@@ -1,0 +1,16 @@
+{
+    "gid": "1838407329252903",
+    "title": "Counter-Strike 2 Update",
+    "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/1838407329252903",
+    "is_external_url": true,
+    "author": "mcjohn",
+    "contents": "[p]\\[ MAPS ][/p][p]Fachwerk[/p][list][*][p]Updated to the latest version from the Community Workshop ([url=\"https://steamcommunity.com/sharedfiles/filedetails/changelog/3442040035\"]Update Notes[/url]).[/p][/*][/list][p]Boulder[/p][list][*][p]Updated to the latest version from the Community Workshop ([url=\"https://steamcommunity.com/sharedfiles/filedetails/changelog/3663186989\"]Update Notes[/url]).[/p][/*][/list][p]Shelter[/p][list][*][p]Updated to the latest version from the Community Workshop ([url=\"https://steamcommunity.com/sharedfiles/filedetails/changelog/3737179295\"]Update Notes[/url]).[/p][/*][/list][p]El Dorado[/p][list][*][p]Updated to the latest version from the Community Workshop ([url=\"https://steamcommunity.com/sharedfiles/filedetails/changelog/3408790618\"]Update Notes[/url]).[/p][/*][/list][p]\\[ MISC ][/p][list][*][p]Various stability and security fixes.[/p][/*][/list]",
+    "feedlabel": "Community Announcements",
+    "date": 1784076120,
+    "feedname": "steam_community_announcements",
+    "feed_type": 1,
+    "appid": 730,
+    "tags": [
+        "patchnotes"
+    ]
+}

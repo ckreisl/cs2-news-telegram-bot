@@ -12,26 +12,21 @@ from .telegram import TelegramMessage
 
 logger = logging.getLogger(__name__)
 
-
-def cleanup_soup(soup: BeautifulSoup) -> None:
-    for img in soup.find_all("img"):
-        img.decompose()
-
-    for br in soup.find_all("br"):
-        br.decompose()
+READ_MORE_PHRASES = ("read more", "read the rest of the story")
 
 
-def extract_read_more_links(soup: BeautifulSoup) -> list[Tag]:
-    read_more: list[Tag] = []
-    for anchor in soup.find_all("a"):
-        if not isinstance(anchor, Tag):
-            continue
+def strip_media(soup: BeautifulSoup) -> None:
+    for tag in soup.find_all(["img", "br"]):
+        tag.decompose()
 
-        text = anchor.text.lower()
-        if "read more" in text or "read the rest of the story" in text:
-            read_more.append(anchor)
 
-    return read_more
+def find_read_more_links(soup: BeautifulSoup) -> list[Tag]:
+    return [
+        anchor
+        for anchor in soup.find_all("a")
+        if isinstance(anchor, Tag)
+        and any(phrase in anchor.text.lower() for phrase in READ_MORE_PHRASES)
+    ]
 
 
 def remove_read_more_links(read_more: list[Tag]) -> None:
@@ -46,37 +41,40 @@ def build_content(soup: BeautifulSoup) -> str:
     return content.strip()
 
 
-def build_message(post: Post, content: str, source_url: str | None = None) -> str:
-    if source_url is None:
-        source_url = post.url
-    msg = "🔗 <b>External News</b>\n\n"
-    msg += f"<b>{html.escape(post.title)}</b>\n"
-    msg += f"({post.date_as_datetime})\n"
-    msg += "\n"
-    msg += content
-    msg += "\n\n"
-    msg += f"Source: <a href='{html.escape(source_url, quote=True)}'>Link</a>"
-    return msg
+def render_external_message(post: Post, content: str, source_url: str) -> str:
+    return (
+        "🔗 <b>External News</b>\n\n"
+        f"<b>{html.escape(post.title)}</b>\n"
+        f"({post.date_display})\n"
+        "\n"
+        f"{content}"
+        "\n\n"
+        f"Source: <a href='{html.escape(source_url, quote=True)}'>Link</a>"
+    )
+
+
+def _source_url(post: Post, read_more: list[Tag]) -> str:
+    """Prefer the article's own "read more" target over Steam's redirect."""
+    if read_more:
+        href = read_more[0].get("href")
+        if isinstance(href, str):
+            return href
+    return get_redirected_url(post.url)
 
 
 class CounterStrikeExternalMessage(TelegramMessage):
+    """A third-party article summary, rendered as plain text."""
+
     def __init__(self, post: Post) -> None:
         self.post = post
-        source_url = get_redirected_url(post.url)
 
         soup = BeautifulSoup(post.contents, "html.parser")
-
-        cleanup_soup(soup)
-        read_more = extract_read_more_links(soup)
+        strip_media(soup)
+        read_more = find_read_more_links(soup)
         remove_read_more_links(read_more)
 
-        content = build_content(soup)
-
-        if len(read_more) > 0:
-            href = read_more[0].get("href")
-            if isinstance(href, str):
-                source_url = href
-
-        msg = build_message(post, content, source_url)
-
-        super().__init__(msg)
+        super().__init__(
+            render_external_message(
+                post, build_content(soup), _source_url(post, read_more)
+            )
+        )

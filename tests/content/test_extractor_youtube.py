@@ -84,7 +84,7 @@ def test_youtube_extractor_extract_video_url_generation():
     text = "[previewyoutube=dQw4w9WgXcQ;full][/previewyoutube]"
     extractor = YoutubeExtractor(text)
     videos = extractor.extract()
-    assert videos[0].get_url() == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    assert videos[0].watch_url == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 def test_youtube_extractor_extract_long_video_id():

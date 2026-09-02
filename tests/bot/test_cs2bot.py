@@ -1,1036 +1,540 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
 from unittest.mock import Mock
-from unittest.mock import call
 from unittest.mock import patch
 
 import pytest
-from telegram import Update
 from telegram.constants import ChatType
-from telegram.error import BadRequest
-from telegram.error import ChatMigrated
-from telegram.error import Forbidden
 
-from cs2posts.bot import settings
+from cs2posts.bot.cs2 import ALREADY_RUNNING_MESSAGE
+from cs2posts.bot.cs2 import HELP_MESSAGE
+from cs2posts.bot.cs2 import STOPPED_MESSAGE
 from cs2posts.bot.cs2 import CounterStrike2UpdateBot
+from cs2posts.bot.spam import SpamProtector
 from cs2posts.dto.chats import Chat
-from cs2posts.dto.post import Post
+from cs2posts.dto.post import PostType
+from tests.conftest import NOW
+from tests.fakes import FakeBot
+from tests.fakes import InMemoryChatRepository
+from tests.fakes import InMemoryPostRepository
+
+CHAT_ID = 1337
+USER_ID = 99
 
 
-def create_update_post():
-    return Post(
-        gid="1337",
-        title="Update Post",
-        url="http://test.com",
-        is_external_url=True,
-        author="Test author",
-        contents="Test body",
-        feedlabel="Test label",
-        feedname="Test feed",
-        date=1234567890,
-        feed_type=1,
-        appid=730,
-        tags=["patchnotes"],
-    )
+class StubCrawler:
+    async def crawl(self, *, count: int = 100):
+        return {"appnews": {"newsitems": []}}
 
 
-def create_news_post():
-    return Post(
-        gid="gid",
-        title="title",
-        url="url",
-        is_external_url=True,
-        author="author",
-        contents="contents",
-        feedlabel="feedlabel",
-        feedname="feedname",
-        date=1234567890,
-        feed_type=1,
-        appid=730,
+class Replies:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    @property
+    def texts(self) -> list[str]:
+        return [call["text"] for call in self.calls]
+
+    async def __call__(self, text: str | None = None, **kwargs) -> None:
+        self.calls.append({"text": text, **kwargs})
+
+
+@pytest.fixture
+def chat_db():
+    return InMemoryChatRepository()
+
+
+@pytest.fixture
+def post_db():
+    return InMemoryPostRepository()
+
+
+@pytest.fixture
+def bot(settings, clock, chat_db, post_db):
+    """A bot wired to in-memory repositories and a stub Telegram application."""
+    return CounterStrike2UpdateBot(
+        settings=settings,
+        crawler=StubCrawler(),
+        spam_protector=SpamProtector(settings, clock),
+        post_db=post_db,
+        chat_db=chat_db,
+        application=Mock(),
     )
 
 
 @pytest.fixture
-@patch("cs2posts.bot.spam.SpamProtector")
-@patch("cs2posts.crawler.CounterStrike2Crawler")
-def bot(mocked_crawler, mocked_spam_protector):
-    mocked_spam_protector.check = AsyncMock()
-    mocked_spam_protector.strike = AsyncMock()
-    mocked_chat_db = AsyncMock()
-    mocked_post_db = AsyncMock()
+def telegram_bot():
+    return FakeBot()
 
-    bot = CounterStrike2UpdateBot(
-        token="test_token",
-        chat_db=mocked_chat_db,
-        post_db=mocked_post_db,
-        crawler=mocked_crawler,
-        spam_protector=mocked_spam_protector,
-    )
 
-    return bot
+@pytest.fixture
+def context(telegram_bot):
+    context = Mock()
+    context.bot = telegram_bot
+    return context
 
 
-def test_cs2_bot_init_no_files(bot):
-    # TODO finish up setup
-    pass
+def make_update(
+    *,
+    chat_id: int = CHAT_ID,
+    user_id: int = USER_ID,
+    chat_type: str = ChatType.PRIVATE,
+) -> Mock:
+    update = Mock()
+    update.message.chat_id = chat_id
+    update.message.chat.type = chat_type
+    update.message.from_user.id = user_id
+    update.message.reply_text = Replies()
+    return update
 
 
-@patch("cs2posts.bot.cs2.Application.builder")
-@patch("cs2posts.bot.cs2.HTTPXRequest")
-def test_cs2_bot_init_sets_custom_timeouts(mocked_httpx_request, mocked_builder):
-    app = Mock()
-    app.add_handlers = Mock()
+# --- construction and wiring -------------------------------------------------
 
-    builder = Mock()
-    builder.post_init.return_value = builder
-    builder.post_shutdown.return_value = builder
-    builder.token.return_value = builder
-    builder.request.return_value = builder
-    builder.build.return_value = app
-    mocked_builder.return_value = builder
 
-    request_instance = Mock()
-    mocked_httpx_request.return_value = request_instance
-
-    CounterStrike2UpdateBot(
-        token="test_token",
-        chat_db=AsyncMock(),
-        post_db=AsyncMock(),
-        crawler=AsyncMock(),
-        spam_protector=AsyncMock(),
-    )
-
-    mocked_httpx_request.assert_called_once_with(
-        read_timeout=30,
-        write_timeout=30,
-        connect_timeout=15,
-        pool_timeout=15,
-    )
-    builder.request.assert_called_once_with(request_instance)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_init(bot):
-    mocked_app = AsyncMock()
-    mocked_app.bot.username = "test_bot"
-    mocked_app.job_queue = Mock()
-    await bot.post_init(mocked_app)
-    assert bot.username == "test_bot"
-    assert mocked_app.job_queue.run_repeating.call_count == 2
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_init_without_job_queue(bot):
-    mocked_app = AsyncMock()
-    mocked_app.bot.username = "test_bot"
-    mocked_app.job_queue = None
-    await bot.post_init(mocked_app)
-    assert bot.username == "test_bot"
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_shutdown(bot):
-    bot.latest_news_post = create_news_post()
-    bot.latest_update_post = create_update_post()
-    bot.latest_external_post = create_update_post()
-
-    await bot.post_shutdown(Mock())
-
-    assert call(bot.latest_news_post) in bot.post_db.save.call_args_list
-    assert call(bot.latest_update_post) in bot.post_db.save.call_args_list
-    assert call(bot.latest_external_post) in bot.post_db.save.call_args_list
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_new_chat_member_bot_added(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    bot.username = "myBotName"
-    mocked_member = AsyncMock()
-    mocked_member.username = bot.username
-    mocked_update.message.new_chat_members = [mocked_member]
-    mocked_update.message.chat_id = 42
-    mocked_update.message.from_user.id = 1337
-    bot.chat_db.get.return_value = None
-
-    chat = Chat(42)
-
-    bot.chat_db.add.return_value = chat
-
-    await bot.new_chat_member(mocked_update, mocked_context)
-
-    bot.chat_db.get.assert_called_once_with(42)
-    chat.chat_id_admin = 1337
-    bot.chat_db.add.assert_called_once_with(chat)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_new_chat_member_not_bot_added(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    bot.username = "myBotName"
-    mocked_member = AsyncMock()
-    mocked_member.username = "notTheBotsUsername"
-    mocked_update.message.new_chat_members = [mocked_member]
-
-    bot.chat_db.reset_mock()
-    await bot.new_chat_member(mocked_update, mocked_context)
-
-    bot.chat_db.get.assert_not_called()
-    bot.chat_db.add.assert_not_called()
-    # bot.chat_db.save.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_left_chat_member_bot_left(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    bot.username = "myBotName"
-    mocked_update.message.left_chat_member.username = bot.username
-    mocked_update.message.chat_id = 42
-    mocked_update.message.from_user.id = 1337
-    bot.chat_db.get.return_value = None
-
-    await bot.left_chat_member(mocked_update, mocked_context)
-    bot.chat_db.get.assert_called_once_with(42)
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.left_chat_member(mocked_update, mocked_context)
-
-    bot.chat_db.remove.assert_called_once_with(chat)
-    # bot.chat_db.save.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_left_chat_member_not_bot_left(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    bot.username = "myBotName"
-    mocked_update.message.left_chat_member.username = "notTheBotsUsername"
-    mocked_update.message.chat_id = 42
-    mocked_update.message.from_user.id = 1337
-    bot.chat_db.get.return_value = None
-
-    await bot.left_chat_member(mocked_update, mocked_context)
-
-    bot.chat_db.get.assert_not_called()
-    bot.chat_db.remove.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_migrate_chat(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    mocked_update.message.migrate_from_chat_id = None
-    await bot.migrate_chat(mocked_update, mocked_context)
-    bot.chat_db.migrate.assert_not_called()
-    bot.chat_db.reset_mock()
-
-    chat = Chat(42)
-    mocked_update.message.migrate_from_chat_id = 42
-    bot.chat_db.get.side_effect = [None, chat, chat]
-    await bot.migrate_chat(mocked_update, mocked_context)
-    bot.chat_db.migrate.assert_not_called()
-
-    mocked_update.message.chat_id = 1337
-    await bot.migrate_chat(mocked_update, mocked_context)
-    bot.chat_db.migrate.assert_called_once_with(chat, 1337)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_start_command_new_user(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_context.job_queue = Mock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat_id = 42
-    mocked_update.message.from_user.id = 42
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = None
-    bot.chat_db.add.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.start(mocked_update, mocked_context)
-
-    chat.is_running = True
-    chat.chat_id_admin = 42
-    bot.chat_db.add.assert_called_once_with(chat)
-    bot.spam_protector.update_chat_activity.assert_called_once_with(chat)
-
-    # assert chat.is_running
-    mocked_update.message.reply_text.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_start_command_existing_user(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_context.job_queue = Mock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat_id = 42
-    mocked_update.message.from_user.id = 42
-
-    chat = Chat(42)
-    chat.is_running = True
-    chat.is_removed_while_banned = True
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.start(mocked_update, mocked_context)
-
-    bot.chat_db.add.assert_not_called()
-    # bot.chat_db.save.assert_not_called()
-    mocked_update.message.reply_text.assert_called_once()
-
-    mocked_context.job_queue.run_repeating.assert_not_called()
-    assert chat.is_removed_while_banned is False
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_stop_command_chat_none(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat_id = 42
-
-    bot.chat_db.get.return_value = None
-    bot.chat_db.reset_mock()
-    await bot.stop(mocked_update, mocked_context)
-
-    bot.chat_db.get.assert_called_with(42)
-
-    mocked_update.message.reply_text.assert_not_called()
-    bot.chat_db.remove.assert_not_called()
-    # bot.chat_db.save.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_stop_command_chat_is_banned(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    chat = Chat(42)
-    chat.is_banned = True
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.stop(mocked_update, mocked_context)
-
-    mocked_update.message.reply_text.assert_not_called()
-    bot.chat_db.remove.assert_not_called()
-    # Regression (#3): the spam check's mutations (including the ban itself)
-    # must be persisted even when the message is subsequently dropped.
-    bot.chat_db.update.assert_called_once_with(chat)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_stop_command_chat_is_group(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat.type = ChatType.GROUP
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.stop(mocked_update, mocked_context)
-
-    assert chat.is_running is False
-
-    mocked_update.message.reply_text.assert_called_once()
-    bot.chat_db.remove.assert_not_called()
-    # bot.chat_db.save.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_stop_command_chat_is_private(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat.type = ChatType.PRIVATE
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.stop(mocked_update, mocked_context)
-    mocked_update.message.reply_text.assert_called_once_with(
-        "Bot has been stopped for this chat. You can start it again with /start"
-    )
-    bot.chat_db.remove.assert_called_once_with(chat)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_stop_command_chat_is_unknown_type(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat.type = "UNKNOWN_CHAT_TYPE"
-    mocked_update.message.chat_id = 42
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-
-    with patch("cs2posts.bot.cs2.logger.error") as mocked_logger_error:
-        await bot.stop(mocked_update, mocked_context)
-
-    mocked_update.message.reply_text.assert_not_called()
-    bot.chat_db.remove.assert_not_called()
-    mocked_logger_error.assert_called_once_with(
-        "Unknown chat type UNKNOWN_CHAT_TYPE for chat_id=42"
-    )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_help_command(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    bot.chat_db.get.return_value = None
-
-    await bot.help(mocked_update, mocked_context)
-
-    mocked_update.message.reply_text.assert_not_called()
-    bot.chat_db.get.return_value = Chat(42)
-
-    await bot.help(mocked_update, mocked_context)
-
-    mocked_update.message.reply_text.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_latest_command(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-    bot.latest_post = Mock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        mocked_msg = Mock()
-        mocked_factory.return_value = mocked_msg
-        bot.send_message = AsyncMock()
-        await bot.latest(mocked_update, mocked_context)
-        mocked_factory.assert_called_once_with(bot.latest_post)
-        bot.send_message.assert_called_once_with(
-            context=mocked_context, msg=mocked_msg, chat=chat
-        )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_news_command(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-    bot.latest_news_post = Mock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        mocked_msg = Mock()
-        mocked_factory.return_value = mocked_msg
-        bot.send_message = AsyncMock()
-        await bot.news(mocked_update, mocked_context)
-        mocked_factory.assert_called_once_with(bot.latest_news_post)
-        bot.send_message.assert_called_once_with(
-            context=mocked_context, msg=mocked_msg, chat=chat
-        )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_update_command(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-    bot.latest_update_post = Mock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        mocked_msg = Mock()
-        mocked_factory.return_value = mocked_msg
-        bot.send_message = AsyncMock()
-        await bot.update(mocked_update, mocked_context)
-        mocked_factory.assert_called_once_with(bot.latest_update_post)
-        bot.send_message.assert_called_once_with(
-            context=mocked_context, msg=mocked_msg, chat=chat
-        )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_crawler_exception(bot):
-    mocked_context = AsyncMock()
-    bot.crawler.crawl.side_effect = Exception("Exception")
-
-    bot._post_checker_news = AsyncMock()
-    bot._post_checker_update = AsyncMock()
-    await bot.post_checker(context=mocked_context)
-    bot._post_checker_news.assert_not_awaited()
-    bot._post_checker_update.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_posts_empty(bot):
-    # TODO
-    pass
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_new_news_post(bot):
-    # TODO
-    pass
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_new_update_post(bot):
-    # TODO
-    pass
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_new_news_and_update_post(bot):
-    # TODO
-    pass
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_news_post_to_chats(bot):
-    mocked_context = AsyncMock()
-    mocked_post = Mock()
-    mocked_post.is_news.return_value = True
-    bot.chat_db.get_running_and_interested_in_news_chats.return_value = [Chat(13)]
-    bot.send_message = AsyncMock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        mocked_msg = Mock()
-        mocked_factory.return_value = mocked_msg
-        await bot.send_post_to_chats(mocked_context, mocked_post)
-        bot.chat_db.get_running_and_interested_in_news_chats.assert_called_once()
-        bot.chat_db.get_running_and_interested_in_updates_chats.assert_not_called()
-        mocked_factory.assert_called_once_with(post=mocked_post)
-        bot.send_message.assert_called_with(
-            context=mocked_context, msg=mocked_msg, chat=Chat(13)
-        )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_update_post_to_chats(bot):
-    mocked_context = AsyncMock()
-    mocked_post = Mock()
-    mocked_post.is_news.return_value = False
-    mocked_post.is_update.return_value = True
-    bot.chat_db.get_running_and_interested_in_updates_chats.return_value = [Chat(13)]
-    bot.send_message = AsyncMock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        mocked_msg = Mock()
-        mocked_factory.return_value = mocked_msg
-        await bot.send_post_to_chats(mocked_context, mocked_post)
-        bot.chat_db.get_running_and_interested_in_updates_chats.assert_called_once()
-        bot.chat_db.get_running_and_interested_in_news_chats.assert_not_called()
-        mocked_factory.assert_called_once_with(post=mocked_post)
-        bot.send_message.assert_called_with(
-            context=mocked_context, msg=mocked_msg, chat=Chat(13)
-        )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_external_post_to_chats(bot):
-    mocked_context = AsyncMock()
-    mocked_post = Mock()
-    mocked_post.is_news.return_value = False
-    mocked_post.is_update.return_value = False
-    mocked_post.is_external.return_value = True
-    bot.chat_db.get_running_and_interested_in_news_chats.return_value = [Chat(13)]
-    bot.chat_db.get_running_and_interested_in_updates_chats.return_value = [Chat(42)]
-    bot.send_message = AsyncMock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        mocked_msg = Mock()
-        mocked_factory.return_value = mocked_msg
-        await bot.send_post_to_chats(mocked_context, mocked_post)
-        bot.chat_db.get_running_and_interested_in_updates_chats.assert_not_called()
-        bot.chat_db.get_running_and_interested_in_news_chats.assert_not_called()
-        mocked_factory.assert_called_once_with(post=mocked_post)
-        bot.send_message.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_unknown_post_to_chats(bot):
-    mocked_context = AsyncMock()
-    mocked_post = Mock()
-    mocked_post.is_news.return_value = False
-    mocked_post.is_update.return_value = False
-    mocked_post.is_external.return_value = False
-    bot.send_message = AsyncMock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        await bot.send_post_to_chats(mocked_context, mocked_post)
-        bot.chat_db.get_running_and_interested_in_updates_chats.assert_not_called()
-        bot.chat_db.get_running_and_interested_in_news_chats.assert_not_called()
-        mocked_factory.assert_not_called()
-        bot.send_message.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_message_chat_is_none(bot):
-    mocked_context = AsyncMock()
-    mocked_msg = AsyncMock()
-
-    await bot.send_message(mocked_context, mocked_msg, None)
-    mocked_msg.send.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_message(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_msg = AsyncMock()
-    mocked_msg.send = AsyncMock()
-    chat = Chat(42)
-
-    await bot.send_message(mocked_context, mocked_msg, chat)
-    mocked_msg.send.assert_called_once_with(mocked_context.bot, chat_id=chat.chat_id)
-    mocked_msg.send.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_message_raises_bad_request_chat_not_found(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_msg = AsyncMock()
-    mocked_msg.send = AsyncMock()
-    mocked_msg.send.side_effect = BadRequest("Chat not found")
-    chat = Chat(42)
-
-    await bot.send_message(mocked_context, mocked_msg, chat)
-    mocked_msg.send.assert_called_once_with(mocked_context.bot, chat_id=chat.chat_id)
-    bot.chat_db.remove.assert_called_once_with(chat)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_message_raises_bad_request(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_msg = AsyncMock()
-    mocked_msg.send = AsyncMock()
-    mocked_msg.send.side_effect = BadRequest("something")
-    chat = Chat(42)
-
-    await bot.send_message(mocked_context, mocked_msg, chat)
-    mocked_msg.send.assert_called_once_with(mocked_context.bot, chat_id=chat.chat_id)
-    bot.chat_db.remove.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_message_raises_forbidden(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_msg = AsyncMock()
-    mocked_msg.send = AsyncMock()
-    mocked_msg.send.side_effect = Forbidden("Forbidden")
-    chat = Chat(42)
-
-    await bot.send_message(mocked_context, mocked_msg, chat)
-    mocked_msg.send.assert_called_once_with(mocked_context.bot, chat_id=chat.chat_id)
-    bot.chat_db.remove.assert_called_once_with(chat)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_message_raises_chat_migrated(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    chat = Chat(42)
-    migrated_chat = Chat(1337)
-
-    mocked_msg = AsyncMock()
-    # First send triggers the migration, the retry after migrating succeeds.
-    mocked_msg.send = AsyncMock(side_effect=[ChatMigrated(1337), None])
-    bot.chat_db.migrate = AsyncMock(return_value=migrated_chat)
-
-    await bot.send_message(mocked_context, mocked_msg, chat)
-
-    bot.chat_db.migrate.assert_awaited_once_with(chat, 1337)
-    assert mocked_msg.send.await_count == 2
-    mocked_msg.send.assert_awaited_with(
-        mocked_context.bot, chat_id=migrated_chat.chat_id
-    )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_send_message_raises_exception(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_msg = AsyncMock()
-    mocked_msg.send = AsyncMock()
-    mocked_msg.send.side_effect = Exception("Exception")
-    chat = Chat(42)
-
-    with pytest.raises(Exception, match="Exception"):
-        await bot.send_message(mocked_context, mocked_msg, chat)
-
-    mocked_msg.send.assert_called_once_with(mocked_context.bot, chat_id=chat.chat_id)
-    bot.chat_db.remove.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_backup_chats_db_from_settings(tmp_path, bot):
-    with patch("cs2posts.bot.cs2.ChatDatabaseBackupManager") as mocked_manager:
-        backup_manager = Mock()
-        backup_manager.backup = AsyncMock(
-            return_value=tmp_path / "backup_20260403_120000.db"
-        )
-        mocked_manager.return_value = backup_manager
-
-        await bot.backup_chats_db(Mock())
-
-        mocked_manager.assert_called_once()
-        backup_manager.backup.assert_called_once()
-        backup_manager.rotate_backups.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_backup_chats_db_creates_timestamped_file(tmp_path, bot):
-    backup_path = tmp_path / "backup.db"
-
+def test_the_application_is_built_with_generous_timeouts(settings, clock):
     with (
-        patch("cs2posts.bot.cs2.settings") as mocked_settings,
-        patch("cs2posts.bot.cs2.ChatDatabaseBackupManager") as mocked_manager,
+        patch("cs2posts.bot.cs2.Application.builder") as builder,
+        patch("cs2posts.bot.cs2.HTTPXRequest") as request,
     ):
-        backup_manager = Mock()
-        backup_manager.backup = AsyncMock(
-            return_value=tmp_path / "backup_20260403_120000.db"
-        )
-        mocked_manager.return_value = backup_manager
-        mocked_settings.CHAT_DB_BACKUP_FILEPATH = str(backup_path)
-        mocked_settings.CHAT_DB_BACKUP_COUNT = 5
+        chained = builder.return_value
+        for method in ("post_init", "post_shutdown", "token", "request"):
+            getattr(chained, method).return_value = chained
+        chained.build.return_value = Mock()
 
-        await bot.backup_chats_db(Mock())
-
-        mocked_manager.assert_called_once_with(
-            chat_db=bot.chat_db,
-            backup_filepath=str(backup_path),
-            max_backups=5,
+        CounterStrike2UpdateBot(
+            settings=settings,
+            crawler=StubCrawler(),
+            spam_protector=SpamProtector(settings, clock),
+            post_db=InMemoryPostRepository(),
+            chat_db=InMemoryChatRepository(),
         )
 
-
-def test_cs2_bot_run(bot):
-    bot.app = Mock()
-    bot.run()
-    bot.app.run_polling.assert_called_once_with(allowed_updates=Update.ALL_TYPES)
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_none_post(bot):
-    mocked_context = AsyncMock()
-
-    # Test _post_checker with None post
-    bot.send_post_to_chats = AsyncMock()
-    await bot._post_checker(mocked_context, None)
-    bot.send_post_to_chats.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_not_newer_post(bot):
-    mocked_context = AsyncMock()
-
-    # Setup latest news post
-    bot.latest_news_post = create_news_post()
-    bot.latest_news_post.date = 1234567890
-
-    # Create a post that is not newer
-    old_post = create_news_post()
-    old_post.date = 1234567800  # Earlier timestamp
-
-    bot.send_post_to_chats = AsyncMock()
-    await bot._post_checker(mocked_context, old_post)
-    bot.send_post_to_chats.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_newer_news_post(bot):
-    mocked_context = AsyncMock()
-
-    # Setup latest news post
-    bot.latest_news_post = create_news_post()
-    bot.latest_news_post.date = 1234567890
-
-    # Create a post that is newer
-    new_post = create_news_post()
-    new_post.date = 1234567999  # Later timestamp
-
-    bot.send_post_to_chats = AsyncMock()
-    bot.post_db.save = AsyncMock()
-
-    await bot._post_checker(mocked_context, new_post)
-    bot.send_post_to_chats.assert_called_once_with(mocked_context, post=new_post)
-    bot.post_db.save.assert_called_once_with(new_post)
-    assert bot.latest_news_post == new_post
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_newer_update_post(bot):
-    mocked_context = AsyncMock()
-
-    # Setup latest update post
-    bot.latest_update_post = create_update_post()
-    bot.latest_update_post.date = 1234567890
-
-    # Create a post that is newer
-    new_post = create_update_post()
-    new_post.date = 1234567999  # Later timestamp
-
-    bot.send_post_to_chats = AsyncMock()
-    bot.post_db.save = AsyncMock()
-
-    await bot._post_checker(mocked_context, new_post)
-    bot.send_post_to_chats.assert_called_once_with(mocked_context, post=new_post)
-    bot.post_db.save.assert_called_once_with(new_post)
-    assert bot.latest_update_post == new_post
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_post_checker_valid_posts(bot):
-    mocked_context = AsyncMock()
-
-    # Setup
-    bot.latest_news_post = create_news_post()
-    bot.latest_update_post = create_update_post()
-    bot.latest_external_post = create_update_post()
-    bot._post_checker = AsyncMock()
-
-    # Mock crawler response
-    bot.crawler.crawl = AsyncMock(
-        return_value={"appnews": {"appid": 730, "newsitems": []}}
+    request.assert_called_once_with(
+        read_timeout=30, write_timeout=30, connect_timeout=15, pool_timeout=15
     )
-
-    with patch("cs2posts.cs2posts.CounterStrike2Posts") as mocked_posts:
-        mocked_cs2posts = Mock()
-        mocked_cs2posts.is_empty.return_value = True
-        mocked_cs2posts.validate.return_value = None
-        mocked_posts.create.return_value = mocked_cs2posts
-
-        await bot.post_checker(mocked_context)
-        bot._post_checker.assert_not_called()
+    chained.token.assert_called_once_with(settings.telegram_token)
 
 
-@pytest.mark.asyncio
-async def test_cs2_bot_new_chat_member_update_none(bot):
-    mocked_context = AsyncMock()
-    await bot.new_chat_member(None, mocked_context)
-    bot.chat_db.get.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_new_chat_member_message_none(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message = None
-    await bot.new_chat_member(mocked_update, mocked_context)
-    bot.chat_db.get.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_left_chat_member_update_none(bot):
-    mocked_context = AsyncMock()
-    await bot.left_chat_member(None, mocked_context)
-    bot.chat_db.get.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_left_chat_member_message_none(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message = None
-    await bot.left_chat_member(mocked_update, mocked_context)
-    bot.chat_db.get.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_external_command(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-    bot.latest_external_post = Mock()
-
-    with patch("cs2posts.bot.cs2.create_message") as mocked_factory:
-        mocked_msg = Mock()
-        mocked_factory.return_value = mocked_msg
-        bot.send_message = AsyncMock()
-        await bot.external(mocked_update, mocked_context)
-        mocked_factory.assert_called_once_with(bot.latest_external_post)
-        bot.send_message.assert_called_once_with(
-            context=mocked_context, msg=mocked_msg, chat=chat
-        )
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_start_not_running_chat(bot):
-    mocked_context = AsyncMock()
-    mocked_context.bot = AsyncMock()
-    mocked_context.job_queue = Mock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat_id = 42
-    mocked_update.message.from_user.id = 42
-
-    chat = Chat(42)
-    chat.is_running = False
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.start(mocked_update, mocked_context)
-
-    assert chat.is_running is True
-    mocked_update.message.reply_text.assert_called_once()
-    bot.chat_db.update.assert_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_stop_command_chat_is_supergroup(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat.type = ChatType.SUPERGROUP
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.stop(mocked_update, mocked_context)
-
-    assert chat.is_running is False
-    mocked_update.message.reply_text.assert_called_once()
-    bot.chat_db.remove.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cs2_bot_stop_command_chat_is_channel(bot):
-    mocked_context = AsyncMock()
-    mocked_update = AsyncMock()
-    mocked_update.message.chat.type = ChatType.CHANNEL
-
-    chat = Chat(42)
-    bot.chat_db.get.return_value = chat
-
-    bot.chat_db.reset_mock()
-    await bot.stop(mocked_update, mocked_context)
-
-    assert chat.is_running is False
-    mocked_update.message.reply_text.assert_called_once()
-    bot.chat_db.remove.assert_not_called()
-
-
-def _crawl_payload_with_one_post_of_each_type():
-    update_item = create_update_post().to_dict()
-    update_item["date"] = 1700000000
-
-    news_item = create_news_post().to_dict()
-    news_item["gid"] = "news-1"
-    news_item["date"] = 1700000001
-
-    external_item = create_news_post().to_dict()
-    external_item["gid"] = "external-1"
-    external_item["feed_type"] = 0
-    external_item["date"] = 1700000002
-
-    return {
-        "appnews": {"appid": 730, "newsitems": [update_item, news_item, external_item]}
+def test_every_command_is_registered(bot):
+    (handlers,), _ = bot.app.add_handlers.call_args
+    commands = {
+        command for handler in handlers for command in getattr(handler, "commands", ())
     }
 
+    assert commands == {"start", "stop", "help", "latest", "news", "update", "external"}
+
 
 @pytest.mark.asyncio
-async def test_cs2_bot_async_init_seeds_when_post_db_empty(bot):
-    bot.post_db.filepath = Mock()
-    bot.chat_db.filepath = Mock()
-    bot.post_db.filepath.exists.return_value = True
-    bot.chat_db.filepath.exists.return_value = True
-    bot.post_db.is_empty = AsyncMock(return_value=True)
-    bot.crawler.crawl = AsyncMock(
-        return_value=_crawl_payload_with_one_post_of_each_type()
+async def test_post_init_records_the_username_and_schedules_the_jobs(bot, tmp_path):
+    from dataclasses import replace
+
+    bot.settings = replace(bot.settings, heartbeat_filepath=tmp_path / "beat")
+    app = Mock()
+    app.bot.username = "test_bot"
+
+    await bot.post_init(app)
+
+    assert bot.username == "test_bot"
+    assert app.job_queue.run_repeating.call_count == 2
+    assert (tmp_path / "beat").exists()
+
+
+@pytest.mark.asyncio
+async def test_post_init_prepares_storage(bot, tmp_path, chat_db, post_db):
+    """Startup is async but run_polling is not, so bootstrap happens in the
+    post_init hook -- inside the event loop python-telegram-bot owns."""
+    from dataclasses import replace
+
+    bot.settings = replace(bot.settings, heartbeat_filepath=tmp_path / "beat")
+    app = Mock()
+    app.bot.username = "test_bot"
+
+    await bot.post_init(app)
+
+    assert chat_db.is_setup
+    assert post_db.is_setup
+
+
+@pytest.mark.asyncio
+async def test_post_init_without_a_job_queue_is_survivable(bot, tmp_path, caplog):
+    from dataclasses import replace
+
+    bot.settings = replace(bot.settings, heartbeat_filepath=tmp_path / "beat")
+    app = Mock()
+    app.job_queue = None
+
+    await bot.post_init(app)
+
+    assert "Job queue is not available" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_post_checker_refreshes_the_heartbeat(bot, context, tmp_path):
+    from dataclasses import replace
+
+    bot.settings = replace(bot.settings, heartbeat_filepath=tmp_path / "beat")
+
+    await bot.post_checker(context)
+
+    assert (tmp_path / "beat").exists()
+
+
+def test_run_starts_polling(bot):
+    bot.run()
+
+    bot.app.run_polling.assert_called_once()
+
+
+# --- /start ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_start_registers_a_new_chat_and_welcomes_it(bot, context, chat_db):
+    update = make_update()
+
+    await bot.start(update, context)
+
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert chat.is_running
+    assert chat.chat_id_admin == USER_ID
+    assert "Welcome" in update.message.reply_text.texts[0]
+
+
+@pytest.mark.asyncio
+async def test_start_on_a_running_chat_says_so(bot, context, chat_db):
+    await chat_db.add(Chat(CHAT_ID, chat_id_admin=USER_ID, is_running=True))
+
+    await bot.start(make_update(), context)
+
+    update = make_update()
+    await bot.start(update, context)
+    assert update.message.reply_text.texts == [ALREADY_RUNNING_MESSAGE]
+
+
+@pytest.mark.asyncio
+async def test_start_restarts_a_stopped_chat(bot, context, chat_db):
+    await chat_db.add(Chat(CHAT_ID, chat_id_admin=USER_ID, is_running=False))
+
+    await bot.start(make_update(), context)
+
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert chat.is_running
+
+
+@pytest.mark.asyncio
+async def test_start_clears_the_removed_while_banned_flag(bot, context, chat_db):
+    await chat_db.add(
+        Chat(CHAT_ID, chat_id_admin=USER_ID, is_removed_while_banned=True)
     )
-    bot.options.set_chat_db = Mock()
 
-    await bot.async_init()
+    await bot.start(make_update(), context)
 
-    bot.post_db.create_table.assert_awaited()
-    bot.chat_db.create_table.assert_awaited()
-    bot.crawler.crawl.assert_awaited_once()
-    # One save for each seeded post type (news, update, external).
-    assert bot.post_db.save.await_count == 3
-    bot.options.set_chat_db.assert_called_once_with(bot.chat_db)
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert not chat.is_removed_while_banned
 
 
-@pytest.mark.asyncio
-async def test_cs2_bot_async_init_skips_seed_when_not_empty(bot):
-    bot.post_db.filepath = Mock()
-    bot.chat_db.filepath = Mock()
-    bot.post_db.filepath.exists.return_value = True
-    bot.chat_db.filepath.exists.return_value = True
-    bot.post_db.is_empty = AsyncMock(return_value=False)
-    bot.crawler.crawl = AsyncMock()
-    bot.options.set_chat_db = Mock()
-
-    await bot.async_init()
-
-    bot.crawler.crawl.assert_not_awaited()
-    bot.post_db.save.assert_not_awaited()
+# --- /stop -------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_cs2_bot_async_init_creates_missing_databases(bot):
-    bot.post_db.filepath = Mock()
-    bot.chat_db.filepath = Mock()
-    bot.post_db.filepath.exists.return_value = False
-    bot.chat_db.filepath.exists.return_value = False
-    bot.post_db.is_empty = AsyncMock(return_value=False)
-    bot.options.set_chat_db = Mock()
+async def test_stop_on_an_unknown_chat_does_nothing(bot, context):
+    update = make_update()
 
-    await bot.async_init()
+    await bot.stop(update, context)
 
-    bot.post_db.create.assert_awaited_once()
-    bot.chat_db.create.assert_awaited_once()
+    assert update.message.reply_text.calls == []
 
 
 @pytest.mark.asyncio
-async def test_cs2_bot_async_init_imports_json_when_configured(bot):
-    bot.post_db.filepath = Mock()
-    bot.chat_db.filepath = Mock()
-    bot.post_db.filepath.exists.return_value = True
-    bot.chat_db.filepath.exists.return_value = True
-    bot.post_db.is_empty = AsyncMock(return_value=False)
-    bot.options.set_chat_db = Mock()
+@pytest.mark.parametrize(
+    "chat_type", [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]
+)
+async def test_stop_in_a_group_keeps_the_chat_but_pauses_it(
+    bot, context, chat_db, chat_type
+):
+    await chat_db.add(Chat(CHAT_ID, is_running=True))
+    update = make_update(chat_type=chat_type)
 
-    with (
-        patch.object(settings, "IMPORT_CHATS_FROM_JSON", "chats.json"),
-        patch.object(settings, "IMPORT_POSTS_FROM_JSON", "posts.json"),
-    ):
-        await bot.async_init()
+    await bot.stop(update, context)
 
-    bot.chat_db.import_from_json.assert_awaited_once()
-    bot.post_db.import_from_json.assert_awaited_once()
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert not chat.is_running
+    assert update.message.reply_text.texts == [STOPPED_MESSAGE]
 
 
 @pytest.mark.asyncio
-async def test_cs2_bot_async_init_swallows_json_import_errors(bot):
-    bot.post_db.filepath = Mock()
-    bot.chat_db.filepath = Mock()
-    bot.post_db.filepath.exists.return_value = True
-    bot.chat_db.filepath.exists.return_value = True
-    bot.post_db.is_empty = AsyncMock(return_value=False)
-    bot.options.set_chat_db = Mock()
-    bot.chat_db.import_from_json = AsyncMock(side_effect=Exception("boom"))
+async def test_stop_in_a_private_chat_removes_it(bot, context, chat_db):
+    await chat_db.add(Chat(CHAT_ID, is_running=True))
+    update = make_update(chat_type=ChatType.PRIVATE)
 
-    with patch.object(settings, "IMPORT_CHATS_FROM_JSON", "chats.json"):
-        # The error must be swallowed so startup can continue.
-        await bot.async_init()
+    await bot.stop(update, context)
 
-    bot.chat_db.import_from_json.assert_awaited_once()
+    assert await chat_db.get(CHAT_ID) is None
+    assert update.message.reply_text.texts == [STOPPED_MESSAGE]
+
+
+@pytest.mark.asyncio
+async def test_stop_with_an_unknown_chat_type_is_logged(bot, context, chat_db, caplog):
+    await chat_db.add(Chat(CHAT_ID, is_running=True))
+
+    await bot.stop(make_update(chat_type="carrier pigeon"), context)
+
+    assert "Unknown chat type" in caplog.text
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert chat.is_running
+
+
+# --- /help -------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_help_lists_the_commands(bot, context, chat_db):
+    await chat_db.add(Chat(CHAT_ID))
+    update = make_update()
+
+    await bot.help(update, context)
+
+    assert update.message.reply_text.texts == [HELP_MESSAGE]
+
+
+@pytest.mark.asyncio
+async def test_help_for_an_unknown_chat_is_skipped(bot, context, caplog):
+    update = make_update()
+
+    await bot.help(update, context)
+
+    assert update.message.reply_text.calls == []
+    assert "Chat not found" in caplog.text
+
+
+# --- /latest, /news, /update, /external --------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("post_type", "title"),
+    [
+        (None, "Newest Overall"),
+        (PostType.NEWS, "Some News"),
+        (PostType.UPDATE, "Release Notes"),
+        (PostType.EXTERNAL, "Elsewhere"),
+    ],
+)
+async def test_the_latest_commands_send_the_cached_post(
+    bot,
+    context,
+    chat_db,
+    telegram_bot,
+    post_db,
+    make_post,
+    http_response,
+    post_type,
+    title,
+):
+    http_response(url="https://example.com/resolved")
+    await chat_db.add(Chat(CHAT_ID))
+    await post_db.save(make_post(gid="n", title="Some News", date=10))
+    await post_db.save(
+        make_post(gid="u", title="Release Notes", date=20, tags=["patchnotes"])
+    )
+    await post_db.save(make_post(gid="e", title="Elsewhere", date=30, feed_type=0))
+    if post_type is None:
+        await post_db.save(make_post(gid="x", title="Newest Overall", date=99))
+    await bot.notifier.load()
+
+    await bot.send_latest(post_type)(make_update(), context)
+
+    assert any(title in text for text in telegram_bot.texts)
+
+
+@pytest.mark.asyncio
+async def test_a_latest_command_with_nothing_cached_sends_nothing(
+    bot, context, chat_db, telegram_bot, caplog
+):
+    await chat_db.add(Chat(CHAT_ID))
+    await bot.notifier.load()
+
+    await bot.send_latest(PostType.NEWS)(make_update(), context)
+
+    assert telegram_bot.messages == []
+    assert "No latest" in caplog.text
+
+
+# --- spam protection ---------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_banned_chat_gets_no_reply(bot, context, chat_db):
+    # Banned and still inside its timeout window.
+    await chat_db.add(Chat(CHAT_ID, is_banned=True, last_activity=NOW))
+    update = make_update()
+
+    await bot.help(update, context)
+
+    assert update.message.reply_text.calls == []
+
+
+@pytest.mark.asyncio
+async def test_spam_protection_keeps_the_handler_name(bot):
+    assert bot.help.__name__ == "help"
+    assert bot.start.__name__ == "start"
+
+
+@pytest.mark.asyncio
+async def test_an_update_without_a_message_is_ignored(bot, context):
+    update = Mock()
+    update.message = None
+
+    await bot.help(update, context)
+    await bot.start(update, context)
+    await bot.stop(update, context)
+
+
+# --- membership events -------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_being_added_to_a_chat_registers_it(bot, context, chat_db):
+    bot.username = "cs2bot"
+    update = make_update()
+    member = Mock()
+    member.username = "cs2bot"
+    update.message.new_chat_members = [member]
+
+    await bot.new_chat_member(update, context)
+
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert chat.chat_id_admin == USER_ID
+
+
+@pytest.mark.asyncio
+async def test_another_member_joining_is_ignored(bot, context, chat_db):
+    bot.username = "cs2bot"
+    update = make_update()
+    member = Mock()
+    member.username = "someone_else"
+    update.message.new_chat_members = [member]
+
+    await bot.new_chat_member(update, context)
+
+    assert await chat_db.get(CHAT_ID) is None
+
+
+@pytest.mark.asyncio
+async def test_being_removed_from_a_chat_deletes_it(bot, context, chat_db):
+    bot.username = "cs2bot"
+    await chat_db.add(Chat(CHAT_ID))
+    update = make_update()
+    update.message.left_chat_member.username = "cs2bot"
+
+    await bot.left_chat_member(update, context)
+
+    assert await chat_db.get(CHAT_ID) is None
+
+
+@pytest.mark.asyncio
+async def test_another_member_leaving_is_ignored(bot, context, chat_db):
+    bot.username = "cs2bot"
+    await chat_db.add(Chat(CHAT_ID))
+    update = make_update()
+    update.message.left_chat_member.username = "someone_else"
+
+    await bot.left_chat_member(update, context)
+
+    assert await chat_db.get(CHAT_ID) is not None
+
+
+@pytest.mark.asyncio
+async def test_leaving_an_unknown_chat_is_survivable(bot, context):
+    bot.username = "cs2bot"
+    update = make_update()
+    update.message.left_chat_member.username = "cs2bot"
+
+    await bot.left_chat_member(update, context)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("handler", ["new_chat_member", "left_chat_member"])
+async def test_membership_events_without_a_message_are_ignored(bot, context, handler):
+    update = Mock()
+    update.message = None
+
+    await getattr(bot, handler)(update, context)
+
+
+@pytest.mark.asyncio
+async def test_a_migration_moves_the_chat_to_its_new_id(bot, context, chat_db):
+    await chat_db.add(Chat(42))
+    update = make_update(chat_id=-100)
+    update.message.migrate_from_chat_id = 42
+
+    await bot.migrate_chat(update, context)
+
+    assert await chat_db.get(42) is None
+    assert await chat_db.get(-100) is not None
+
+
+@pytest.mark.asyncio
+async def test_the_second_migration_event_is_ignored(bot, context, chat_db):
+    update = make_update(chat_id=-100)
+    update.message.migrate_from_chat_id = None
+
+    await bot.migrate_chat(update, context)
+
+    assert await chat_db.get(-100) is None
+
+
+@pytest.mark.asyncio
+async def test_migrating_an_unknown_chat_is_survivable(bot, context, caplog):
+    update = make_update(chat_id=-100)
+    update.message.migrate_from_chat_id = 42
+
+    await bot.migrate_chat(update, context)
+
+    assert "Nothing to do" in caplog.text
+
+
+# --- backups -----------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_backup_job_writes_a_timestamped_file(
+    bot, context, chat_db, tmp_path
+):
+    from dataclasses import replace
+
+    bot.settings = replace(bot.settings, chat_db_backup_filepath=tmp_path / "backup.db")
+
+    await bot.backup_chats_db(context)
+
+    (written,) = chat_db.backups
+    assert written.parent == tmp_path
+    assert written.name.startswith("backup_")
+    assert written.suffix == ".db"
+
+
+@pytest.mark.asyncio
+async def test_being_re_added_to_a_known_chat_updates_it(bot, context, chat_db):
+    """Regression: the handler issued a bare INSERT even when the row already
+    existed, so a redelivered join update -- or a re-add after the bot was
+    removed while offline -- failed on the primary key."""
+    bot.username = "cs2bot"
+    await chat_db.add(Chat(CHAT_ID, chat_id_admin=1, is_running=True))
+    update = make_update()
+    member = Mock()
+    member.username = "cs2bot"
+    update.message.new_chat_members = [member]
+
+    await bot.new_chat_member(update, context)
+
+    chat = await chat_db.get(CHAT_ID)
+    assert chat is not None
+    assert chat.chat_id_admin == USER_ID
+    # The rest of the chat's state survives re-registration.
+    assert chat.is_running

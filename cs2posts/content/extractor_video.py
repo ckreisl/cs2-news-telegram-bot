@@ -10,13 +10,20 @@ from .extractor import Extractor
 
 
 class VideoExtractor(Extractor):
-    _BOOL_TRUE: ClassVar[set[str]] = {"1", "true", "yes", "on"}
-    _BOOL_FALSE: ClassVar[set[str]] = {"0", "false", "no", "off"}
-    _VIDEO_RE = re.compile(
+    """Reads ``[video ...]`` bbcode, whose attributes Steam quotes
+    inconsistently (plain, single, or HTML-entity quotes, sometimes wrapping a
+    whole anchor element)."""
+
+    BOOL_TRUE: ClassVar[frozenset[str]] = frozenset({"1", "true", "yes", "on"})
+    BOOL_FALSE: ClassVar[frozenset[str]] = frozenset({"0", "false", "no", "off"})
+    URL_ATTRIBUTES: ClassVar[tuple[str, ...]] = ("webm", "mp4", "poster")
+
+    VIDEO_RE = re.compile(
         r"\[video\b(?P<attrs>.*?)\](?P<inner>.*?)\[/video\]", re.I | re.S
     )
-    _URL_IN_TEXT_RE = re.compile(r'(https?://[^\s"<>\]]+)', re.I)
-    _ATTRS_MIXED_RE = re.compile(
+    URL_IN_TEXT_RE = re.compile(r'(https?://[^\s"<>\]]+)', re.I)
+    HREF_RE = re.compile(r'href=[\'"]([^\'"]+)[\'"]', re.I)
+    ATTRS_RE = re.compile(
         r"""
         (\w+)                                 # key
         \s*=\s*
@@ -30,71 +37,72 @@ class VideoExtractor(Extractor):
         re.I | re.S | re.X,
     )
 
-    def _to_bool(self, s: str | None) -> bool | None:
-        if s is None:
+    def _to_bool(self, value: str | None) -> bool | None:
+        if value is None:
             return None
-        v = s.strip().lower()
-        if v in self._BOOL_TRUE:
+        normalized = value.strip().lower()
+        if normalized in self.BOOL_TRUE:
             return True
-        if v in self._BOOL_FALSE:
+        if normalized in self.BOOL_FALSE:
             return False
         return None
 
-    def _extract_url(self, val: str) -> str | None:
-        href = re.search(r'href=[\'"]([^\'"]+)[\'"]', val, re.I)
+    def _to_url(self, value: str | None) -> str | None:
+        """The URL inside an attribute value, which may be bare or an anchor."""
+        if value is None:
+            return None
+
+        href = self.HREF_RE.search(value)
         if href:
             return href.group(1).strip()
-        m = self._URL_IN_TEXT_RE.search(val)
-        if m:
-            return m.group(1).strip()
-        # Return raw value if it's a non-empty path (e.g., {STEAM_CLAN_IMAGE}/...)
-        stripped = val.strip()
+
+        in_text = self.URL_IN_TEXT_RE.search(value)
+        if in_text:
+            return in_text.group(1).strip()
+
+        # Keep a bare path such as {STEAM_CLAN_IMAGE}/... as-is.
+        stripped = value.strip()
         if not stripped or " " in stripped:
             return None
         return stripped
 
     def _parse_attrs(self, attrs_raw: str) -> dict[str, str]:
-        out: dict[str, str] = {}
-        for m in self._ATTRS_MIXED_RE.finditer(attrs_raw):
-            key = m.group(1).strip().lower()
-            # pick the first non-None alternative group (2..6)
-            val = next(g for g in m.groups()[1:] if g is not None)
-            out[key] = html.unescape(val.strip())
-        return out
+        attrs: dict[str, str] = {}
+        for match in self.ATTRS_RE.finditer(attrs_raw):
+            key = match.group(1).strip().lower()
+            # The first non-None alternative group holds the value.
+            value = next(group for group in match.groups()[1:] if group is not None)
+            attrs[key] = html.unescape(value.strip())
+        return attrs
+
+    def _resolved_url(self, attrs: dict[str, str], name: str) -> str | None:
+        """An absent attribute yields ``None``, never an empty string.
+
+        Callers distinguish "no mp4 source" from "an mp4 source we could not
+        parse"; conflating the two used to hide webm-only videos.
+        """
+        url = self._to_url(attrs.get(name))
+        return resolve_steam_clan_image_url(url) if url else None
 
     def extract(self) -> list[Video]:
         videos = []
 
-        for m in re.finditer(self._VIDEO_RE, self.text):
-            attrs_raw = m.group("attrs") or ""
-            attrs = self._parse_attrs(attrs_raw)
-
-            # Pull urls (handles raw url or <a href="...">)
-            webm_url = (
-                self._extract_url(attrs.get("webm", "")) if "webm" in attrs else ""
-            )
-            mp4_url = self._extract_url(attrs.get("mp4", "")) if "mp4" in attrs else ""
-            poster_url = (
-                self._extract_url(attrs.get("poster", "")) if "poster" in attrs else ""
-            )
-
-            if webm_url:
-                webm_url = resolve_steam_clan_image_url(webm_url)
-            if mp4_url:
-                mp4_url = resolve_steam_clan_image_url(mp4_url)
-            if poster_url:
-                poster_url = resolve_steam_clan_image_url(poster_url)
+        for match in self.VIDEO_RE.finditer(self.text):
+            attrs = self._parse_attrs(match.group("attrs") or "")
+            urls = {
+                name: self._resolved_url(attrs, name) for name in self.URL_ATTRIBUTES
+            }
 
             videos.append(
                 Video(
-                    text_pos_start=m.start(),
-                    text_pos_end=m.end(),
-                    webm=webm_url,
-                    mp4=mp4_url,
-                    poster=poster_url,
+                    text_pos_start=match.start(),
+                    text_pos_end=match.end(),
+                    is_heading=False,
+                    webm=urls["webm"],
+                    mp4=urls["mp4"],
+                    poster=urls["poster"],
                     autoplay=self._to_bool(attrs.get("autoplay")),
                     controls=self._to_bool(attrs.get("controls")),
-                    is_heading=False,
                 )
             )
 

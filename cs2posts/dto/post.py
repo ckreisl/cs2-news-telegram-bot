@@ -7,30 +7,24 @@ from dataclasses import fields
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from zoneinfo import ZoneInfo
+
+from cs2posts.clock import UTC
 
 
 class PostType(Enum):
+    """The three kinds of post the bot distinguishes.
+
+    Every post is exactly one of these (``is_news`` is defined as the
+    complement of the other two), so lookups keyed by ``PostType`` are total
+    and need no fallback branch.
+    """
+
     NEWS = "news"
     UPDATE = "update"
     EXTERNAL = "external"
-    UNKNOWN = "unknown"
 
     def __str__(self) -> str:
-        return str(self.value)
-
-    def __repr__(self) -> str:
-        return str(self.value)
-
-    @classmethod
-    def from_post(cls, post: Post) -> PostType:
-        if post.is_news():
-            return cls.NEWS
-        if post.is_update():
-            return cls.UPDATE
-        if post.is_external():
-            return cls.EXTERNAL
-        return cls.UNKNOWN
+        return self.value
 
 
 class FeedType(Enum):
@@ -39,7 +33,7 @@ class FeedType(Enum):
     NOT_DEFINED = -1
 
     @classmethod
-    def _missing_(cls, value: object) -> Any:
+    def _missing_(cls, value: object) -> FeedType:
         return cls.NOT_DEFINED
 
 
@@ -66,48 +60,38 @@ class Post:
         field_names = {f.name for f in fields(cls)}
         return cls(**{k: v for k, v in json.items() if k in field_names})
 
-    @property
-    def date_as_datetime(self) -> datetime:
-        # Do not return a timezone-aware datetime object
-        return datetime.fromtimestamp(self.date, tz=ZoneInfo("UTC")).replace(
-            tzinfo=None
-        )
-
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @property
+    def date_as_datetime(self) -> datetime:
+        return datetime.fromtimestamp(self.date, tz=UTC)
+
+    @property
+    def date_display(self) -> str:
+        """How a post date is rendered in every outgoing message."""
+        return self.date_as_datetime.strftime("%Y-%m-%d %H:%M:%S")
+
+    @property
+    def feed_type_enum(self) -> FeedType:
+        return FeedType(self.feed_type)
+
+    @property
+    def type(self) -> PostType:
+        if self.is_update():
+            return PostType.UPDATE
+        if self.is_external():
+            return PostType.EXTERNAL
+        return PostType.NEWS
 
     def is_update(self) -> bool:
         return "patchnotes" in self.tags or "Release Notes" in self.title
 
+    def is_external(self) -> bool:
+        return self.feed_type_enum is FeedType.EXTERN
+
     def is_news(self) -> bool:
         return not self.is_update() and not self.is_external()
 
-    def is_external(self) -> bool:
-        return FeedType(self.feed_type) == FeedType.EXTERN
-
     def is_newer_than(self, other: Post) -> bool:
-        if other is None:
-            return False
         return self.date > other.date
-
-    def is_older_eq_than(self, other: Post | None) -> bool:
-        if other is None:
-            return False
-        return self.date <= other.date
-
-    def get_feed_type(self) -> FeedType:
-        return FeedType(self.feed_type)
-
-    def get_type(self) -> PostType:
-        return PostType.from_post(self)
-
-    def __getitem__(self, key: str) -> Any:
-        return self.to_dict()[key]
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, self.__class__):
-            return self.to_dict() == other.to_dict()
-        return False
-
-    def __ne__(self, other: object) -> bool:
-        return not self.__eq__(other)
